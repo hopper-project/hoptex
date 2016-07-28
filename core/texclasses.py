@@ -7,10 +7,10 @@ class equation:
         self.text = eqtext
         self.type = desig
         self.itemtype = "equation"
-        self.prevtext = ""
-        self.nexttext = ""
-        self.prevtexttoks = []
-        self.nexttexttoks = []
+        # self.prevtext = ""
+        # self.nexttext = ""
+        # self.prevtexttoks = []
+        # self.nexttexttoks = []
         self.file = fname
         self.mathml = ""
         proc = subprocess.Popen(["latexmlmath", "--quiet", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
@@ -38,9 +38,9 @@ class equation:
     def __repr__(self):
         return self.text
 
-    def gentokens():
-        self.prevsenttoks = word_tokenize(self.prevsent)
-        self.nextsenttoks = word_tokenize(self.nextsent)
+    # def gentokens():
+    #     self.prevsenttoks = word_tokenize(self.prevsent)
+    #     self.nextsenttoks = word_tokenize(self.nextsent)
 
     def tojson(self):
         return self.__dict__
@@ -50,16 +50,19 @@ class document:
         self.name = fname
         self.array = textarray
         self.itemtype = "document"
-        arraylen = len(self.array)
-        for i in range(1,arraylen-1):
-            if isinstance(self.array[i],equation):
-                for x in range(i-1,-1,-1):
-                    if isinstance(self.array[x],str):
-                        self.array[i].prevtext = self.array[x]
-                for x in range(i+1,arraylen,1):
-                    if isinstance(self.array[x],str):
-                        self.array[i].nexttext = self.array[x]
-        self.array = self.get_equations()
+        # arraylen = len(self.array)
+        # for i in range(1,arraylen-1):
+        #     if isinstance(self.array[i],equation):
+        #         print("Found an equation :D")
+        #         for x in range(i-1,-1,-1):
+        #             if isinstance(self.array[x],str):
+        #                 self.array[i].prevtext = self.array[x]
+        #                 break
+        #         for x in range(i+1,arraylen,1):
+        #             if isinstance(self.array[x],str):
+        #                 self.array[i].nexttext = self.array[x]
+        #                 break
+        # self.array = self.get_equations()
 
     def get_equations(self):
         ret = []

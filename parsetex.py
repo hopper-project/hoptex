@@ -126,9 +126,9 @@ def main():
     #default path to directory with tex files
     path = '1506/'
     #The program accepts a directory to be analyzed
-    #The directory should have the LaTeX files (entered without the '/')
     if(len(sys.argv)>2):
-        path = str(sys.argv[1]+'/')
+        path = str(sys.argv[1])
+        path = os.path.join(path,'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a directory")
             sys.exit()

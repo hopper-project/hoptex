@@ -10,7 +10,7 @@ import numpy as np #for use in pyplot
 import matplotlib.pyplot as pl #used to plot graphs
 import multiprocessing as mp #drastic speedups when implemented on an i7-4710HQ
 import heapq #to find n largest elements in makegraph
-import pickle #serializing to/from disk
+import cPickle #serializing to/from disk
 from nltk.tokenize import word_tokenize, sent_tokenize
 import gc
 import subprocess
@@ -33,6 +33,7 @@ def proc(instr):
 
 def makeobjs(filename):
     global outpath
+    global eqoutpath
     #print("Start: {}".format(filename))
     f1 = open(filename, 'rt')
     text = f1.read()
@@ -64,7 +65,7 @@ def makeobjs(filename):
     outfname = outpath + (newdoc.name.split('/')[-1])[:-4]+'.pkl'
     with open(outfname,'w') as fh:
         try:
-            pickle.dump(newdoc,fh)
+            cPickle.dump(newdoc,fh)
         except:
             print("{}: Export to pkl failed".format(outfname))
     outfname = outpath + (newdoc.name.split('/')[-1])[:-4]+'.json'
@@ -74,6 +75,14 @@ def makeobjs(filename):
     except:
         print("{}: Export to JSON failed".format(outfname))
     #print("Finish: {}".format(filename))
+    eqlist = newdoc.get_equations()
+    for i, eq in enumerate(eqlist):
+        outfname = eqoutpath + (newdoc.name.split('/')[-1])[:-4]+'.'+str(i)+'.json'
+        try:
+            with open(outfname,'w') as fh:
+                json.dump(eq,fh,default=JSONHandler)
+        except:
+            print("{}: Equation export to JSON failed".format(outfname))
     return newdoc
 
 def main():
@@ -85,17 +94,19 @@ def main():
     #The program accepts a directory to be analyzed
     #The directory should have the LaTeX files (entered without the '/')
     if(len(sys.argv)>2):
-        if path[-1] != '/':
-            path = str(sys.argv[1]+'/')
+        path = os.path.join(str(sys.argv[1]),'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a valid directory")
             sys.exit()
     #per getarxivdatav2, the metadata for tex files in a folder
     #should be in a .txt file of the same name
     metadata = path[:-1] + '.txt'
-    outpath = path[:-1] + '_out/'
+    outpath = path[:-1] + '_documents/'
+    eqoutpath = path[:-1] + '_equations/'
     if not os.path.exists(outpath):
         os.makedirs(outpath)
+    if not os.path.exists(eqoutpath):
+        os.makedirs(eqoutpath)
     #read in data
     #remove general subcategories
     #initialize number of threads to the number of cpu cores
