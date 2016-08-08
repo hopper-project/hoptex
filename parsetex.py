@@ -39,8 +39,8 @@ def proc(instr):
 
 #makes a dictionary of counted values
 def makedict(filename):
-    f1 = open(filename,'rt')
-    text = f1.read()
+    with open(filename,mode='r',encoding='latin-1') as f1:
+        text = f1.read()
     #remove comments
     text = re.sub(r'(?m)^%+.*$','',text) #remove all comments at beginning of lines
     text = re.sub(r"(?m)([^\\])\%+.*?$",r'\1',text) #remove all remaining comments
