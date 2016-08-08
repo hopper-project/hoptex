@@ -9,7 +9,8 @@ from core.funcs import *
 
 path = ''
 outpath = ''
-
+latexml = ''
+latexmlpost = ''
 def strip(param):
     return param.strip()
 
@@ -33,7 +34,7 @@ def genxhtml(filename):
     postamble = ["\\end{document}"]
     output = '\n'.join(preamble+body+postamble)
     try:
-        proc = subprocess.Popen(["latexml", "--quiet", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
+        proc = subprocess.Popen(["perl", latexml, "--quiet", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
         stdout, stderr = proc.communicate(output.encode(), timeout=60)
     except subprocess.TimeoutExpired:
         proc.kill()
@@ -43,7 +44,7 @@ def genxhtml(filename):
         print("{}: Conversion failed".format(filename))
         return ""
     try:
-        proc = subprocess.Popen(["latexmlpost", "--quiet", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
+        proc = subprocess.Popen(["perl",latexmlpost, "--quiet", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
         stdout2, stderr = proc.communicate(stdout)
     except subprocess.TimeoutExpired:
         proc.kill()
@@ -60,13 +61,23 @@ def main():
     origdir = os.getcwd()
     global path
     global outpath
+    global latexml
+    global latexmlpost
     path = '1506/'
     if(len(sys.argv)>2):
         path = os.path.join(str(sys.argv[1]),'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a valid directory")
             sys.exit()
+    print("Generating list of files with math...")
+    latexml = 'latexml/bin/latexml'
+    latexmlpost = 'latexml/bin/latexmlpost'
+    if not (os.path.isfile(latexml) and os.path.isfile(latexmlpost)):
+        print("Error: missing local copy of latexml. Exiting...",file=sys.stderr)
+    latexml = os.path.abspath(latexml)
+    latexmlpost = os.path.abspath(latexmlpost)
     filelist = getmathfiles(path)
+    print("Generation complete.")
     outpath = path[:-1] + '_converted/'
     outpath = os.path.abspath(outpath) + '/'
     if not os.path.exists(outpath):
@@ -74,7 +85,8 @@ def main():
     os.chdir(outpath)
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
-    out = pool.map(genxhtml,filelist)
+    print("Beginning processing...")
+    pool.map(genxhtml,filelist)
     pool.close()
     pool.join()
 
