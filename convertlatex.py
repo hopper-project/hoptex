@@ -70,8 +70,8 @@ def main():
             print("Error: passed parameter is not a valid directory")
             sys.exit()
     print("Generating list of files with math...")
-    latexml = 'latexml/bin/latexml'
-    latexmlpost = 'latexml/bin/latexmlpost'
+    latexml = 'LaTeXML/bin/latexml'
+    latexmlpost = 'LaTeXML/bin/latexmlpost'
     if not (os.path.isfile(latexml) and os.path.isfile(latexmlpost)):
         print("Error: missing local copy of latexml. Exiting...",file=sys.stderr)
     latexml = os.path.abspath(latexml)
