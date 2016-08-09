@@ -15,6 +15,8 @@ def strip(param):
     return param.strip()
 
 def genxhtml(filename):
+    global latexml
+    global latexmlpost
     print("{}: Start".format(filename))
     global outpath
     with open(filename, mode='r', encoding='latin-1') as f1:
