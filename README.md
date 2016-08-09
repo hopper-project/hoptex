@@ -39,7 +39,9 @@ convertlatex.py relies on a local, cloned copy of the LaTeXML repository within 
 
 > `git clone https://github.com/brucemiller/LaTeXML.git`
 
-Make sure you have the prerequisites installed (http://dlmf.nist.gov/LaTeXML/get.html). cd into the LaTeXML directory and make/test LaTeXML (continuing from above):
+**Make sure you have LaTeXML's prerequisites installed** (http://dlmf.nist.gov/LaTeXML/get.html).
+
+cd into the LaTeXML directory and make/test LaTeXML (continuing from above):
 
 > `cd LaTeXML`
 
