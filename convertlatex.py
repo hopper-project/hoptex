@@ -74,6 +74,7 @@ def main():
     latexmlpost = 'LaTeXML/bin/latexmlpost'
     if not (os.path.isfile(latexml) and os.path.isfile(latexmlpost)):
         print("Error: missing local copy of latexml. Exiting...",file=sys.stderr)
+        sys.exit()
     latexml = os.path.abspath(latexml)
     latexmlpost = os.path.abspath(latexmlpost)
     filelist = getmathfiles(path)
