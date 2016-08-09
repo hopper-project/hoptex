@@ -19,7 +19,7 @@ It then generates a folder of matplotlib bar graphs (stored in the parent direct
 
 proctex.py accepts a directory of .tex files. It processes in each document, isolating display mode equations, and generating a nested data structure of document and equation objects.
 
-Currently temporarily defunct (in light convertlatex.py). Future updates will enable a --cached option that will allow you to pass in pre-generated xhtml, and will attempt to generate math on its own (using latexmlmath) if it doesn't have a cached xhtml file to reference.
+Currently temporarily defunct (in light of convertlatex.py). Future updates will enable a --cached option that will allow you to pass in pre-generated xhtml, and will attempt to generate math on its own (using latexmlmath) if it doesn't have a cached xhtml file to reference.
 
 ### convertlatex.py
 
