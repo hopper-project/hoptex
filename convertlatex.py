@@ -46,7 +46,7 @@ def genxhtml(filename):
         print("{}: Conversion failed".format(filename))
         return ""
     try:
-        proc = subprocess.Popen(["/usr/bin/latexml/",latexmlpost, "--quiet", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
+        proc = subprocess.Popen(["/usr/bin/latexmlpost", "--quiet", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
         stdout2, stderr = proc.communicate(stdout)
     except subprocess.TimeoutExpired:
         proc.kill()
