@@ -66,11 +66,12 @@ def main():
     global latexml
     global latexmlpost
     path = '1506/'
-    if(len(sys.argv)>2):
+    if(len(sys.argv)>1):
         path = os.path.join(str(sys.argv[1]),'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a valid directory")
             sys.exit()
+    path = os.path.abspath(path) + '/'
     print("Generating list of files with math...")
     latexml = 'LaTeXML/bin/latexml'
     latexmlpost = 'LaTeXML/bin/latexmlpost'
@@ -89,9 +90,9 @@ def main():
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     print("Beginning processing...")
-    pool.map(genxhtml,filelist)
-    pool.close()
-    pool.join()
+    list(map(genxhtml,filelist))
+    # pool.close()
+    # pool.join()
 
 
 if __name__ == '__main__':

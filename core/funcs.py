@@ -32,6 +32,7 @@ def getmathfiles(path):
     for texfile in filelist:
         if texfile[1]:
             outlist.append(os.path.abspath(texfile[0]))
+    print(len(outlist))
     return outlist
     pool.close()
     pool.join()
