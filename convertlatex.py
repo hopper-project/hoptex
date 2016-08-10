@@ -90,9 +90,9 @@ def main():
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     print("Beginning processing...")
-    list(map(genxhtml,filelist))
-    # pool.close()
-    # pool.join()
+    pool.map(genxhtml,filelist)
+    pool.close()
+    pool.join()
 
 
 if __name__ == '__main__':
