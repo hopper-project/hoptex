@@ -9,16 +9,17 @@ from core.funcs import *
 
 path = ''
 outpath = ''
-latexml = ''
-latexmlpost = ''
 def strip(param):
     return param.strip()
 
 def genxhtml(filename):
-    global latexml
-    global latexmlpost
-    print("{}: Start".format(filename))
     global outpath
+    fname = os.path.basename(filename)
+    outfname = outpath + (os.path.splitext(fname)[0]+'.xhtml')
+    if os.path.isfile(outfname):
+        print("{}: Already generated".format(filename))
+        return
+    print("{}: Start".format(filename))
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
     #remove comments
@@ -29,10 +30,9 @@ def genxhtml(filename):
     body = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
     for i, x in enumerate(body):
         if "\\[" in x:
-            body[i] = re.sub(r'[^\\]\\\[',r'\[',x)
-    #preamble = [re.match(r'(?s).*?\\begin{document}',text)]
+            body[i] = re.sub(r'[^\\]\\\[',r'\$\$',x)
+            body[i] = re.sub(r'\\\]',r'\$\$',x)
     preamble = ['\\documentclass{article}\n','\\usepackage{amsmath}\n','\\usepackage{amsfonts}\n','\\usepackage{amssymb}\n','\\usepackage{bm}\n','\\begin{document}']
-    #preamble = [text.split('\\begin{document}')[0] + "\n\\begin{document}"]
     postamble = ["\\end{document}"]
     output = '\n'.join(preamble+body+postamble)
     try:
@@ -52,8 +52,6 @@ def genxhtml(filename):
         proc.kill()
         print("{}: MathML postprocessing failed - timeout".format(filename))
         return ""
-    fname = os.path.basename(filename)
-    outfname = outpath + (os.path.splitext(fname)[0]+'.xhtml')
     with open(outfname,'w') as fh:
         fh.write(stdout2.decode())
     print("{}: Finish".format(filename))
@@ -63,8 +61,6 @@ def main():
     origdir = os.getcwd()
     global path
     global outpath
-    global latexml
-    global latexmlpost
     path = '1506/'
     if(len(sys.argv)>1):
         path = os.path.join(str(sys.argv[1]),'')
@@ -73,13 +69,6 @@ def main():
             sys.exit()
     path = os.path.abspath(path) + '/'
     print("Generating list of files with math...")
-    latexml = 'LaTeXML/bin/latexml'
-    latexmlpost = 'LaTeXML/bin/latexmlpost'
-    if not (os.path.isfile(latexml) and os.path.isfile(latexmlpost)):
-        print("Error: missing local copy of latexml. Exiting...",file=sys.stderr)
-        sys.exit()
-    latexml = os.path.abspath(latexml)
-    latexmlpost = os.path.abspath(latexmlpost)
     filelist = getmathfiles(path)
     print("Generation complete.")
     outpath = path[:-1] + '_converted/'
