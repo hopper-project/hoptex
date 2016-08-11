@@ -68,7 +68,7 @@ def main():
     for x in sys.argv[1:]:
         path = os.path.join(str(x),'')
         if not os.path.isdir(path):
-            print("Error: passed parameter is not a valid directory")
+            print("Error: {} is not a valid directory".format(x))
             sys.exit()
         path = os.path.abspath(path) + '/'
         print("Generating list of files with math...")
@@ -84,9 +84,9 @@ def main():
         print("Beginning processing...")
         outlist = pool.map(genxhtml,filelist)
         with open(outpath[:-1]+".log",'w') as fh:
-            for x in outlist:
+            for message in outlist:
                 if len(x)>0:
-                    fh.write(x.decode())
+                    fh.write(message.decode())
         pool.close()
         pool.join()
         os.chdir(origdir)
