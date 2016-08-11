@@ -65,29 +65,31 @@ def main():
     global outpath
     if len(sys.argv)==1:
         print("Error: must pass in one or more valid directories")
-    for x in sys.argv[1:]:
-        path = os.path.join(str(x),'')
-        if not os.path.isdir(path):
-            print("Error: {} is not a valid directory".format(x))
-            sys.exit()
-        print("Beginning processing of {}".format(path))
-        path = os.path.abspath(path) + '/'
-        print("Generating list of files with math...")
-        filelist = getmathfiles(path)
-        print("Generation complete.")
+    path = os.path.join(str(sys.argv[1]),'')
+    if not os.path.isdir(path):
+        print("Error: {} is not a valid directory".format(x))
+        sys.exit()
+    print("Beginning processing of {}".format(path))
+    path = os.path.abspath(path) + '/'
+    print("Generating list of files with math...")
+    filelist = getmathfiles(path)
+    print("Generation complete.")
+    if len(sys.argv)==2:
+        outpath = os.path.join(sys.argv[2],'')
+    else:
         outpath = path[:-1] + '_converted/'
-        outpath = os.path.abspath(outpath) + '/'
-        if not os.path.exists(outpath):
-            os.makedirs(outpath)
-        os.chdir(outpath)
-        pool = mp.Pool(processes=mp.cpu_count())
-        print("Initialized {} threads".format(mp.cpu_count()))
-        print("Beginning processing...")
-        outlist = pool.map(genxhtml,filelist)
-        with open(outpath[:-1]+".log",'w') as fh:
-            for message in outlist:
-                if len(x)>0:
-                    fh.write(message.decode())
+    outpath = os.path.abspath(outpath) + '/'
+    if not os.path.exists(outpath):
+        os.makedirs(outpath)
+    os.chdir(outpath)
+    pool = mp.Pool(processes=mp.cpu_count())
+    print("Initialized {} threads".format(mp.cpu_count()))
+    print("Beginning processing...")
+    outlist = pool.map(genxhtml,filelist)
+    with open(outpath[:-1]+".log",'w') as fh:
+        for message in outlist:
+            if len(message)>0:
+                fh.write(message)
         pool.close()
         pool.join()
         os.chdir(origdir)
