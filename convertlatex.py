@@ -18,7 +18,7 @@ def genxhtml(filename):
     outfname = outpath + (os.path.splitext(fname)[0]+'.xhtml')
     if os.path.isfile(outfname):
         print("{}: Already generated".format(filename))
-        return
+        return ""
     # print("{}: Start".format(filename))
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
@@ -31,56 +31,65 @@ def genxhtml(filename):
     for i, x in enumerate(body):
         if "\\[" in x:
             body[i] = re.sub(r'[^\\]\\\[',r'\\\[',x)
-    preamble = ['\\documentclass{article}\n','\\usepackage{amsmath}\n','\\usepackage{amsfonts}\n','\\usepackage{amssymb}\n','\\usepackage{bm}\n','\\begin{document}']
+    packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
+    for i, x in enumerate(packages):
+        packages[i] = x + '\n'
+    preamble = ['\\documentclass{article}\n'] + packages + ['\\begin{document}\n']
     postamble = ["\\end{document}"]
     output = '\n'.join(preamble+body+postamble)
     try:
         proc = subprocess.Popen(["latexml", "--quiet", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
-        stdout, stderr = proc.communicate(output.encode(), timeout=60)
+        stdout, stderr = proc.communicate(output.encode(), timeout=30)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML conversion failed - timeout".format(filename))
-        return ""
+        return "{}: MathML conversion failed - timeout".format(filename)
     except:
         print("{}: Conversion failed".format(filename))
-        return ""
+        return "{}: Conversion failed".format(filename)
     try:
         proc = subprocess.Popen(["latexmlpost", "--quiet", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
         stdout2, stderr = proc.communicate(stdout)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML postprocessing failed - timeout".format(filename))
-        return ""
+        return "{}: MathML postprocessing failed - timeout".format(filename)
     with open(outfname,'w') as fh:
         fh.write(stdout2.decode())
     # print("{}: Finish".format(filename))
-    return stdout2
+    return ""
 
 def main():
     origdir = os.getcwd()
     global path
     global outpath
-    path = '1506/'
-    if(len(sys.argv)>1):
-        path = os.path.join(str(sys.argv[1]),'')
+    if len(sys.argv)==1:
+        print("Error: must pass in one or more valid directories")
+    for x in sys.argv[1:]:
+        path = os.path.join(str(x),'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a valid directory")
             sys.exit()
-    path = os.path.abspath(path) + '/'
-    print("Generating list of files with math...")
-    filelist = getmathfiles(path)
-    print("Generation complete.")
-    outpath = path[:-1] + '_converted/'
-    outpath = os.path.abspath(outpath) + '/'
-    if not os.path.exists(outpath):
-        os.makedirs(outpath)
-    os.chdir(outpath)
-    pool = mp.Pool(processes=mp.cpu_count())
-    print("Initialized {} threads".format(mp.cpu_count()))
-    print("Beginning processing...")
-    pool.map(genxhtml,filelist)
-    pool.close()
-    pool.join()
+        path = os.path.abspath(path) + '/'
+        print("Generating list of files with math...")
+        filelist = getmathfiles(path)
+        print("Generation complete.")
+        outpath = path[:-1] + '_converted/'
+        outpath = os.path.abspath(outpath) + '/'
+        if not os.path.exists(outpath):
+            os.makedirs(outpath)
+        os.chdir(outpath)
+        pool = mp.Pool(processes=mp.cpu_count())
+        print("Initialized {} threads".format(mp.cpu_count()))
+        print("Beginning processing...")
+        outlist = pool.map(genxhtml,filelist)
+        with open(outpath[:-1]+".log",'w') as fh:
+            for x in outlist:
+                if len(x)>0:
+                    fh.write(x.decode())
+        pool.close()
+        pool.join()
+        os.chdir(origdir)
 
 
 if __name__ == '__main__':
