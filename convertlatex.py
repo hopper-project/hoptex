@@ -30,8 +30,7 @@ def genxhtml(filename):
     body = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
     for i, x in enumerate(body):
         if "\\[" in x:
-            body[i] = re.sub(r'[^\\]\\\[',r'\$\$',x)
-            body[i] = re.sub(r'\\\]',r'\$\$',x)
+            body[i] = re.sub(r'[^\\]\\\[',r'\\\[',x)
     preamble = ['\\documentclass{article}\n','\\usepackage{amsmath}\n','\\usepackage{amsfonts}\n','\\usepackage{amssymb}\n','\\usepackage{bm}\n','\\begin{document}']
     postamble = ["\\end{document}"]
     output = '\n'.join(preamble+body+postamble)
