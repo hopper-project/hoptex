@@ -39,7 +39,7 @@ def genxhtml(filename):
     output = '\n'.join(preamble+body+postamble)
     try:
         proc = subprocess.Popen(["latexml", "--quiet", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
-        stdout, stderr = proc.communicate(output.encode(), timeout=30)
+        stdout, stderr = proc.communicate(output.encode(), timeout=60)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML conversion failed - timeout".format(filename))
@@ -49,7 +49,7 @@ def genxhtml(filename):
         return "{}: Conversion failed".format(filename)
     try:
         proc = subprocess.Popen(["latexmlpost", "--quiet", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
-        stdout2, stderr = proc.communicate(stdout)
+        stdout2, stderr = proc.communicate(stdout, timeout=60)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML postprocessing failed - timeout".format(filename))
@@ -70,6 +70,7 @@ def main():
         if not os.path.isdir(path):
             print("Error: {} is not a valid directory".format(x))
             sys.exit()
+        print("Beginning processing of {}".format(path))
         path = os.path.abspath(path) + '/'
         print("Generating list of files with math...")
         filelist = getmathfiles(path)
