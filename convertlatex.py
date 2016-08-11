@@ -19,7 +19,7 @@ def genxhtml(filename):
     if os.path.isfile(outfname):
         print("{}: Already generated".format(filename))
         return
-    print("{}: Start".format(filename))
+    # print("{}: Start".format(filename))
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
     #remove comments
@@ -54,7 +54,7 @@ def genxhtml(filename):
         return ""
     with open(outfname,'w') as fh:
         fh.write(stdout2.decode())
-    print("{}: Finish".format(filename))
+    # print("{}: Finish".format(filename))
     return stdout2
 
 def main():
