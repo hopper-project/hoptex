@@ -74,7 +74,7 @@ def main():
     print("Generating list of files with math...")
     filelist = getmathfiles(path)
     print("Generation complete.")
-    if len(sys.argv)==2:
+    if len(sys.argv)==3:
         outpath = os.path.join(sys.argv[2],'')
     else:
         outpath = path[:-1] + '_converted/'
