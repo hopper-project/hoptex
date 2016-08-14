@@ -54,9 +54,11 @@ def mse(filename):
     mathimage = "--mathimage=" + os.path.abspath(imgname)
     print(preload)
     print(mathimage)
-    proc = subprocess.Popen(["latexmlmath", preload.encode,mathimage, "-"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    proc.communicate(rendereq)
-    print(stdout)
+    try:
+        proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        proc.communicate(rendereq)
+    except:
+        print("{}: Failed to generate image")
     return 0
 
 def main():
