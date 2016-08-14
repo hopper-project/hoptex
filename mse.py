@@ -47,13 +47,10 @@ def mse(filename):
     if len(rendereq)>1500:
         print("{}: MSE too long")
         return(-1)
-    print("{}: Rendereq: {}".format(filename,rendereq))
     rendereq = rendereq.encode('utf-8')
     print("Outputting to: {}".format(imgname))
     preload = "--preload="+os.path.abspath(stylefile)
     mathimage = "--mathimage=" + os.path.abspath(imgname)
-    print(preload)
-    print(mathimage)
     try:
         proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
         proc.communicate(rendereq)
@@ -77,7 +74,7 @@ def main():
     pool = mp.Pool(processes=mp.cpu_count())
     doclist = getmathfiles(path)
     doclist = map(os.path.abspath,doclist)
-    list(map(mse,doclist))
+    pool.map(mse,doclist)
     pool.close()
     pool.join()
 
