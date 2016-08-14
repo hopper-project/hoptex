@@ -39,7 +39,7 @@ def main():
                     failed.append(ex[0])
         print("Failed: {}".format(len(failed)))
         print("Timed out: {}".format(len(timed_out)))
-        outputdir = x[:-4] + '_converted/'
+        outputdir = x[:-4] + '/'
         outputtedfiles = glob.glob(os.path.join(outputdir,'*.xhtml'))
         pool = mp.Pool(processes=mp.cpu_count())
         coverage = pool.map(eqerrors,outputtedfiles)

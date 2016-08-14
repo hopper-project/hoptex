@@ -10,7 +10,7 @@ import numpy as np #for use in pyplot
 import matplotlib.pyplot as pl #used to plot graphs
 import multiprocessing as mp #drastic speedups when implemented on an i7-4710HQ
 import heapq #to find n largest elements in makegraph
-import cPickle #serializing to/from disk
+import pickle #serializing to/from disk
 from nltk.tokenize import word_tokenize, sent_tokenize
 import gc
 import subprocess
@@ -34,11 +34,22 @@ def proc(instr):
 def makeobjs(filename):
     global outpath
     global eqoutpath
+    global convertedpath
     #print("Start: {}".format(filename))
-    f1 = open(filename, 'rt')
+    f1 = open(filename, mode='r', encoding='latin-1')
     text = f1.read()
     f1.close()
-    newtext = text.decode('utf-8', 'ignore')
+    cleanname = os.path.basename(os.path.splitext(filename)[0])
+    convertedfilepath = os.path.join(eqoutpath,cleanname)
+    if not os.path.isfile(convertedfilepath):
+        print("{}: missing converted file")
+        converteddoc = ""
+        eqs = []
+    else:
+        with open(convertedfilepath,'r') as fh:
+            converteddoc = fh.read()
+        eqs = re.findall(r'\<math.*?\<\/math>',text)
+    newtext = text
     #remove comments
     #remove all comments at beginning of lines
     newtext = re.sub(r'(?m)^%+.*$', '', newtext)
@@ -57,17 +68,18 @@ def makeobjs(filename):
     dispeqs = re.findall(r'(?s)' + cdelim + r'(.*?)' + cdelim,newtext)
     map(strip,dispeqs)
     textlist = newtext.split(cdelim)
-    textlist = map(strip,textlist)
+    textlist = list(map(strip,textlist))
     for i in range(len(textlist)):
         if textlist[i] in dispeqs:
             textlist[i] = equation(eqtext = textlist[i], fname = filename)
     newdoc = document(filename,textlist)
-    outfname = outpath + (newdoc.name.split('/')[-1])[:-4]+'.pkl'
-    with open(outfname,'w') as fh:
-        try:
-            cPickle.dump(newdoc,fh)
-        except:
-            print("{}: Export to pkl failed".format(outfname))
+    # pickling broke with py3 conversion
+    # outfname = outpath + os.path.basename(os.path.splitext(filename)[0])+'.pkl'
+    # with open(outfname,'w') as fh:
+    #     try:
+    #         pickle.dump(newdoc,fh)
+    #     except:
+    #         print("{}: Export to pkl failed".format(outfname))
     outfname = outpath + (newdoc.name.split('/')[-1])[:-4]+'.json'
     try:
         with open(outfname,'w') as fh:
@@ -77,7 +89,7 @@ def makeobjs(filename):
     #print("Finish: {}".format(filename))
     eqlist = newdoc.get_equations()
     for i, eq in enumerate(eqlist):
-        outfname = eqoutpath + (newdoc.name.split('/')[-1])[:-4]+'.'+str(i)+'.json'
+        outfname = eqoutpath + cleanname+'.'+str(i)+'.json'
         try:
             with open(outfname,'w') as fh:
                 json.dump(eq,fh,default=JSONHandler)
@@ -89,11 +101,12 @@ def main():
     global path
     global outpath
     global eqoutpath
+    global convertedpath
     #default path to directory with tex files
-    path = '1506/'
+    path = 'demacro/'
     #The program accepts a directory to be analyzed
     #The directory should have the LaTeX files (entered without the '/')
-    if(len(sys.argv)>2):
+    if(len(sys.argv)>1):
         path = os.path.join(str(sys.argv[1]),'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a valid directory")
@@ -103,6 +116,7 @@ def main():
     metadata = path[:-1] + '.txt'
     outpath = path[:-1] + '_documents/'
     eqoutpath = path[:-1] + '_equations/'
+    convertedpath = path[:-1] + '_converted/'
     if not os.path.exists(outpath):
         os.makedirs(outpath)
     if not os.path.exists(eqoutpath):

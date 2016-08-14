@@ -13,24 +13,6 @@ class equation:
         # self.nexttexttoks = []
         self.file = fname
         self.mathml = ""
-        proc = subprocess.Popen(["latexmlmath", "--quiet", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
-        try:
-            stdout, stderr = proc.communicate(self.text)
-        except:
-            print("{}: Text encoding error occurred. Encoding to utf-8...".format(fname))
-            try:
-                stdout, stderr = proc.communicate(self.text.encode('utf-8'))
-                print("{}: Alternate encoding successful".format(fname))
-            except:
-                print("{}: Encoding failed - MathML invalid".format(fname))
-                selfmathml = ""
-                return
-        if proc.returncode !=0:
-            self.mathml = ""
-            print("{}: Encountered MathML equation error".format(fname))
-        else:
-            stdout = stdout.strip()
-            self.mathml = stdout
 
     def __str__(self):
         return self.text

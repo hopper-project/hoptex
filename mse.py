@@ -5,7 +5,6 @@ import multiprocessing as mp
 import re
 from collections import Counter
 import subprocess
-from subprocess import PIPE
 from core.funcs import *
 
 def mse(filename):
@@ -52,7 +51,7 @@ def mse(filename):
     preload = "--preload="+os.path.abspath(stylefile)
     mathimage = "--mathimage=" + os.path.abspath(imgname)
     try:
-        proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         proc.communicate(rendereq)
     except:
         print("{}: Failed to generate image")
@@ -61,9 +60,13 @@ def mse(filename):
 def main():
     global outpath
     global path
-    if len(sys.argv)>3:
+    global mapping
+    if len(sys.argv)<3:
         print("Error: require input/output directories", file=sys.stderr)
         sys.exit()
+    if len(sys.argv==4):
+        with open(sys.argv[3]) as metadata:
+            mapping = metadata.readlines()
     path = os.path.join(sys.argv[1],'')
     outpath = os.path.join(sys.argv[2],'')
     if not os.path.isdir(path):

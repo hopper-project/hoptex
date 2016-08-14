@@ -1,3 +1,5 @@
+#accepts a folder of .tex files
+#prints out the 50 most commonly used packages (\usepackage)
 import itertools
 import operator
 from collections import Counter
@@ -33,10 +35,10 @@ def main():
     if(len(sys.argv)>1):
         path = os.path.join(str(sys.argv[1]),'')
     else:
-        print("ERROR: No destination folder given", file=sys.stderr)
+        print("ERROR: No destination folder given")
         exit()
     if not os.path.isdir(path):
-        print("Error: invalid directory passed in", file=sys.stderr)
+        print("Error: invalid directory passed in")
         sys.exit()
     #per getarxivdatav2, the metadata for tex files in a folder
     #should be in a .txt file of the same name
