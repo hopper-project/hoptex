@@ -23,7 +23,8 @@ def mse(filename):
         try:
             bibcode = bibcodedict[cleanname]
         except:
-            return("{}: No corresponding bibcode. Skipping...")
+            print("{}: No corresponding bibcode. Skipping...\n".format(filename))
+            return("{}: No corresponding bibcode. Skipping...\n".format(filename))
         imgname = os.path.join(outpath,bibcode+'.png')
     else:
         imgname = os.path.join(outpath,cleanname+'.png')
@@ -34,7 +35,7 @@ def mse(filename):
     isFirst = 0
     equations = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
     if len(equations)==0:
-        return(-1)
+        return("{}: Something weird happened\n".format(filename))
     for equation in equations:
         x = re.match(r'\\label\{(.*?)\}',equation)
         if x:
@@ -55,22 +56,23 @@ def mse(filename):
         rendereq = equations[0]
         isFirst = 1
     if len(rendereq)>1500:
-        print("{}: MSE too long")
-        return(-1)
+        print("{}: MSE too long".format(filename))
+        return("{}: MSE too long".format(filename))
     rendereq = rendereq.encode('utf-8')
     print("Outputting to: {}".format(imgname))
     preload = "--preload="+os.path.abspath(stylefile)
     mathimage = "--mathimage=" + os.path.abspath(imgname)
     try:
         proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        proc.communicate(rendereq, timeout=30)
+        proc.communicate(rendereq, timeout=90)
     except:
-        print("{}: Failed to generate image")
+        print("{}: Failed to generate image".format(filename))
+        return("{}: Failed to generate image".format(filename))
     os.remove(stylefile)
     if isFirst:
-        return("{}: first equation\n")
+        return("{}: first equation\n".format(filename))
     else:
-        return("{}: {} occurrences\n",filename,count[0][1])
+        return("{}: {} occurrences\n".format(filename,count[0][1]))
 
 def main():
     global outpath
