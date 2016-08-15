@@ -23,7 +23,7 @@ def mse(filename):
         try:
             bibcode = bibcodedict[cleanname]
         except:
-            print("{}: No corresponding bibcode. Skipping...\n".format(filename))
+            print("{}: No corresponding bibcode. Skipping...".format(filename))
             return("{}: No corresponding bibcode. Skipping...\n".format(filename))
         imgname = os.path.join(outpath,bibcode+'.png')
     else:
@@ -66,8 +66,9 @@ def mse(filename):
         proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         proc.communicate(rendereq, timeout=90)
     except:
+        proc.kill()
         print("{}: Failed to generate image".format(filename))
-        return("{}: Failed to generate image".format(filename))
+        return("{}: Failed to generate image\n".format(filename))
     os.remove(stylefile)
     if isFirst:
         return("{}: first equation\n".format(filename))
