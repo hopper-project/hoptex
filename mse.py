@@ -19,7 +19,14 @@ def mse(filename):
     packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
     packages = '\n'.join(packages)
     stylefile = os.path.join(outpath,cleanname+'.sty')
-    imgname = os.path.join(outpath,cleanname+'.png')
+    if(bibcodedict):
+        try:
+            bibcode = bibcodedict[cleanname]
+        except:
+            return("{}: No corresponding bibcode. Skipping...")
+        imgname = os.path.join(outpath,bibcode+'.png')
+    else:
+        imgname = os.path.join(outpath,cleanname+'.png')
     with open(stylefile,'w') as fh:
         fh.write(packages)
     eqlabels = []
@@ -68,13 +75,15 @@ def mse(filename):
 def main():
     global outpath
     global path
-    global mapping
+    global bibcodedict
+    bibcodedict = None
     if len(sys.argv)<3:
         print("Error: require input/output directories", file=sys.stderr)
         sys.exit()
-    # if len(sys.argv==4):
-    #     with open(sys.argv[3]) as metadata:
-    #         mapping = metadata.readlines()
+    if len(sys.argv)==4:
+        with open(sys.argv[3]) as metadata:
+            mapping = metadata.readlines()
+        bibcodedict = dict([x.strip().split(',') for x in mapping])
     path = os.path.join(sys.argv[1],'')
     outpath = os.path.join(sys.argv[2],'')
     if not os.path.isdir(path):
