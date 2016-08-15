@@ -24,6 +24,7 @@ def mse(filename):
         fh.write(packages)
     eqlabels = []
     occurrences = []
+    isFirst = 0
     equations = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
     if len(equations)==0:
         return(-1)
@@ -39,10 +40,13 @@ def mse(filename):
     if count:
         if count[0][1]==1:
             rendereq = equations[0]
+            isFirst = 1
         else:
             rendereq = count[0][0]
+            isFirst = 0
     else:
         rendereq = equations[0]
+        isFirst = 1
     if len(rendereq)>1500:
         print("{}: MSE too long")
         return(-1)
@@ -52,10 +56,13 @@ def mse(filename):
     mathimage = "--mathimage=" + os.path.abspath(imgname)
     try:
         proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        proc.communicate(rendereq)
+        proc.communicate(rendereq, timeout=30)
     except:
         print("{}: Failed to generate image")
-    return 0
+    if isFirst:
+        return("{}: first equation\n")
+    else:
+        return("{}: {} occurrences\n",filename,count[0][1])
 
 def main():
     global outpath
@@ -64,9 +71,9 @@ def main():
     if len(sys.argv)<3:
         print("Error: require input/output directories", file=sys.stderr)
         sys.exit()
-    if len(sys.argv==4):
-        with open(sys.argv[3]) as metadata:
-            mapping = metadata.readlines()
+    # if len(sys.argv==4):
+    #     with open(sys.argv[3]) as metadata:
+    #         mapping = metadata.readlines()
     path = os.path.join(sys.argv[1],'')
     outpath = os.path.join(sys.argv[2],'')
     if not os.path.isdir(path):
@@ -77,7 +84,11 @@ def main():
     pool = mp.Pool(processes=mp.cpu_count())
     doclist = getmathfiles(path)
     doclist = map(os.path.abspath,doclist)
-    pool.map(mse,doclist)
+    tofile = pool.map(mse,doclist)
+    outdocname = outpath[:-1] + '.log'
+    with open(outdocname,'w') as fh:
+        for x in tofile:
+            fh.write(x)
     pool.close()
     pool.join()
 
