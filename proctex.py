@@ -17,6 +17,7 @@ import subprocess
 from subprocess import PIPE
 import json
 from core.texclasses import *
+from core.funcs import *
 path = ''
 outpath = ''
 eqoutpath = ''
@@ -40,21 +41,21 @@ def makeobjs(filename):
     text = f1.read()
     f1.close()
     cleanname = os.path.basename(os.path.splitext(filename)[0])
-    convertedfilepath = os.path.join(eqoutpath,cleanname)
+    convertedfilepath = os.path.join(convertedpath,cleanname+'.xhtml')
     if not os.path.isfile(convertedfilepath):
-        print("{}: missing converted file")
+        #print("{}: missing converted file - {}".format(filename,convertedfilepath))
         converteddoc = ""
         eqs = []
     else:
         with open(convertedfilepath,'r') as fh:
             converteddoc = fh.read()
-        eqs = re.findall(r'\<math.*?\<\/math>',text)
+        eqs = re.findall(r'\<math.*?\<\/math>',converteddoc)
     newtext = text
     #remove comments
     #remove all comments at beginning of lines
     newtext = re.sub(r'(?m)^%+.*$', '', newtext)
     #remove all remaining comments
-    cdelim = " CUSTOMDELIMITERHERE "
+    cdelim = "CUSTOMDELIMITERHERE"
     newtext = re.sub(r"(?m)([^\\])\%+.*?$", r'\1', newtext)
     newtext = re.sub(r'\\begin\{comment\}.*?\\end\{comment\}','',newtext,re.DOTALL)
     newtext = re.sub(r'(?s)\\begin\{equation\}(.*?)\\end\{equation\}',cdelim + r'\1' + cdelim,newtext)
@@ -66,36 +67,35 @@ def makeobjs(filename):
     newtext = re.sub(r'(?s)[^\\]\\\[(.*?)\\\]',cdelim + r'\1' + cdelim,newtext)
     newtext = re.sub(r'(?s)\$\$([^\^].*?)\$\$',cdelim + r'\1' + cdelim,newtext)
     dispeqs = re.findall(r'(?s)' + cdelim + r'(.*?)' + cdelim,newtext)
+    actualeqs  = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
     map(strip,dispeqs)
     textlist = newtext.split(cdelim)
+    if len(dispeqs)!=len(eqs):
+        if len(eqs)!=0:
+            print("{}: LaTeX/XHTML equation count mismatch {} {} {}".format(filename, len(dispeqs), len(eqs), len(actualeqs)))
     textlist = list(map(strip,textlist))
     for i in range(len(textlist)):
         if textlist[i] in dispeqs:
             textlist[i] = equation(eqtext = textlist[i], fname = filename)
-    newdoc = document(filename,textlist)
-    # pickling broke with py3 conversion
-    # outfname = outpath + os.path.basename(os.path.splitext(filename)[0])+'.pkl'
-    # with open(outfname,'w') as fh:
-    #     try:
-    #         pickle.dump(newdoc,fh)
-    #     except:
-    #         print("{}: Export to pkl failed".format(outfname))
-    outfname = outpath + (newdoc.name.split('/')[-1])[:-4]+'.json'
-    try:
-        with open(outfname,'w') as fh:
-            json.dump(newdoc,fh,default=JSONHandler)
-    except:
-        print("{}: Export to JSON failed".format(outfname))
+    #newdoc = document(filename,textlist)
+    # outfname = outpath + (newdoc.name.split('/')[-1])[:-4]+'.json'
+    # try:
+    #     with open(outfname,'w') as fh:
+    #         json.dump(newdoc,fh,default=JSONHandler)
+    # except:
+    #     print("{}: Export to JSON failed".format(outfname))
     #print("Finish: {}".format(filename))
-    eqlist = newdoc.get_equations()
-    for i, eq in enumerate(eqlist):
-        outfname = eqoutpath + cleanname+'.'+str(i)+'.json'
-        try:
-            with open(outfname,'w') as fh:
-                json.dump(eq,fh,default=JSONHandler)
-        except:
-            print("{}: Equation export to JSON failed".format(outfname))
-    return newdoc
+    # eqlist = newdoc.get_equations()
+    # for i, eq in enumerate(eqlist):
+    #     outfname = eqoutpath + cleanname+'.'+str(i)+'.json'
+    #     if(eqs):
+    #         eq.mathml = eqs[i]
+    #     try:
+    #         with open(outfname,'w') as fh:
+    #             json.dump(eq,fh,default=JSONHandler)
+    #     except:
+    #         print("{}: Equation export to JSON failed".format(outfname))
+    # return newdoc
 
 def main():
     global path
@@ -113,7 +113,6 @@ def main():
             sys.exit()
     #per getarxivdatav2, the metadata for tex files in a folder
     #should be in a .txt file of the same name
-    metadata = path[:-1] + '.txt'
     outpath = path[:-1] + '_documents/'
     eqoutpath = path[:-1] + '_equations/'
     convertedpath = path[:-1] + '_converted/'
@@ -127,33 +126,11 @@ def main():
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     #error handling for missing metadata file
-    if not os.path.isfile(metadata):
-        print("Error: file not found. Make sure you've entered the correct directory AND have run getarxivdatav2.py for said directory.")
-        sys.exit()
     #load in the list of files and their categories
-    filecats = open(metadata,'r')
-    lines = filecats.readlines()
-    filecats.close()
-    print("Read in file metadata.")
     #each line of the form 'filename.tex' 'category'
     #this changes it to just 'filename' and 'category'
-    lines = pool.map(proc,lines)
-    #dictionary of categories
-    #keys are category names
-    #values are count dictionaries of tokens in papers of the category
-    categories = {}
-    #dictionary of file names and their associated categories
-    fnamedict = {}
-    for x in lines:
-        if x[1] not in categories:
-            categories[x[1]] = {}
-        fnamedict[x[0]] = x[1]
-    print("Populated file category dictionary.")
     #list of tex files in the directory specified by path
-    filelist= glob.glob(os.path.join(path,'*.tex'))
-    if len(lines)!=len(filelist):
-        print("Warning: possible mismatch - the number of .tex files has changed since metadata was last generated. Rerun getarxivdatav2.py to update metadata")
-    print("Generating doc/equation objects...")
+    filelist= getmathfiles(path)
     #filedictlist is the result of makedict mapped over each filename
     #filelist[0] corresponds to filedictlist[0]
     doclist = pool.map(makeobjs,filelist)
