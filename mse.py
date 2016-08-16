@@ -67,9 +67,9 @@ def mse(filename):
         proc.communicate(rendereq, timeout=90)
     except:
         proc.kill()
+        os.remove(stylefile)
         print("{}: Failed to generate image".format(filename))
         return("{}: Failed to generate image\n".format(filename))
-    os.remove(stylefile)
     if isFirst:
         return("{}: first equation\n".format(filename))
     else:
