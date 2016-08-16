@@ -46,12 +46,7 @@ def mse(filename):
             occurrences.append(label.strip())
     count = Counter(occurrences).most_common(1)
     if count:
-        if count[0][1]==1:
-            rendereq = equations[0]
-            isFirst = 1
-        else:
-            rendereq = count[0][0]
-            isFirst = 0
+        rendereq=count[0][0]
     else:
         rendereq = equations[0]
         isFirst = 1
