@@ -29,8 +29,7 @@ def genxhtml(filename):
     #series of regex expressions
     body = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
     for i, x in enumerate(body):
-        if "\\[" in x:
-            body[i] = re.sub(r'[^\\]\\\[',r'\\\[',x)
+        body[i] = re.sub(r'.\\\[',"\[",x) + '\n'
     packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
     for i, x in enumerate(packages):
         packages[i] = x + '\n'
