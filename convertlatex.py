@@ -9,8 +9,6 @@ from core.funcs import *
 
 path = ''
 outpath = ''
-def strip(param):
-    return param.strip()
 
 def genxhtml(filename):
     global outpath
@@ -27,17 +25,19 @@ def genxhtml(filename):
     text = re.sub(r"(?m)([^\\])\%+.*?$",r'\1',text) #remove all remaining comments
     text = re.sub(r'\\begin\{comment\}.*?\\end\{comment\}','',text,re.DOTALL)
     #series of regex expressions
-    body = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
-    for i, x in enumerate(body):
-        body[i] = re.sub(r'.\\\[',"\[",x) + '\n'
+    docbody = re.search(r'(?s)\\begin\{document\}.*?\\end\{document\}',text).group(0)
+    body = grabmath(docbody)
     packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
-    for i, x in enumerate(packages):
-        packages[i] = x + '\n'
-    preamble = ['\\documentclass{article}\n'] + packages + ['\\begin{document}\n']
+    docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
+    if(docclass):
+        docclass = docclass.group(0)+'\n'
+    else:
+        docclass = '\\documentclass{article}\n'
+    preamble = [docclass] + packages + ['\\begin{document}\n']
     postamble = ["\\end{document}"]
     output = '\n'.join(preamble+body+postamble)
     try:
-        proc = subprocess.Popen(["latexml", "--quiet", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
+        proc = subprocess.Popen(["latexml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
         stdout, stderr = proc.communicate(output.encode(), timeout=120)
     except subprocess.TimeoutExpired:
         proc.kill()
@@ -47,12 +47,15 @@ def genxhtml(filename):
         print("{}: Conversion failed".format(filename))
         return "{}: Conversion failed".format(filename)
     try:
-        proc = subprocess.Popen(["latexmlpost", "--quiet", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
+        proc = subprocess.Popen(["latexmlpost", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
         stdout2, stderr = proc.communicate(stdout, timeout=60)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML postprocessing failed - timeout".format(filename))
         return "{}: MathML postprocessing failed - timeout".format(filename)
+    if len(stdout2.strip())==0:
+        print("{}: Conversion failed".format(filename))
+        return("{}: Conversion failed".format(filename))
     with open(outfname,'w') as fh:
         fh.write(stdout2.decode())
     # print("{}: Finish".format(filename))
@@ -89,9 +92,9 @@ def main():
         for message in outlist:
             if len(message)>0:
                 fh.write(message)
-        pool.close()
-        pool.join()
-        os.chdir(origdir)
+    pool.close()
+    pool.join()
+    os.chdir(origdir)
 
 
 if __name__ == '__main__':
