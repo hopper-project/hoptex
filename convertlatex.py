@@ -20,10 +20,7 @@ def genxhtml(filename):
     # print("{}: Start".format(filename))
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
-    #remove comments
-    text = re.sub(r'(?m)^%+.*$','',text) #remove all comments at beginning of lines
-    text = re.sub(r"(?m)([^\\])\%+.*?$",r'\1',text) #remove all remaining comments
-    text = re.sub(r'\\begin\{comment\}.*?\\end\{comment\}','',text,re.DOTALL)
+    text = removecomments(text)
     #series of regex expressions
     docbody = re.search(r'(?s)\\begin\{document\}.*?\\end\{document\}',text).group(0)
     body = grabmath(docbody)

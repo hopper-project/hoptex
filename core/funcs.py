@@ -8,6 +8,11 @@ def gettexfiles(path):
     file_list = glob.glob(os.path.join(absolute_path,'*.tex'))
     return file_list
 
+def removecomments(text):
+    text = re.sub(r'(?m)^%+.*$','',text)
+    text = re.sub(r"(?m)([^\\])\%+.*?$",r'\1',text)
+    text = re.sub(r'(?s)\\begin\{comment\}.*?\\end\{comment\}','',text)
+    return(text)
 def grabmath(text, split=0):
     delim = r'|'
     a = r'\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
@@ -22,10 +27,14 @@ def grabmath(text, split=0):
     if(split):
         tomatch = r'(?s)('+delim.join(exprmatch)+r')'
         matches = re.split(tomatch,text)
+        for i, x in enumerate(matches):
+            matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
         return matches
     else:
         tomatch = r'(?s)' + delim.join(exprmatch)
         matches = re.findall(tomatch,text)
+        for i, x in enumerate(matches):
+            matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
         return matches
 
 def hasmath(filename):
