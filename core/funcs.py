@@ -43,6 +43,6 @@ def getmathfiles(path):
         if texfile[1]:
             outlist.append(os.path.abspath(texfile[0]))
     print("{} files with math".format(len(outlist)))
-    return outlist
     pool.close()
     pool.join()
+    return outlist
