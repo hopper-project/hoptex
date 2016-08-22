@@ -24,8 +24,8 @@ def genxhtml(filename):
     #series of regex expressions
     docbody = re.findall(r'(?s)\\begin\{document\}.*?\\end\{document\}',text)
     if not docbody:
-        print("{}: Error: \\begin{document} error".format(filename))
-        return("{}: Error: \\begin{document} error".format(filename))
+        print("{}: Error: no body found ".format(filename))
+        return("{}: Error: no body found".format(filename))
     docbody = docbody[0]
     body = grabmath(docbody)
     packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
