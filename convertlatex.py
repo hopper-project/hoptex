@@ -39,7 +39,7 @@ def genxhtml(filename):
     output = '\n'.join(preamble+body+postamble)
     try:
         proc = subprocess.Popen(["latexml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
-        stdout, stderr = proc.communicate(output.encode(), timeout=120)
+        stdout, stderr = proc.communicate(output.encode(), timeout=90)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML conversion failed - timeout".format(filename))
@@ -92,7 +92,7 @@ def main():
     with open(outpath[:-1]+".log",'w') as fh:
         for message in outlist:
             if len(message)>0:
-                fh.write(message)
+                fh.write(message+'\n')
     pool.close()
     pool.join()
     os.chdir(origdir)
