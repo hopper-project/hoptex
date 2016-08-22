@@ -40,6 +40,7 @@ def grabmath(text, split=0):
 def hasmath(filename):
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
+    text = removecomments(text)
     finds = grabmath(text)
     return (filename, len(finds))
 
