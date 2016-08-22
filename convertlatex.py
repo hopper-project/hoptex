@@ -23,6 +23,9 @@ def genxhtml(filename):
     text = removecomments(text)
     #series of regex expressions
     docbody = re.search(r'(?s)\\begin\{document\}.*?\\end\{document\}',text).group(0)
+    if not docbody:
+        print("{}: Error: \\begin{document} error".format(filename))
+        return("{}: Error: \\begin{document} error".format(filename))
     body = grabmath(docbody)
     packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
     docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
