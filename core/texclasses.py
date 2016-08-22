@@ -3,16 +3,16 @@ from subprocess import PIPE
 from nltk.tokenize import word_tokenize
 import os
 class equation:
-    def __init__(self,eqtext,fname, desig = 'latex'):
+    def __init__(self,eqtext,fname, pos, nexttext, prevtext, index,mathml,desig = 'latex'):
         self.text = eqtext
         self.type = desig
         self.itemtype = "equation"
-        # self.prevtext = ""
-        # self.nexttext = ""
-        # self.prevtexttoks = []
-        # self.nexttexttoks = []
+        self.prevtext = prevtext
+        self.nexttext = nexttext
         self.file = fname
-        self.mathml = ""
+        self.index=index
+        self.pos = pos
+        self.mathml = mathml
 
     def __str__(self):
         return self.text
@@ -32,19 +32,6 @@ class document:
         self.name = fname
         self.array = textarray
         self.itemtype = "document"
-        # arraylen = len(self.array)
-        # for i in range(1,arraylen-1):
-        #     if isinstance(self.array[i],equation):
-        #         print("Found an equation :D")
-        #         for x in range(i-1,-1,-1):
-        #             if isinstance(self.array[x],str):
-        #                 self.array[i].prevtext = self.array[x]
-        #                 break
-        #         for x in range(i+1,arraylen,1):
-        #             if isinstance(self.array[x],str):
-        #                 self.array[i].nexttext = self.array[x]
-        #                 break
-        # self.array = self.get_equations()
 
     def get_equations(self):
         ret = []
