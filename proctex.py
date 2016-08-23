@@ -42,6 +42,7 @@ def makeobjs(filename):
         converteddoc = ""
         eqs = []
         tableeqs = []
+        return
     else:
         with open(convertedfilepath,'r') as fh:
             converteddoc = fh.read()
@@ -63,9 +64,15 @@ def makeobjs(filename):
         return
     else:
         for i, x in enumerate(tableeqs):
-            tableeqs[i] = '\n'.join(re.findall(r'(?s)\<math.*?\<\/math\>',x))
+            tempvar = '\n'.join(re.findall(r'(?s)\<math.*?\<\/math\>',x))
+            if len(tempvar)==0:
+                print("{}-{}: No math in table".format(filename, i))
+                return
+            else:
+                tableeqs[i] =  tempvar
         split = grabmath(docbody,split=1)
         for i, x in enumerate(actualeqs):
+            outfname = eqoutpath + cleanname + '.' + str(i) + '.json'
             index = split.index(x)
             nexttext = ""
             prevtext = ""
@@ -82,8 +89,10 @@ def makeobjs(filename):
             if len(prevtext)>400:
                 prevtext = prevtext[-400:]
             location = docbody.find(x)
+            if len(tableeqs[i].strip())==0:
+                print("{}: Empty JSON {} \"{}\" - \n{}".format(filename,type(tableeqs[i]),tableeqs[i],tempvar))
             neweq = equation(eqtext=x,fname=os.path.basename(filename),pos=location,nexttext=nexttext,prevtext=prevtext,index=index,mathml=tableeqs[i])
-            outfname = eqoutpath + cleanname + '.' + str(i) + '.json'
+
             try:
                 with open(outfname,'w') as fh:
                     json.dump(neweq,fh,default=JSONHandler)
