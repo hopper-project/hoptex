@@ -13,9 +13,7 @@ def mse(filename):
     cleanname = os.path.splitext(os.path.basename(filename))[0]
     with open(filename, mode='r', encoding='latin-1') as fh:
         text = fh.read()
-    text = re.sub(r'(?m)^%+.*$', '', text)
-    text = re.sub(r"(?m)([^\\])\%+.*?$", r'\1', text)
-    text = re.sub(r'\\begin\{comment\}.*?\\end\{comment\}','',text,re.DOTALL)
+    text = removecomments(text)
     packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
     packages = '\n'.join(packages)
     stylefile = os.path.join(outpath,cleanname+'.sty')
@@ -32,21 +30,34 @@ def mse(filename):
         fh.write(packages)
     eqlabels = []
     occurrences = []
+    labeldict = {}
     isFirst = 0
-    equations = re.findall(r'(?s)\\begin\{equation\}.*?\\end\{equation\}|\\begin\{multline\}.*?\\end\{multline\}|\\begin\{gather\}.*?\\end\{gather\}|\\begin\{align\}.*?\\end\{align\}|\\begin\{flalign\*\}.*?\\end\{flalign\*\}|\\begin\{math\}.*?\\end\{math\}|[^\\]\\\[.*?\\\]|\$\$[^\^].*?\$\$',text)
+    equations = grabmath(text)
     if len(equations)==0:
         return("{}: Something weird happened\n".format(filename))
     for equation in equations:
-        x = re.match(r'\\label\{(.*?)\}',equation)
-        if x:
-            eqlabels.append(x.group(1).strip())
+        x = re.findall(r'\\label\{(.*?)\}',equation)
+        eqlabels = eqlabels + x
+        for match in x:
+            labeldict[match] = equation
     labels = re.findall(r'\\eqref\{(.*?)\}',text) + re.findall(r'\\ref\{(.*?)\}',text)
     for label in labels:
         if label.strip() in eqlabels:
-            occurrences.append(label.strip())
-    count = Counter(occurrences).most_common(1)
-    if count:
-        rendereq=count[0][0]
+            occurrences.append(labeldict[label.strip()])
+    eqcount = Counter(occurrences).most_common()
+    if eqcount:
+        rendereq=eqcount[0][0]
+        if len(eqcount)>1:
+            firstcount = eqcount[0][1]
+            pos = text.find(eqcount[0][0])
+            for x in eqcount[1:]:
+                if x[1]==firstcount:
+                    xpos = text.find(x[0])
+                    if xpos<pos:
+                        pos=xpos
+                        rendereq=x[0]
+                else:
+                    break
     else:
         rendereq = equations[0]
         isFirst = 1
@@ -62,13 +73,13 @@ def mse(filename):
         proc.communicate(rendereq, timeout=90)
     except:
         proc.kill()
-        os.remove(stylefile)
         print("{}: Failed to generate image".format(filename))
         return("{}: Failed to generate image\n".format(filename))
+    os.remove(stylefile)
     if isFirst:
         return("{}: first equation\n".format(filename))
     else:
-        return("{}: {} occurrences\n".format(filename,count[0][1]))
+        return("{}: {} occurrences\n".format(filename,eqcount[0][1]))
 
 def main():
     global outpath
