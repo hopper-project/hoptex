@@ -107,7 +107,7 @@ def main():
     outdocname = outpath[:-1] + '.log'
     with open(outdocname,'w') as fh:
         for x in tofile:
-            fh.write(x)
+            fh.write(x+'\n')
     pool.close()
     pool.join()
 
