@@ -140,7 +140,6 @@ def main():
     print("Initialized {} threads".format(mp.cpu_count()))
     print("Finding all files with math...")
     filelist= getmathfiles(path)
-    print("{} files with display mode math".format(len(filelist)))
     print("Generating equation object JSONs...")
     doclist = pool.map(makeobjs,filelist)
     print("JSON conversion complete")
