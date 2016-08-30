@@ -138,7 +138,10 @@ def main():
     print("{}: Beginning processing".format(path))
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
+    print("Finding all files with math...")
     filelist= getmathfiles(path)
+    print("{} files with display mode math".format(len(filelist)))
+    print("Generating equation object JSONs...")
     doclist = pool.map(makeobjs,filelist)
     print("JSON conversion complete")
     print("Logging...")
@@ -146,7 +149,8 @@ def main():
         for x in doclist:
             if x:
                 fh.write(x+'\n')
-    print("Loggin complete")
+    print("Logging complete")
+    print("{}: Finished".format(path))
     #handles closing of multiple processes
     pool.close()
     pool.join()
