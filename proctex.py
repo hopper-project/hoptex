@@ -82,7 +82,11 @@ def makeobjs(filename):
         split = grabmath(docbody,split=1)
         for i, x in enumerate(actualeqs):
             outfname = eqoutpath + cleanname + '.' + str(i) + '.json'
-            index = split.index(x.strip())
+            try:
+                index = split.index(x)
+            except:
+                print("{}: Equation matching failed".format(filename))
+                return("{}: Equation matching failed".format(filename))
             nexttext = ""
             prevtext = ""
             for y in range(i-1,-1,-1):
