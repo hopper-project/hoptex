@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-#proctex.py - generates equation & document objects
+#proctex.py - generates equation objects
 #Jay Dhanoa
-#before running this script, run getarxivdatav2.py for the corresponding folder
+
 import sys #handling arguments passed to function
 import glob #file path handling
 import os #checking files and writing to/from files
@@ -116,7 +116,7 @@ def main():
         print("Usage: python3 proctex.py /folder/to/tex/files/ /folder/to/output/")
         sys.exit()
     eqoutpath = path
-    erroroutputpath = path[:-1] + '_errors/'
+    erroroutputpath = eqoutpath[:-1] + '_errors/'
     if not os.path.exists(eqoutpath):
         os.makedirs(eqoutpath)
     if not os.path.exists(erroroutputpath):
