@@ -3,6 +3,31 @@ import os
 import re
 import multiprocessing as mp
 
+def gensanitized(filename):
+    fname = os.path.basename(filename)
+    # print("{}: Start".format(filename))
+    with open(filename, mode='r', encoding='latin-1') as f1:
+        text = f1.read()
+    text = removecomments(text)
+    #series of regex expressions
+    docbody = re.findall(r'(?s)\\begin\{document\}.*?\\end\{document\}',text)
+    if not docbody:
+        print("{}: Error: no body found ".format(filename))
+        return("")
+    docbody = docbody[0]
+    body = grabmath(docbody)
+    packages = re.findall(r'(?s)\\usepackage(?:\[.*?\])?\{.*?\}',text)
+    docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
+    if(docclass):
+        docclass = docclass.group(0)+'\n'
+    else:
+        docclass = '\\documentclass{article}\n'
+    preamble = [docclass] + packages + ['\\begin{document}\n']
+    postamble = ["\\end{document}"]
+    output = '\n'.join(preamble+body+postamble)
+    return(output)
+
+
 def gettexfiles(path):
     absolute_path = os.path.abspath(path) + '/'
     file_list = glob.glob(os.path.join(absolute_path,'*.tex'))
