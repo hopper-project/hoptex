@@ -1,6 +1,5 @@
 import subprocess
 from subprocess import PIPE
-from nltk.tokenize import word_tokenize
 import os
 class equation:
     def __init__(self,eqtext,fname, pos, nexttext, prevtext, index,mathml,desig = 'latex'):
