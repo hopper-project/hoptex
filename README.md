@@ -17,9 +17,15 @@ It then generates a folder of matplotlib bar graphs (stored in the parent direct
 
 ### proctex.py
 
-proctex.py accepts a directory of .tex files. It processes in each document, isolating display mode equations, and generating a nested data structure of document and equation objects.
+proctex.py accepts a directory of .tex files, the corresponding directory of converted .xhtml files, and an output directory.
 
-Currently temporarily defunct (in light of convertlatex.py). Future updates will enable a --cached option that will allow you to pass in pre-generated xhtml, and will attempt to generate math on its own (using latexmlmath) if it doesn't have a cached xhtml file to reference.
+It generates JSON objects. Each JSON object contains the following:
+* Text before
+* Text after
+* LaTeX text
+* converted MathML (if applicable)
+* Filename
+* Equation number (in document)
 
 ### convertlatex.py
 
