@@ -82,7 +82,7 @@ def makeobjs(filename):
         split = grabmath(docbody,split=1)
         for i, x in enumerate(actualeqs):
             outfname = eqoutpath + cleanname + '.' + str(i) + '.json'
-            index = split.index(x)
+            index = split.index(x.strip())
             nexttext = ""
             prevtext = ""
             for y in range(i-1,-1,-1):
