@@ -42,7 +42,7 @@ def makeobjs(filename):
         converteddoc = ""
         eqs = []
         tableeqs = []
-        return
+        return("{}: Missing XHTML".format(filename))
     else:
         with open(convertedfilepath,'r') as fh:
             converteddoc = fh.read()
@@ -51,23 +51,23 @@ def makeobjs(filename):
     docbody = re.findall(r'(?s)\\begin\{document\}(.*?)\\end\{document\}',newtext)
     if not docbody:
         print("{}: Missing body".format(filename))
-        return
+        return("{}: Missing body".format(filename))
     docbody = docbody[0]
     actualeqs = grabmath(newtext)
     if len(actualeqs)!=len(tableeqs):
         if len(tableeqs)!=0:
             print("{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(actualeqs), len(tableeqs)))
             sanitizedfile = os.path.join(erroroutputpath,cleanname+'.tex')
-            # with open(sanitizedfile,'w') as fh:
-            #     fh.write(genxhtml(filename))
+            with open(sanitizedfile,'w') as fh:
+                fh.write(genxhtml(filename))
         #print("{}: skipping...".format(filename))
-        return
+        return "{}: LaTeX/XHTML equation count mismatch {} {}"
     else:
         for i, x in enumerate(tableeqs):
             tempvar = '\n'.join(re.findall(r'(?s)\<math.*?\<\/math\>',x))
             if len(tempvar)==0:
                 print("{}-{}: No math in table".format(filename, i))
-                return
+                return "{}-{}: No math in table".format(filename, i)
             else:
                 tableeqs[i] =  tempvar
         split = grabmath(docbody,split=1)
@@ -105,41 +105,25 @@ def main():
     global eqoutpath
     global convertedpath
     global erroroutputpath
-    #default path to directory with tex files
-    path = 'demacro/'
-    #The program accepts a directory to be analyzed
-    #The directory should have the LaTeX files (entered without the '/')
-    if(len(sys.argv)>1):
+    if(len(sys.argv)==3):
         path = os.path.join(str(sys.argv[1]),'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a valid directory")
             sys.exit()
-    #per getarxivdatav2, the metadata for tex files in a folder
-    #should be in a .txt file of the same name
-    outpath = path[:-1] + '_documents/'
-    eqoutpath = path[:-1] + '_equations/'
-    convertedpath = path[:-1] + '_converted/'
+        eqoutpath=os.path.join(str(sys.argv[2]),'')
+    else:
+        print("Error: incorrect number of arguments")
+        print("Usage: python3 proctex.py /folder/to/tex/files/ /folder/to/output/")
+        sys.exit()
+    eqoutpath = path
     erroroutputpath = path[:-1] + '_errors/'
-    if not os.path.exists(outpath):
-        os.makedirs(outpath)
     if not os.path.exists(eqoutpath):
         os.makedirs(eqoutpath)
     if not os.path.exists(erroroutputpath):
         os.makedirs(erroroutputpath)
-    #read in data
-    #remove general subcategories
-    #initialize number of threads to the number of cpu cores
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
-    #error handling for missing metadata file
-    #load in the list of files and their categories
-    #each line of the form 'filename.tex' 'category'
-    #this changes it to just 'filename' and 'category'
-    #list of tex files in the directory specified by path
     filelist= getmathfiles(path)
-    #filelist = ['/home/jay/hopper/hoptex/1501/1501.04805.tex']
-    #filedictlist is the result of makedict mapped over each filename
-    #filelist[0] corresponds to filedictlist[0]
     doclist = pool.map(makeobjs,filelist)
     print("Object generation complete")
     #handles closing of multiple processes
