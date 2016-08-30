@@ -131,16 +131,18 @@ def main():
         os.makedirs(erroroutputpath)
     if not os.path.exists(missingoutputpath):
         os.makedirs(missingoutputpath)
+    print("{}: Beginning processing")
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     filelist= getmathfiles(path)
     doclist = pool.map(makeobjs,filelist)
-    print("Object generation complete")
+    print("JSON conversion complete")
     print("Logging...")
     with open(eqoutpath[:-1]+'.log','w') as fh:
         for x in doclist:
             if x:
                 fh.write(x+'\n')
+    print("Loggin complete")
     #handles closing of multiple processes
     pool.close()
     pool.join()
