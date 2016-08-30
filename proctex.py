@@ -131,7 +131,7 @@ def main():
         os.makedirs(erroroutputpath)
     if not os.path.exists(missingoutputpath):
         os.makedirs(missingoutputpath)
-    print("{}: Beginning processing")
+    print("{}: Beginning processing".format(path))
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     filelist= getmathfiles(path)
