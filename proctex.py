@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-#proctex.py - generates equation objects
+#proctex.py - generates equation & document objects
 #Jay Dhanoa
-
+#before running this script, run getarxivdatav2.py for the corresponding folder
 import sys #handling arguments passed to function
 import glob #file path handling
 import os #checking files and writing to/from files
@@ -15,7 +15,6 @@ import json
 from core.texclasses import *
 from core.funcs import *
 path = ''
-outpath = ''
 eqoutpath = ''
 #FUNCTIONS
 
@@ -27,10 +26,10 @@ def proc(instr):
 
 
 def makeobjs(filename):
-    global outpath
     global eqoutpath
     global convertedpath
     global erroroutputpath
+    global missingoutputpath
     #print("Start: {}".format(filename))
     f1 = open(filename, mode='r', encoding='latin-1')
     text = f1.read()
@@ -38,11 +37,18 @@ def makeobjs(filename):
     cleanname = os.path.basename(os.path.splitext(filename)[0])
     convertedfilepath = os.path.join(convertedpath,cleanname+'.xhtml')
     if not os.path.isfile(convertedfilepath):
-        #print("{}: missing converted file - {}".format(filename,convertedfilepath))
-        converteddoc = ""
-        eqs = []
-        tableeqs = []
-        return("{}: Missing XHTML".format(filename))
+        print("{}: missing converted file - {}".format(filename,convertedfilepath))
+        # converteddoc = ""
+        # eqs = []
+        # tableeqs = []
+        sanitizedfile = os.path.join(missingoutputpath,cleanname+'.tex')
+        outstr = gensanitized(filename)
+        if len(outstr.strip())==0:
+            return
+        else:
+            with open(sanitizedfile,'w') as fh:
+                fh.write(gensanitized(filename))
+        return "{}: missing converted file - {}".format(filename,convertedfilepath)
     else:
         with open(convertedfilepath,'r') as fh:
             converteddoc = fh.read()
@@ -51,23 +57,26 @@ def makeobjs(filename):
     docbody = re.findall(r'(?s)\\begin\{document\}(.*?)\\end\{document\}',newtext)
     if not docbody:
         print("{}: Missing body".format(filename))
-        return("{}: Missing body".format(filename))
+        return "{}: Missing body".format(filename)
     docbody = docbody[0]
     actualeqs = grabmath(newtext)
     if len(actualeqs)!=len(tableeqs):
         if len(tableeqs)!=0:
             print("{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(actualeqs), len(tableeqs)))
             sanitizedfile = os.path.join(erroroutputpath,cleanname+'.tex')
-            with open(sanitizedfile,'w') as fh:
-                fh.write(genxhtml(filename))
-        #print("{}: skipping...".format(filename))
-        return "{}: LaTeX/XHTML equation count mismatch {} {}"
+            outstr = gensanitized(filename)
+            if len(outstr.strip())==0:
+                return
+            else:
+                with open(sanitizedfile,'w') as fh:
+                    fh.write(gensanitized(filename))
+        return "{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(actualeqs), len(tableeqs))
     else:
         for i, x in enumerate(tableeqs):
             tempvar = '\n'.join(re.findall(r'(?s)\<math.*?\<\/math\>',x))
             if len(tempvar)==0:
                 print("{}-{}: No math in table".format(filename, i))
-                return "{}-{}: No math in table".format(filename, i)
+                tableeqs[i] = ""
             else:
                 tableeqs[i] =  tempvar
         split = grabmath(docbody,split=1)
@@ -89,10 +98,7 @@ def makeobjs(filename):
             if len(prevtext)>400:
                 prevtext = prevtext[-400:]
             location = docbody.find(x)
-            if len(tableeqs[i].strip())==0:
-                print("{}: Empty JSON {} \"{}\" - \n{}".format(filename,type(tableeqs[i]),tableeqs[i],tempvar))
             neweq = equation(eqtext=x,fname=os.path.basename(filename),pos=location,nexttext=nexttext,prevtext=prevtext,index=index,mathml=tableeqs[i])
-
             try:
                 with open(outfname,'w') as fh:
                     json.dump(neweq,fh,default=JSONHandler)
@@ -101,31 +107,40 @@ def makeobjs(filename):
 
 def main():
     global path
-    global outpath
     global eqoutpath
     global convertedpath
     global erroroutputpath
-    if(len(sys.argv)==3):
+    global missingoutputpath
+    if(len(sys.argv)==4):
         path = os.path.join(str(sys.argv[1]),'')
         if not os.path.isdir(path):
             print("Error: passed parameter is not a valid directory")
             sys.exit()
-        eqoutpath=os.path.join(str(sys.argv[2]),'')
+        convertedpath = os.path.join(str(sys.argv[2]),'')
+        eqoutpath = os.path.join(str(sys.argv[3]),'')
     else:
-        print("Error: incorrect number of arguments")
-        print("Usage: python3 proctex.py /folder/to/tex/files/ /folder/to/output/")
+        print("Error: usage")
         sys.exit()
-    eqoutpath = path
+    #per getarxivdatav2, the metadata for tex files in a folder
+    #should be in a .txt file of the same name
     erroroutputpath = eqoutpath[:-1] + '_errors/'
+    missingoutputpath = eqoutpath[:-1] + '_missing/'
     if not os.path.exists(eqoutpath):
         os.makedirs(eqoutpath)
     if not os.path.exists(erroroutputpath):
         os.makedirs(erroroutputpath)
+    if not os.path.exists(missingoutputpath):
+        os.makedirs(missingoutputpath)
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     filelist= getmathfiles(path)
     doclist = pool.map(makeobjs,filelist)
     print("Object generation complete")
+    print("Logging...")
+    with open(eqoutpath[:-1]+'.log','w') as fh:
+        for x in doclist:
+            if x:
+                fh.write(x+'\n')
     #handles closing of multiple processes
     pool.close()
     pool.join()
