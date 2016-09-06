@@ -18,13 +18,6 @@ path = ''
 eqoutpath = ''
 #FUNCTIONS
 
-#split on period function for multithreaded mapping
-def proc(instr):
-    val = instr.split()
-    val[1] = (val[1].split('.'))[0]
-    return val
-
-
 def makeobjs(filename):
     global eqoutpath
     global convertedpath
@@ -108,6 +101,7 @@ def makeobjs(filename):
                     json.dump(neweq,fh,default=JSONHandler)
             except:
                 print("{}: Equation export to JSON failed".format(outfname))
+                return("{}: Equation export to JSON failed".format(outfname))
 
 def main():
     global path
@@ -125,8 +119,6 @@ def main():
     else:
         print("Error: usage")
         sys.exit()
-    #per getarxivdatav2, the metadata for tex files in a folder
-    #should be in a .txt file of the same name
     erroroutputpath = eqoutpath[:-1] + '_errors/'
     missingoutputpath = eqoutpath[:-1] + '_missing/'
     if not os.path.exists(eqoutpath):
@@ -144,13 +136,13 @@ def main():
     doclist = pool.map(makeobjs,filelist)
     print("JSON conversion complete")
     print("Logging...")
+    # temporary fix until multiprocess logs/file handling exists in python
     with open(eqoutpath[:-1]+'.log','w') as fh:
         for x in doclist:
             if x:
                 fh.write(x+'\n')
     print("Logging complete")
     print("{}: Finished".format(path))
-    #handles closing of multiple processes
     pool.close()
     pool.join()
 
