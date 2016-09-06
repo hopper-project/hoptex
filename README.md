@@ -5,11 +5,24 @@ This folder and its associated scripts can be used for the parsing and processin
 There are three main scripts in this folder: getarxivdata.py, parsetex.py,and proctex.py.
 Classes and their supporting JSON handler function are stored in core/texclasses.
 
+The primary conversion pipeline (master.py) is as follows:
+
+1. demacro.py (python2, from the hopper-tools repository) untarballs/demacroes documents into .tex files
+2. convertlatex.py takes the .tex files from demacro and generates/stores xhtml equivalents using LaTeXML
+3. proctex.py takes the .tex files, the .xhtml files, and generates .JSON objects for every display mode equation successfully processed by LaTeXML
+
+As standalone components:
+* mse.py can generate images or just the MathML of the most significant equation in demacro'd .tex files
+* parsetex.py generates graphs of the most frequently used display mode 'tokens' (e.g. '\\token'), not counting equation start/end tokens
+* getarxivdata.py can grab file metadata
+
 ### getarxivdata.py:
 getarxivdata accepts a directory of .tex files, and in the parent directory of those .tex files, generates a metadata file of all of the files and their categories.
 
 ### parsetex.py
 * Note: getarxivdata *must* be run on the folder of .tex files you're going to pass in.
+
+PREREQUISITES: numpy, matplotlib
 
 parsetex.py accepts a directory of tex files. It begins by tokenizing each expression, finding LaTeX's markup tags (e.g. \\int), before generating total token counts by category for every file in the directory.
 
