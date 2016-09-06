@@ -69,16 +69,11 @@ def main():
     global erroroutputpath
     if len(sys.argv)==1:
         print("Error: must pass in one or more valid directories")
+        exit()
     path = os.path.join(str(sys.argv[1]),'')
     if not os.path.isdir(path):
         print("Error: {} is not a valid directory".format(x))
         sys.exit()
-    erroroutputpath = os.path.join(os.path.join(outpath,os.pardir)[:-1],os.path.abspath(path[:-1]))+'_failed/'
-    print("Beginning processing of {}".format(path))
-    path = os.path.abspath(path) + '/'
-    print("Generating list of files with math...")
-    filelist = getmathfiles(path)
-    print("Generation complete.")
     if len(sys.argv)==3:
         outpath = os.path.join(sys.argv[2],'')
     else:
@@ -87,6 +82,12 @@ def main():
     if not os.path.exists(outpath):
         os.makedirs(outpath)
     os.chdir(outpath)
+    erroroutputpath = os.path.join(os.path.split(outpath[:-1])[0]+'/',os.path.basename(path[:-1])+'_failed/')
+    print("Beginning processing of {}".format(path))
+    path = os.path.abspath(path) + '/'
+    print("Generating list of files with math...")
+    filelist = getmathfiles(path)
+    print("Generation complete.")
     if not os.path.isdir(erroroutputpath):
         os.makedirs(erroroutputpath)
     pool = mp.Pool(processes=mp.cpu_count())
