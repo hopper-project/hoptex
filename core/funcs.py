@@ -3,29 +3,25 @@ import os
 import re
 import multiprocessing as mp
 
-def gensanitized(filename):
-    fname = os.path.basename(filename)
-    # print("{}: Start".format(filename))
-    with open(filename, mode='r', encoding='latin-1') as f1:
-        text = f1.read()
+def gensanitized(text):
     text = removecomments(text)
-    #series of regex expressions
+    text = re.sub(r'(?s)([^\$])(\$[^\$]*?\$)(\$[^\$]*?\$)([^\$])',r"\1\2 \3\4",text,flags=re.DOTALL)
     docbody = re.findall(r'(?s)\\begin\{document\}.*?\\end\{document\}',text)
     if not docbody:
-        print("{}: Error: no body found ".format(filename))
-        return("")
+        return ""
     docbody = docbody[0]
     body = grabmath(docbody)
     packages = re.findall(r'(?s)\\usepackage(?:\[.*?\])?\{.*?\}',text)
     docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
     if(docclass):
         docclass = docclass.group(0)+'\n'
+        docclass = re.sub(r'\{.*?\}',"{article}",docclass)
     else:
         docclass = '\\documentclass{article}\n'
     preamble = [docclass] + packages + ['\\begin{document}\n']
     postamble = ["\\end{document}"]
     output = '\n'.join(preamble+body+postamble)
-    return(output)
+    return output
 
 
 def gettexfiles(path):
@@ -37,7 +33,8 @@ def removecomments(text):
     text = re.sub(r'(?m)^%+.*$','',text)
     text = re.sub(r"(?m)([^\\])\%+.*?$",r'\1',text)
     text = re.sub(r'(?s)\\begin\{comment\}.*?\\end\{comment\}','',text)
-    return(text)
+    return text
+
 def grabmath(text, split=0):
     delim = r'|'
     a = r'\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
