@@ -10,42 +10,37 @@ from core.funcs import *
 path = ''
 outpath = ''
 
+def writesanitized(sanitized,cleanname):
+    global erroroutputpath
+    outfile = os.path.join(erroroutputpath,cleanname+'.tex')
+    with open(outfile,'w') as fh:
+        fh.write(sanitized)
+
 def genxhtml(filename):
     global outpath
-    fname = os.path.basename(filename)
-    outfname = outpath + (os.path.splitext(fname)[0]+'.xhtml')
+    cleanname = os.path.splitext(os.path.basename(filename))[0]
+    outfname = outpath + cleanname+'.xhtml'
     if os.path.isfile(outfname):
-        print("{}: Already generated".format(filename))
+        # print("{}: Already generated".format(filename))
         return ""
     # print("{}: Start".format(filename))
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
-    text = removecomments(text)
-    #series of regex expressions
-    docbody = re.findall(r'(?s)\\begin\{document\}.*?\\end\{document\}',text)
-    if not docbody:
-        print("{}: Error: no body found ".format(filename))
-        return("{}: Error: no body found".format(filename))
-    docbody = docbody[0]
-    body = grabmath(docbody)
-    packages = re.findall(r'(?s)\\usepackage(?:\[.*?\])?\{.*?\}',text)
-    docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
-    if(docclass):
-        docclass = docclass.group(0)+'\n'
-    else:
-        docclass = '\\documentclass{article}\n'
-    preamble = [docclass] + packages + ['\\begin{document}\n']
-    postamble = ["\\end{document}"]
-    output = '\n'.join(preamble+body+postamble)
+    output = gensanitized(text)
+    if len(output)==0:
+        print("{}: Error - no body found".format(filename))
+        return("{}: Error - no body found".format(filename))
     try:
         proc = subprocess.Popen(["latexml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
-        stdout, stderr = proc.communicate(output.encode(), timeout=90)
+        stdout, stderr = proc.communicate(output.encode(), timeout=60)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML conversion failed - timeout".format(filename))
+        writesanitized(output,cleanname)
         return "{}: MathML conversion failed - timeout".format(filename)
     except:
         print("{}: Conversion failed".format(filename))
+        writesanitized(output,cleanname)
         return "{}: Conversion failed".format(filename)
     try:
         proc = subprocess.Popen(["latexmlpost", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
@@ -53,12 +48,17 @@ def genxhtml(filename):
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML postprocessing failed - timeout".format(filename))
+        writesanitized(output,cleanname)
         return "{}: MathML postprocessing failed - timeout".format(filename)
     if len(stdout2.strip())==0:
         print("{}: Conversion failed".format(filename))
+        writesanitized(output,cleanname)
         return("{}: Conversion failed".format(filename))
+    stdout2 = stdout2.decode()
+    stdout2 = re.sub(r'(href\=\").*?(LaTeXML\.css)(\")',r'\1\2\3',stdout2)
+    stdout2 = re.sub(r'(href=\").*?(ltx-article\.css)(\")',r'\1\2\3',stdout2)
     with open(outfname,'w') as fh:
-        fh.write(stdout2.decode())
+        fh.write(stdout2)
     # print("{}: Finish".format(filename))
     return ""
 
@@ -66,12 +66,14 @@ def main():
     origdir = os.getcwd()
     global path
     global outpath
+    global erroroutputpath
     if len(sys.argv)==1:
         print("Error: must pass in one or more valid directories")
     path = os.path.join(str(sys.argv[1]),'')
     if not os.path.isdir(path):
         print("Error: {} is not a valid directory".format(x))
         sys.exit()
+    erroroutputpath = os.path.join(os.path.join(outpath,os.pardir)[:-1],os.path.abspath(path[:-1]))+'_failed/'
     print("Beginning processing of {}".format(path))
     path = os.path.abspath(path) + '/'
     print("Generating list of files with math...")
@@ -85,6 +87,8 @@ def main():
     if not os.path.exists(outpath):
         os.makedirs(outpath)
     os.chdir(outpath)
+    if not os.path.isdir(erroroutputpath):
+        os.makedirs(erroroutputpath)
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     print("Beginning processing...")
