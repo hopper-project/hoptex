@@ -27,7 +27,7 @@ def main():
         # print(outfolders[i],xhtml[i],json[i])
         proc = subprocess.Popen(["python3","convertlatex.py",os.path.join(path,outfolders[i],'')+'/',xhtml[i]])
         proc.wait()
-        proc = subprocess.Popen(["python3","proctex.py",os.path.join(outfolders[i],'')+'/',xhtml[i],json[i]])
+        proc = subprocess.Popen(["python3","proctex.py",os.path.join(path,outfolders[i],'')+'/',xhtml[i],json[i]])
         proc.wait()
 
 if __name__ == '__main__':
