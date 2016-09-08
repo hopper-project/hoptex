@@ -82,7 +82,7 @@ def main():
     if not os.path.exists(outpath):
         os.makedirs(outpath)
     os.chdir(outpath)
-    erroroutputpath = os.path.join(os.path.split(outpath[:-1])[0],os.path.basename(path[:-1]),'_failed/')
+    erroroutputpath = os.path.join(os.path.split(os.path.normpath(outpath))[0],os.path.basename(os.path.normpath(path)),'_failed')
     print("Beginning processing of {}".format(path))
     print("Generating list of files with math...")
     filelist = getmathfiles(path)
