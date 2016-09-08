@@ -78,7 +78,7 @@ def main():
         outpath = os.path.join(sys.argv[2],'')
     else:
         outpath = path[:-1] + '_converted/'
-    outpath = os.path.abspath(outpath) + '/'
+    outpath = os.path.join(os.path.abspath(outpath),'')
     if not os.path.exists(outpath):
         os.makedirs(outpath)
     os.chdir(outpath)
