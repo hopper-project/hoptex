@@ -14,7 +14,7 @@ def main():
     outfolders = []
     folders = []
     for x in cdir:
-        if os.path.isdir(x) and x[0]!='.':
+        if os.path.isdir(os.path.join(path,'x')) and x[0]!='.':
             outfolders.append(os.path.split(x)[1])
 
     xhtml = []
