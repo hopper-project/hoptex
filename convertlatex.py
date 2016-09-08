@@ -70,7 +70,7 @@ def main():
     if len(sys.argv)==1:
         print("Error: must pass in one or more valid directories")
         exit()
-    path = os.path.join(str(sys.argv[1]),'')
+    path = os.path.abspath(os.path.join(str(sys.argv[1]),''))
     if not os.path.isdir(path):
         print("Error: {} is not a valid directory".format(x))
         sys.exit()
@@ -84,7 +84,6 @@ def main():
     os.chdir(outpath)
     erroroutputpath = os.path.join(os.path.split(outpath[:-1])[0]+'/',os.path.basename(path[:-1])+'_failed/')
     print("Beginning processing of {}".format(path))
-    path = os.path.abspath(path) + '/'
     print("Generating list of files with math...")
     filelist = getmathfiles(path)
     print("Generation complete.")
