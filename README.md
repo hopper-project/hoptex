@@ -28,7 +28,28 @@ parsetex.py accepts a directory of tex files. It begins by tokenizing each expre
 
 It then generates a folder of matplotlib bar graphs (stored in the parent directory of the .tex files). Each graph is sorted by the top 20 most frequently occurring tokens for that category.
 
+## master.py
+
+Usage: `python3 master.py /path/to/texparent/ /path/to/xhtmlparent/ /path/to/jsonparent/`
+
+Where texparent, xhtmlparent,and jsonparent are the parent directories of multiple directories of .tex, desired output .xhtml files, and desired output .json files.
+
+It calls convertlatex.py and proctex.py in series every folder in the passed in directory.
+
+### convertlatex.py
+
+Usage:`python3 convertlatex.py /path/to/tex/dir /path/to/xhtml/dir/`
+
+convertlatex.py accepts a directory of .tex files, and generates a folder of xhtml files, each of which contains only the math packages. If the math for a file takes longer than 60 seconds to process (often the case of latexml becoming unresponsive and/or leaking memory), it aborts the attempt to generate an xhtml file for that document file and prints a corresponding note of failure to stderr.
+
+Each xhtml file is generated using the *latexml* and *latexmlpost* commands.
+
+convertlatex.py uses the multiprocessing library and, by default, will utilize as many cores as your system has.
+
+
 ### proctex.py
+
+Usage:`python3 proctex.py /path/to/tex/dir /path/to/xhtml/dir/ /path/to/json/output/dir`
 
 proctex.py accepts a directory of .tex files, the corresponding directory of converted .xhtml files, and an output directory.
 
@@ -40,13 +61,6 @@ It generates JSON objects. Each JSON object contains the following:
 * Filename
 * Equation number (in document)
 
-### convertlatex.py
-
-convertlatex.py accepts a directory of .tex files, and generates a folder of xhtml files, each of which contains only the math packages. If the math for a file takes longer than 60 seconds to process (often the case of latexml becoming unresponsive and/or leaking memory), it aborts the attempt to generate an xhtml file for that document file and prints a corresponding note of failure to stderr.
-
-Each xhtml file is generated using the *latexml* and *latexmlpost* commands.
-
-convertlatex.py uses the multiprocessing library and, by default, will utilize as many cores as your system has.
 
 ###### Installation/usage
 
