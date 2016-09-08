@@ -1,8 +1,8 @@
 import sys #handling arguments passed to function
 import glob #file path handling
 import os #checking files and writing to/from files
-import re #regex matching
-import multiprocessing as mp #drastic speedups when implemented on an i7-4710HQ
+import re
+import multiprocessing as mp
 import subprocess
 from subprocess import PIPE
 from core.funcs import *
@@ -82,7 +82,7 @@ def main():
     if not os.path.exists(outpath):
         os.makedirs(outpath)
     os.chdir(outpath)
-    erroroutputpath = os.path.join(os.path.split(outpath[:-1])[0]+'/',os.path.basename(path[:-1])+'_failed/')
+    erroroutputpath = os.path.join(os.path.split(outpath[:-1])[0],os.path.basename(path[:-1]),'_failed/')
     print("Beginning processing of {}".format(path))
     print("Generating list of files with math...")
     filelist = getmathfiles(path)
