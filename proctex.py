@@ -22,7 +22,6 @@ def makeobjs(filename):
     global eqoutpath
     global convertedpath
     global erroroutputpath
-    global missingoutputpath
     #print("Start: {}".format(filename))
     f1 = open(filename, mode='r', encoding='latin-1')
     text = f1.read()
@@ -34,14 +33,7 @@ def makeobjs(filename):
         # converteddoc = ""
         # eqs = []
         # tableeqs = []
-        sanitizedfile = os.path.join(missingoutputpath,cleanname+'.tex')
-        outstr = gensanitized(filename)
-        if len(outstr.strip())==0:
-            return
-        else:
-            with open(sanitizedfile,'w') as fh:
-                fh.write(gensanitized(filename))
-        return "{}: missing converted file - {}".format(filename,convertedfilepath)
+        return ""
     else:
         with open(convertedfilepath,'r') as fh:
             converteddoc = fh.read()
@@ -108,7 +100,6 @@ def main():
     global eqoutpath
     global convertedpath
     global erroroutputpath
-    global missingoutputpath
     if(len(sys.argv)==4):
         path = os.path.join(str(sys.argv[1]),'')
         if not os.path.isdir(path):
@@ -120,13 +111,10 @@ def main():
         print("Error: usage")
         sys.exit()
     erroroutputpath = eqoutpath[:-1] + '_errors/'
-    missingoutputpath = eqoutpath[:-1] + '_missing/'
     if not os.path.exists(eqoutpath):
         os.makedirs(eqoutpath)
     if not os.path.exists(erroroutputpath):
         os.makedirs(erroroutputpath)
-    if not os.path.exists(missingoutputpath):
-        os.makedirs(missingoutputpath)
     print("{}: Beginning processing".format(path))
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
