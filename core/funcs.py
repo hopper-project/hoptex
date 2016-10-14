@@ -51,6 +51,7 @@ def grabmath(text, split=0):
         matches = re.split(tomatch,text)
         for i, x in enumerate(matches):
             matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
+        matches.append("")
         return matches
     else:
         tomatch = r'(?s)' + delim.join(exprmatch)

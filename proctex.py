@@ -19,6 +19,11 @@ eqoutpath = ''
 #FUNCTIONS
 
 def makeobjs(filename):
+    '''
+    Accepts filepath in filename, opens corresponding .tex and .xhtml files
+    If the number of display mode math sections & math tables match up,
+    generate a JSON object and write it out to the json path.
+    '''
     global eqoutpath
     global convertedpath
     global erroroutputpath
@@ -29,44 +34,46 @@ def makeobjs(filename):
     cleanname = os.path.basename(os.path.splitext(filename)[0])
     convertedfilepath = os.path.join(convertedpath,cleanname+'.xhtml')
     if not os.path.isfile(convertedfilepath):
-        print("{}: missing converted file - {}".format(filename,convertedfilepath))
+        # print("{}: missing converted file - {}".format(filename,convertedfilepath))
         # converteddoc = ""
         # eqs = []
-        # tableeqs = []
+        # xhtml_equations = []
         return ""
     else:
         with open(convertedfilepath,'r') as fh:
             converteddoc = fh.read()
-        tableeqs = re.findall(r'(?s)\<table.*?\<\/table\>',converteddoc)
+        xhtml_equations = re.findall(r'(?s)\<table.*?\<\/table\>',converteddoc)
     newtext = removecomments(text)
     docbody = re.findall(r'(?s)\\begin\{document\}(.*?)\\end\{document\}',newtext)
     if not docbody:
         print("{}: Missing body".format(filename))
         return "{}: Missing body".format(filename)
     docbody = docbody[0]
-    actualeqs = grabmath(newtext)
-    if len(actualeqs)!=len(tableeqs):
-        if len(tableeqs)!=0:
-            print("{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(actualeqs), len(tableeqs)))
+    #enforce that document body is in the document
+    tex_equations = grabmath(newtext)
+    if len(tex_equations)!=len(xhtml_equations):
+        if len(xhtml_equations)!=0:
+            print("{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(tex_equations), len(xhtml_equations)))
             sanitizedfile = os.path.join(erroroutputpath,cleanname+'.tex')
             outstr = gensanitized(filename)
-            if len(outstr.strip())==0:
-                return
+            if len(gensanitized(filename).strip())==0:
+                print("{}: LaTeXML failure".format(filename))
+                return("{}: LaTeXML failure".format(filename))
             else:
                 with open(sanitizedfile,'w') as fh:
                     fh.write(gensanitized(filename))
-        return "{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(actualeqs), len(tableeqs))
+        return "{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(tex_equations), len(xhtml_equations))
     else:
-        for i, x in enumerate(tableeqs):
+        for i, x in enumerate(xhtml_equations):
             tempvar = '\n'.join(re.findall(r'(?s)\<math.*?\<\/math\>',x))
             if len(tempvar)==0:
                 print("{}-{}: No math in table".format(filename, i))
-                tableeqs[i] = ""
+                xhtml_equations[i] = ""
             else:
-                tableeqs[i] =  tempvar
+                xhtml_equations[i] =  tempvar
         split = grabmath(docbody,split=1)
-        for i, x in enumerate(actualeqs):
-            outfname = eqoutpath + cleanname + '.' + str(i) + '.json'
+        export_list = []
+        for i, x in enumerate(tex_equations):
             try:
                 index = split.index(x)
             except:
@@ -74,26 +81,43 @@ def makeobjs(filename):
                 return("{}: Equation matching failed".format(filename))
             nexttext = ""
             prevtext = ""
-            for y in range(i-1,-1,-1):
-                if isinstance(split[y],str):
-                    prevtext = split[y]
-                    break
-            for y in range(i+1,len(split)):
-                if isinstance(split[y],str):
-                    nexttext = split[y]
-                    break
-            if len(nexttext)>400:
-                nexttext = nexttext[:400]
-            if len(prevtext)>400:
-                prevtext = prevtext[-400:]
+            # for y in range(i-1,-1,-1):
+            #     if split[y] not in tex_equations:
+            #         prevtext = split[y]
+            #         break
+            # for y in range(i+1,len(split)):
+            #     if split[y] not in tex_equations:
+            #         nexttext = split[y]
+            #         break
+            # if len(nexttext)>400:
+            #     nexttext = nexttext[:400]
+            # if len(prevtext)>400:
+            #     prevtext = prevtext[-400:]
+            if i in range(0, len(tex_equations)-1):
+                if split[index-1] not in tex_equations:
+                    prevtext = split[index-1]
+                if split[index+1] not in tex_equations:
+                    nexttext = split[index+1]
             location = docbody.find(x)
-            neweq = equation(eqtext=x,fname=os.path.basename(filename),pos=location,nexttext=nexttext,prevtext=prevtext,index=index,mathml=tableeqs[i])
-            try:
-                with open(outfname,'w') as fh:
-                    json.dump(neweq,fh,default=JSONHandler)
-            except:
-                print("{}: Equation export to JSON failed".format(outfname))
-                return("{}: Equation export to JSON failed".format(outfname))
+            neweq = equation(eqtext=x,fname=os.path.basename(filename),pos=location,nexttext=nexttext,prevtext=prevtext,index=index,mathml=xhtml_equations[i])
+            export_list.append(neweq)
+            '''code for exporting each equation object as a JSON'''
+            '''comment out the try/except statement in the outer loop
+            if you want to use this'''
+            # outfname = eqoutpath + cleanname + '.' + str(i) + '.json'
+            # try:
+            #     with open(outfname,'w') as fh:
+            #         json.dump(neweq,fh,default=JSONHandler)
+            # except:
+            #     print("{}: Equation export to JSON failed".format(outfname))
+            #     return("{}: Equation export to JSON failed".format(outfname))
+        outfname = eqoutpath + cleanname + '.json'
+        try:
+            with open(outfname,'w') as fh:
+                json.dump(export_list,fh,default=JSONHandler)
+        except:
+            print("{}: Equation export to JSON failed".format(outfname))
+            return("{}: Equation export to JSON failed".format(outfname))
 
 def main():
     global path
@@ -124,7 +148,6 @@ def main():
     doclist = pool.map(makeobjs,filelist)
     print("JSON conversion complete")
     print("Logging...")
-    # temporary fix until multiprocess logs/file handling exists in python
     with open(eqoutpath[:-1]+'.log','w') as fh:
         for x in doclist:
             if x:
