@@ -6,6 +6,7 @@ from collections import Counter
 import subprocess
 from core.funcs import *
 import argparse
+import tempfile
 
 def cleantuple(tup):
     global outpath
@@ -20,22 +21,24 @@ def sqlgrab(filename):
     return(matches)
 
 def render(tup):
-    outpath, text = tup
+    filepath, text = tup
     rendertext = text.encode('utf-8')
     try:
-        proc = subprocess.Popen(["latexmlmath","--mathimage="+os.path.abspath(outpath),"-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = proc.communicate(rendertext, timeout=90)
-        stderr = stderr.decode()
-        if len(stderr)>0:
-            print("{}: {}".format(outpath,stderr))
-            return("{}: {}\n".format(outpath,stderr))
+        with tempfile.TemporaryDirectory() as path:
+            os.chdir(path)
+            proc = subprocess.Popen(["latexmlmath","--mathimage="+filepath,"-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = proc.communicate(rendertext, timeout=90)
+            stderr = stderr.decode()
+            if len(stderr)>0:
+                print("{}: {}".format(filepath,stderr))
+                return("{}: {}\n".format(filepath,stderr))
     except:
         try:
             proc.kill()
         except:
             pass
-        print("{}: Failed to generate image".format(outpath))
-        return("{}: Failed to generate image\n".format(outpath))
+        print("{}: Failed to generate image".format(filepath))
+        return("{}: Failed to generate image\n".format(filepath))
     return("")
 
 def main():
@@ -47,18 +50,22 @@ def main():
     args = parser.parse_args()
     fname = args.fname
     outpath = args.outdir
+    pool = mp.Pool(processes=mp.cpu_count())
     if not os.path.exists(outpath):
         os.makedirs(outpath)
+    outpath = os.path.abspath(outpath)
     if(args.sql):
         matches = sqlgrab(args.fname)
-        matches = list(map(cleantuple,matches))
-        log = list(map(render,matches))
+        matches = list(map(cleantuple,matches)
+        log = pool.map(render,matches)
         with open('templog.log','w') as fh:
             for x in log:
                 if(x):
                     fh.write(x)
     else:
         print("Default functionality of script not yet implemented. ¯\_(ツ)_/¯")
+    pool.close()
+    pool.join()
 
 if __name__ == '__main__':
     main()
