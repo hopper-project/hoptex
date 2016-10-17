@@ -22,6 +22,8 @@ def sqlgrab(filename):
 
 def render(tup):
     filepath, text = tup
+    if os.path.isfile(filepath):
+        return("")
     rendertext = text.encode('utf-8')
     try:
         with tempfile.TemporaryDirectory() as path:
@@ -56,7 +58,7 @@ def main():
     outpath = os.path.abspath(outpath)
     if(args.sql):
         matches = sqlgrab(args.fname)
-        matches = list(map(cleantuple,matches)
+        matches = list(map(cleantuple,matches))
         log = pool.map(render,matches)
         with open('templog.log','w') as fh:
             for x in log:
