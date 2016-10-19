@@ -93,7 +93,7 @@ def makeobjs(filename):
             #     nexttext = nexttext[:400]
             # if len(prevtext)>400:
             #     prevtext = prevtext[-400:]
-            if i in range(0, len(tex_equations)-1):
+            if i in range(0, len(tex_equations)):
                 if split[index-1] not in tex_equations:
                     prevtext = split[index-1]
                 if split[index+1] not in tex_equations:
