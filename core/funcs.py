@@ -79,3 +79,14 @@ def getmathfiles(path):
     pool.close()
     pool.join()
     return outlist
+
+def getmathfromfilelist(files):
+    pool = mp.Pool(processes=mp.cpu_count())
+    filelist = pool.map(hasmath,files)
+    for texfile in filelist:
+        if texfile[1]:
+            outlist.append(os.path.abspath(texfile[0]))
+    print("{} files with math".format(len(outlist)))
+    pool.close()
+    pool.join()
+    return outlist
