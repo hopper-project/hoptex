@@ -46,6 +46,7 @@ def grabmath(text, split=0):
     g = r'[^\\]\\\[.*?\\\]'
     h = r'\$\$[^\^].*?\$\$'
     exprmatch = [a,b,c,d,e,f,g,h]
+    text = removecomments(text)
     if(split):
         tomatch = r'(?s)('+delim.join(exprmatch)+r')'
         matches = re.split(tomatch,text)
