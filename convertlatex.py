@@ -26,7 +26,7 @@ def genxhtml(filename):
     # print("{}: Start".format(filename))
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
-    output = gensanitized(text)
+    output = generate_sanitized_document(text)
     if len(output)==0:
         print("{}: Error - no body found".format(filename))
         return("{}: Error - no body found".format(filename))

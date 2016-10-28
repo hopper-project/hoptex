@@ -41,8 +41,7 @@ def main():
     #generate list of files in the directory with a .tex file extension
     filelist= glob.glob(os.path.join(path,'*.tex'))
     #initialize the same number of threads as cpu cores
-    cpucount = mp.cpu_count()
-    pool = mp.Pool(processes=cpucount)
+    pool = mp.Pool(processes=mp.cpu_count())
     #append to list/map to list is thread safe
     #that's being done with pool
     output = pool.map(iterwrite,filelist)

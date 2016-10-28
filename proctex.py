@@ -31,37 +31,37 @@ def makeobjs(filename):
     f1 = open(filename, mode='r', encoding='latin-1')
     text = f1.read()
     f1.close()
-    cleanname = os.path.basename(os.path.splitext(filename)[0])
-    convertedfilepath = os.path.join(convertedpath,cleanname+'.xhtml')
+    clean_name = os.path.basename(os.path.splitext(filename)[0])
+    convertedfilepath = os.path.join(convertedpath,clean_name+'.xhtml')
     if not os.path.isfile(convertedfilepath):
         # print("{}: missing converted file - {}".format(filename,convertedfilepath))
-        # converteddoc = ""
+        # converted_document = ""
         # eqs = []
         # xhtml_equations = []
         return ""
     else:
         with open(convertedfilepath,'r') as fh:
-            converteddoc = fh.read()
-        xhtml_equations = re.findall(r'(?s)\<table.*?\<\/table\>',converteddoc)
+            converted_document = fh.read()
+        xhtml_equations = re.findall(r'(?s)\<table.*?\<\/table\>',converted_document)
     newtext = removecomments(text)
-    docbody = re.findall(r'(?s)\\begin\{document\}(.*?)\\end\{document\}',newtext)
-    if not docbody:
+    document_body = re.findall(r'(?s)\\begin\{document\}(.*?)\\end\{document\}',newtext)
+    if not document_body:
         print("{}: Missing body".format(filename))
         return "{}: Missing body".format(filename)
-    docbody = docbody[0]
+    document_body = document_body[0]
     #enforce that document body is in the document
-    tex_equations = grabmath(newtext)
+    tex_equations = grab_math(newtext)
     if len(tex_equations)!=len(xhtml_equations):
         if len(xhtml_equations)!=0:
             print("{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(tex_equations), len(xhtml_equations)))
-            sanitizedfile = os.path.join(erroroutputpath,cleanname+'.tex')
-            outstr = gensanitized(filename)
-            if len(gensanitized(filename).strip())==0:
+            sanitizedfile = os.path.join(erroroutputpath,clean_name+'.tex')
+            outstr = generate_sanitized_document(filename)
+            if len(generate_sanitized_document(filename).strip())==0:
                 print("{}: LaTeXML failure".format(filename))
                 return("{}: LaTeXML failure".format(filename))
             else:
                 with open(sanitizedfile,'w') as fh:
-                    fh.write(gensanitized(filename))
+                    fh.write(generate_sanitized_document(filename))
         return "{}: LaTeX/XHTML equation count mismatch {} {}".format(filename, len(tex_equations), len(xhtml_equations))
     else:
         for i, x in enumerate(xhtml_equations):
@@ -71,7 +71,7 @@ def makeobjs(filename):
                 xhtml_equations[i] = ""
             else:
                 xhtml_equations[i] =  tempvar
-        split = grabmath(docbody,split=1)
+        split = grab_math(document_body,split=1)
         export_list = []
         for i, x in enumerate(tex_equations):
             try:
@@ -98,20 +98,20 @@ def makeobjs(filename):
                     prevtext = split[index-1]
                 if split[index+1] not in tex_equations:
                     nexttext = split[index+1]
-            location = docbody.find(x)
+            location = document_body.find(x)
             neweq = equation(eqtext=x,fname=os.path.basename(filename),pos=location,nexttext=nexttext,prevtext=prevtext,index=index,mathml=xhtml_equations[i])
             export_list.append(neweq)
             '''code for exporting each equation object as a JSON'''
             '''comment out the try/except statement in the outer loop
             if you want to use this'''
-            # outfname = eqoutpath + cleanname + '.' + str(i) + '.json'
+            # outfname = eqoutpath + clean_name + '.' + str(i) + '.json'
             # try:
             #     with open(outfname,'w') as fh:
             #         json.dump(neweq,fh,default=JSONHandler)
             # except:
             #     print("{}: Equation export to JSON failed".format(outfname))
             #     return("{}: Equation export to JSON failed".format(outfname))
-        outfname = eqoutpath + cleanname + '.json'
+        outfname = eqoutpath + clean_name + '.json'
         try:
             with open(outfname,'w') as fh:
                 json.dump(export_list,fh,default=JSONHandler)

@@ -32,7 +32,7 @@ def mse(filename):
     occurrences = []
     labeldict = {}
     isFirst = 0
-    equations = grabmath(text)
+    equations = grab_math(text)
     if len(equations)==0:
         return("{}: Something weird happened\n".format(filename))
     for equation in equations:
@@ -81,6 +81,29 @@ def mse(filename):
     else:
         return("{}: {} occurrences\n".format(filename,eqcount[0][1]))
 
+def rendereq(msetext,filename):
+    global outpath
+    global path
+    if len(rendereq)>1500:
+        print("{}: MSE too long".format(filename))
+        return("{}: MSE too long".format(filename))
+    rendereq = rendereq.encode('utf-8')
+    print("Outputting to: {}".format(imgname))
+    preload = "--preload="+os.path.abspath(stylefile)
+    mathimage = "--mathimage=" + os.path.abspath(imgname)
+    try:
+        proc = subprocess.Popen(["latexmlmath", preload,mathimage, "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc.communicate(rendereq, timeout=90)
+    except:
+        proc.kill()
+        print("{}: Failed to generate image".format(filename))
+        return("{}: Failed to generate image\n".format(filename))
+    os.remove(stylefile)
+    if isFirst:
+        return("{}: first equation\n".format(filename))
+    else:
+        return("{}: {} occurrences\n".format(filename,eqcount[0][1]))
+
 def main():
     global outpath
     global path
@@ -104,8 +127,8 @@ def main():
     doclist = getmathfiles(path)
     doclist = map(os.path.abspath,doclist)
     tofile = pool.map(mse,doclist)
-    outdocname = outpath[:-1] + '.log'
-    with open(outdocname,'w') as fh:
+    log_file = outpath[:-1] + '.log'
+    with open(log_file,'w') as fh:
         for x in tofile:
             fh.write(x+'\n')
     pool.close()

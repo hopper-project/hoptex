@@ -126,7 +126,7 @@ def main():
     #default path to directory with tex files
     path = '1506/'
     #The program accepts a directory to be analyzed
-    if(len(sys.argv)>2):
+    if(len(sys.argv)>1):
         path = str(sys.argv[1])
         path = os.path.join(path,'')
         if not os.path.isdir(path):
