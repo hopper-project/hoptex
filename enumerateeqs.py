@@ -3,13 +3,10 @@ import os
 import multiprocessing as mp
 import fnmatch
 from core.funcs import *
-from collections import Counter
 import time
 
-
 def main():
-    global outpath
-    parser = argparse.ArgumentParser(description='Usage for equation enumeration1')
+    parser = argparse.ArgumentParser(description='Usage for equation enumeration')
     parser.add_argument("directory",help="Path to directory of .tex files")
     parser.add_argument("outfile",help="Path to output file")
     args = parser.parse_args()
@@ -41,7 +38,8 @@ def main():
             math_equations.pop()
             continue
         unique_eqs[math_equations[-1]] = "EQ" + str(eqcount) + "Q"
-        # pop from list and iterate over 0th element for memory reasons
+        # iterate over -1th element and pop as you add to unique dictionary
+        # avoids memory issues
         math_equations.pop()
         eqcount += 1
     print("{} seconds".format(int(time.time()-start)))
@@ -49,7 +47,7 @@ def main():
     print("Writing to file...")
     with open(outpath,mode='w') as fh:
         for x in unique_eqs:
-            fh.write(unique_eqs[x]+'\t'+x.replace("\n","\\n").replace("\"","\\\"").replace("\t","\\t")+'\n')
+            fh.write(unique_eqs[x]+'\t'+repr(x)[1:-1]+'\n')
     print("Finished writing equations to file")
     print("{} seconds".format(int(time.time()-start)))
 

@@ -23,7 +23,6 @@ def generate_sanitized_document(text):
     output = '\n'.join(preamble+body+postamble)
     return output
 
-
 def gettexfiles(path):
     absolute_path = os.path.abspath(path) + '/'
     file_list = glob.glob(os.path.join(absolute_path,'*.tex'))
@@ -35,7 +34,7 @@ def removecomments(text):
     text = re.sub(r'(?s)\\begin\{comment\}.*?\\end\{comment\}','',text)
     return text
 
-def grab_math(text, split=0):
+def grab_math(text, split=False):
     delim = r'|'
     a = r'\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
     b = r'\\begin\{multline\*?\}.*?\\end\{multline\*?\}'
