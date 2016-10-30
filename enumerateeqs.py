@@ -45,13 +45,13 @@ def main():
         math_equations.pop()
         eqcount += 1
     print("{} seconds".format(int(time.time()-start)))
+    print("Found {} unique equations".format(len(unique_eqs)))
     print("Writing to file...")
     with open(outpath,mode='w') as fh:
         for x in unique_eqs:
-            fh.write(unique_eqs[x]+'\t'+"\""+x.replace("\n","\\n").replace("\"","\\\"").replace("\t","\\t")+"\""+'\n')
+            fh.write(unique_eqs[x]+'\t'+x.replace("\n","\\n").replace("\"","\\\"").replace("\t","\\t")+'\n')
     print("Finished writing equations to file")
     print("{} seconds".format(int(time.time()-start)))
-
 
 
 if __name__ == '__main__':
