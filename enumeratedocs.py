@@ -37,16 +37,15 @@ def main():
     # folderlist = glob(directory+'*/')
     print("Generating equation dictionary...")
     eqdict = {}
-    with open('/media/jay/Data1/demacro_equation_out_new.tsv',mode='r',encoding='latin-1') as fh:
+    with open(tsv,mode='r',encoding='latin-1') as fh:
         for line in fh:
             eqid, equation = line.strip().split('\t')
             equation = equation.encode().decode('unicode_escape')
             if equation not in eqdict:
                 eqdict[equation] = eqid
     print("Equation dictionary loaded.")
-    pool = mp.Pool(processes=mp.cpu_count())
-    print("Initialized {} threads".format(mp.cpu_count()))
     if(parent):
+        print("Iterating over folders in {}".format(directory))
         folderlist = next(os.walk(directory))[1]
         for subfolder in folderlist:
             outpath = os.path.join(outdir,subfolder)
@@ -56,7 +55,10 @@ def main():
             current_dir = os.path.join(directory,subfolder)
             filelist = getmathfiles(current_dir)
             print("Writing files...")
+            pool = mp.Pool(processes=mp.cpu_count())
             pool.map(substitute_eqid,filelist)
+            pool.close()
+            pool.join()
     else:
         outpath = outdir
         if not os.path.exists(outpath):
@@ -65,8 +67,8 @@ def main():
         filelist = getmathfiles(directory)
         print("Writing files...")
         pool.map(substitute_eqid,filelist)
-    pool.close()
-    pool.join()
+        pool.close()
+        pool.join()
 
 if __name__ == '__main__':
     main()
