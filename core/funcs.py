@@ -3,14 +3,14 @@ import os
 import re
 import multiprocessing as mp
 
-def gensanitized(text):
+def generate_sanitized_document(text):
     text = removecomments(text)
     text = re.sub(r'(?s)([^\$])(\$[^\$]*?\$)(\$[^\$]*?\$)([^\$])',r"\1\2 \3\4",text,flags=re.DOTALL)
     docbody = re.findall(r'(?s)\\begin\{document\}.*?\\end\{document\}',text)
     if not docbody:
         return ""
     docbody = docbody[0]
-    body = grabmath(docbody)
+    body = grab_math(docbody)
     packages = re.findall(r'(?s)\\usepackage(?:\[.*?\])?\{.*?\}',text)
     docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
     if(docclass):
@@ -35,7 +35,7 @@ def removecomments(text):
     text = re.sub(r'(?s)\\begin\{comment\}.*?\\end\{comment\}','',text)
     return text
 
-def grabmath(text, split=0):
+def grab_math(text, split=0):
     delim = r'|'
     a = r'\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
     b = r'\\begin\{multline\*?\}.*?\\end\{multline\*?\}'
@@ -61,11 +61,17 @@ def grabmath(text, split=0):
             matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
         return matches
 
+def grab_math_from_file(filename, split=0):
+    with open(filename,mode='r',encoding='latin-1') as fh:
+        text = fh.read()
+    return grab_math(text, split)
+
+
 def hasmath(filename):
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
     text = removecomments(text)
-    finds = grabmath(text)
+    finds = grab_math(text)
     return (filename, len(finds))
 
 def getmathfiles(path):
@@ -76,18 +82,16 @@ def getmathfiles(path):
     for texfile in filelist:
         if texfile[1]:
             outlist.append(os.path.abspath(texfile[0]))
-    print("{} files with math".format(len(outlist)))
     pool.close()
     pool.join()
     return outlist
 
 def getmathfromfilelist(files):
     pool = mp.Pool(processes=mp.cpu_count())
-    filelist = pool.map(hasmath,files)
+    filelist = getmathfiles(files)
     for texfile in filelist:
         if texfile[1]:
             outlist.append(os.path.abspath(texfile[0]))
-    print("{} files with math".format(len(outlist)))
     pool.close()
     pool.join()
     return outlist
