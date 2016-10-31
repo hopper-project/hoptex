@@ -18,6 +18,7 @@ def substitute_eqid(filename):
         else:
             textlist[i] = textlist[i].strip()
         newtext = '\n'.join(textlist)
+        newtext = re.sub(r'(?s)\\begin\{eqnarray\}.+?\\end\{eqnarray\}|\\begin\{thebibliography\}.+|\$[^$]{1,50}\$|\\bibinfo\{.+?\}\{.+?\}|\\[A-z]+(?:\[.+?\])(?:\{.+?\})?|\\[A-z]+\{.+?\}|\\[A-z]+','').strip()
     with open(os.path.join(outpath,os.path.basename(filename)),mode='w',encoding='utf-8') as fh:
         fh.write(newtext)
 
