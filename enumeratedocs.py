@@ -9,14 +9,18 @@ from glob import glob
 def substitute_eqid(filename):
     global eqdict
     global outpath
+    no_math = True
     with open(filename,mode='r',encoding='latin-1') as fh:
         text = fh.read()
     textlist = grab_math(text,split=True)
     for i, x in enumerate(textlist):
         if x in eqdict:
             textlist[i] = eqdict[x]
+            no_math = False
         else:
             textlist[i] = textlist[i].strip()
+        if no_math:
+            return
         newtext = '\n'.join(textlist)
         newtext = re.sub(r'(?s)\\begin\{eqnarray\}.+?\\end\{eqnarray\}|\\begin\{thebibliography\}.+|\$[^$]{1,50}\$|\\bibinfo\{.+?\}\{.+?\}|\\[A-z]+(?:\[.+?\])(?:\{.+?\})?|\\[A-z]+\{.+?\}|\\[A-z]+','',newtext).strip()
     with open(os.path.join(outpath,os.path.basename(filename)),mode='w',encoding='utf-8') as fh:
@@ -54,7 +58,7 @@ def main():
                 os.makedirs(outpath)
             print("Finding .tex files in {}".format(subfolder))
             current_dir = os.path.join(directory,subfolder)
-            filelist = getmathfiles(current_dir)
+            filelist = gettexfiles(current_dir)
             print("Writing files...")
             pool = mp.Pool(processes=mp.cpu_count())
             pool.map(substitute_eqid,filelist)
@@ -65,7 +69,7 @@ def main():
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         print("Finding all .tex files...")
-        filelist = getmathfiles(directory)
+        filelist = gettexfiles(outpath)
         print("Writing files...")
         pool.map(substitute_eqid,filelist)
         pool.close()
