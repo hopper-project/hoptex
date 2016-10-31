@@ -20,6 +20,16 @@ def sqlgrab(filename):
     matches = re.findall(r'([\w]+)\s###([^#]+)###',text)
     return(matches)
 
+def tsvgrab(filename):
+    global outpath
+    outlist = []
+    with open(filename,'r') as fh:
+        for line in fh:
+            eqid, eqtext = line.split('\t')
+            eqtext = eqtext.encode().decode('unicode_escape')
+            outlist.append(cleantuple((eqid, eqtext)))
+    return(outlist)
+
 def render(tup):
     filepath, text = tup
     if os.path.isfile(filepath):
@@ -47,11 +57,12 @@ def main():
     global outpath
     parser = argparse.ArgumentParser(description='Options for rendering LaTeX images of files')
     parser.add_argument('--sql',action='store_true', help="Use when passing in a sqlite.out file")
-    parser.add_argument("fname",help="Path to sql file (requires --sql flag), or folder of .tex files.")
-    parser.add_argument("outdir",help="Path to output file")
+    parser.add_argument('--tsv', action='store_true', help="Use when passing in a tsv of the format EQID formula")
+    parser.add_argument("fname",help="Input file/folder")
+    parser.add_argument("outdir",help="Path to output file/folder")
     args = parser.parse_args()
     fname = args.fname
-    outpath = args.outdir
+    outpath = os.path.abspath(args.outdir)
     pool = mp.Pool(processes=mp.cpu_count())
     if not os.path.exists(outpath):
         os.makedirs(outpath)
@@ -60,14 +71,18 @@ def main():
         matches = sqlgrab(args.fname)
         matches = list(map(cleantuple,matches))
         log = pool.map(render,matches)
-        with open('templog.log','w') as fh:
-            for x in log:
-                if(x):
-                    fh.write(x)
+
+    if(args.tsv):
+        matches = tsvgrab(args.fname)
+        log = pool.map(render,matches)
     else:
         print("Default functionality of script not yet implemented. ¯\_(ツ)_/¯")
     pool.close()
     pool.join()
+    with open('templog.log','w') as fh:
+        for x in log:
+            if(x):
+                fh.write(x)
 
 if __name__ == '__main__':
     main()
