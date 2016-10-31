@@ -19,10 +19,10 @@ def substitute_eqid(filename):
             no_math = False
         else:
             textlist[i] = textlist[i].strip()
-        if no_math:
-            return
-        newtext = '\n'.join(textlist)
-        newtext = re.sub(r'(?s)\\begin\{eqnarray\}.+?\\end\{eqnarray\}|\\begin\{thebibliography\}.+|\$[^$]{1,50}\$|\\bibinfo\{.+?\}\{.+?\}|\\[A-z]+(?:\[.+?\])(?:\{.+?\})?|\\[A-z]+\{.+?\}|\\[A-z]+','',newtext).strip()
+    if no_math:
+        return
+    newtext = '\n'.join(textlist)
+    newtext = re.sub(r'(?s)\\begin\{eqnarray\}.+?\\end\{eqnarray\}|\\begin\{thebibliography\}.+|\$[^$]{1,50}\$|\\bibinfo\{.+?\}\{.+?\}|\\[A-z]+(?:\[.+?\])(?:\{.+?\})?|\\[A-z]+\{.+?\}|\\[A-z]+','',newtext).strip()
     with open(os.path.join(outpath,os.path.basename(filename)),mode='w',encoding='utf-8') as fh:
         fh.write(newtext)
 
