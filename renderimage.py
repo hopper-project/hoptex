@@ -21,6 +21,7 @@ def sqlgrab(filename):
     return(matches)
 
 def tsvgrab(filename):
+    print("Loading TSV...")
     global outpath
     outlist = []
     with open(filename,'r') as fh:
@@ -34,6 +35,7 @@ def render(tup):
     filepath, text = tup
     if os.path.isfile(filepath):
         return("")
+    print("Processing {}".format(filepath))
     rendertext = text.encode('utf-8')
     try:
         with tempfile.TemporaryDirectory() as path:
@@ -71,7 +73,6 @@ def main():
         matches = sqlgrab(args.fname)
         matches = list(map(cleantuple,matches))
         log = pool.map(render,matches)
-
     if(args.tsv):
         matches = tsvgrab(args.fname)
         log = pool.map(render,matches)
