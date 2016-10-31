@@ -40,7 +40,10 @@ def render(tup):
     try:
         with tempfile.TemporaryDirectory() as path:
             os.chdir(path)
-            proc = subprocess.Popen(["latexmlmath","--mathimage="+filepath,"-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if(stylefile):
+                proc = subprocess.Popen(["latexmlmath","--preload="+stylefile,"--mathimage="+filepath,"-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            else:
+                proc = subprocess.Popen(["latexmlmath","--mathimage="+filepath,"-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = proc.communicate(rendertext, timeout=90)
             stderr = stderr.decode()
             if len(stderr)>0:
@@ -57,14 +60,17 @@ def render(tup):
 
 def main():
     global outpath
+    global stylefile
     parser = argparse.ArgumentParser(description='Options for rendering LaTeX images of files')
     parser.add_argument('--sql',action='store_true', help="Use when passing in a sqlite.out file")
     parser.add_argument('--tsv', action='store_true', help="Use when passing in a tsv of the format EQID formula")
+    parser.add_argument('--sty', help="Optional parameter for .sty file for use with latexmlmath")
     parser.add_argument("fname",help="Input file/folder")
     parser.add_argument("outdir",help="Path to output file/folder")
     args = parser.parse_args()
     fname = args.fname
     outpath = os.path.abspath(args.outdir)
+    stylefile = args.sty
     pool = mp.Pool(processes=mp.cpu_count())
     if not os.path.exists(outpath):
         os.makedirs(outpath)
