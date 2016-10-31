@@ -22,6 +22,7 @@ def substitute_eqid(filename):
     if no_math:
         return
     newtext = '\n'.join(textlist)
+    newtext = re.sub(r'\\begin\{title\}(.+?)\\end\{title\}',r'\1',newtext)
     newtext = re.sub(r'(?s)\\begin\{eqnarray\}.+?\\end\{eqnarray\}|\\begin\{thebibliography\}.+|\$[^$]{1,50}\$|\\bibinfo\{.+?\}\{.+?\}|\\[A-z]+(?:\[.+?\])(?:\{.+?\})?|\\[A-z]+\{.+?\}|\\[A-z]+','',newtext).strip()
     with open(os.path.join(outpath,os.path.basename(filename)),mode='w',encoding='utf-8') as fh:
         fh.write(newtext)
