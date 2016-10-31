@@ -71,6 +71,8 @@ def main():
     fname = args.fname
     outpath = os.path.abspath(args.outdir)
     stylefile = args.sty
+    if(stylefile):
+        stylefile = os.path.abspath(stylefile)
     pool = mp.Pool(processes=mp.cpu_count())
     if not os.path.exists(outpath):
         os.makedirs(outpath)
