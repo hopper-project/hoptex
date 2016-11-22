@@ -9,19 +9,30 @@ from glob import glob
 def substitute_eqid(filename):
     global eqdict
     global outpath
+    global inline
     no_math = True
     with open(filename,mode='r',encoding='latin-1') as fh:
         text = fh.read()
-    textlist = grab_math(text,split=True)
-    for i, x in enumerate(textlist):
-        if x in eqdict:
-            textlist[i] = eqdict[x]
-            no_math = False
-        else:
-            textlist[i] = textlist[i].strip()
-    if no_math:
-        return
-    newtext = '\n'.join(textlist)
+    if(inline):
+        textlist = grab_inline_math(text,split=True)
+        for i, x in enumerate(textlist):
+            if x in eqdict:
+                textlist[i] = eqdict[x]
+                no_math = False
+        if no_math:
+            return
+        newtext = ''.join(textlist)
+    else:
+        textlist = grab_math(text,split=True)
+        for i, x in enumerate(textlist):
+            if x in eqdict:
+                textlist[i] = eqdict[x]
+                no_math = False
+            else:
+                textlist[i] = textlist[i].strip()
+        if no_math:
+            return
+        newtext = '\n'.join(textlist)
     newtext = re.sub(r'\\begin\{title\}(.+?)\\end\{title\}',r'\1',newtext)
     newtext = re.sub(r'(?s)\\begin\{eqnarray\}.+?\\end\{eqnarray\}|\\begin\{thebibliography\}.+|\$[^$]{1,50}\$|\\bibinfo\{.+?\}\{.+?\}|\\[A-z]+(?:\[.+?\])(?:\{.+?\})?|\\[A-z]+\{.+?\}|\\[A-z]+','',newtext).strip()
     with open(os.path.join(outpath,os.path.basename(filename)),mode='w',encoding='utf-8') as fh:
@@ -30,16 +41,19 @@ def substitute_eqid(filename):
 def main():
     global eqdict
     global outpath
+    global inline
     parser = argparse.ArgumentParser(description='Usage for equation enumeration')
     parser.add_argument("tsv", help="Path to .tsv of enumerated equations (output of enumerateeqs.py)")
     parser.add_argument("--parent", action='store_true', help="Use flag if the specified directory is the parent of .tex file directories")
     parser.add_argument("directory",help="Path to directory of .tex files, or demacro (if the flag is specified)")
     parser.add_argument("outpath",help="Path to output directory")
+    parser.add_argument("--inline", action='store_true', help="Use flag if enumerating inline equations")
     args = parser.parse_args()
     tsv = os.path.abspath(args.tsv)
     directory = os.path.join(os.path.abspath(args.directory),'')
     outdir = os.path.join(os.path.abspath(args.outpath),'')
     parent = args.parent
+    inline = args.inline
     # folderlist = glob(directory+'*/')
     print("Generating equation dictionary...")
     eqdict = {}

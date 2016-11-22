@@ -60,7 +60,36 @@ def grab_math(text, split=False):
             matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
         return matches
 
-def grab_math_from_file(filename, split=0):
+def grab_inline_math(text, split=False):
+    text = removecomments(text)
+    matchlist = []
+    # matches = re.findall(r'(?<=[^\$])(\$[^\$]+?\$)(?=[^\$])|(?<=[^\$])(\$[^\$]+?\$)(\$[^\$]+?\$)(?=[^\$])',text)
+    matches = re.findall(r'(?<=[^\$])((?:\$[^\$]+?\$)+?)(?=[^\$])',text)
+    if split:
+        textlist = re.split(r'(?<=[^\$])((?:\$[^\$]+?\$)+?)(?=[^\$])',text)
+        newtextlist = []
+        matches = set(matches)
+        for text in textlist:
+            if text in matches:
+                submatches = re.findall(r'\$.+?\$',text)
+                for submatch in submatches:
+                    newtextlist.append(submatch)
+            else:
+                newtextlist.append(text)
+        return newtextlist
+    else:
+        for match in matches:
+            submatches = re.findall(r'\$.+?\$',match)
+            for submatch in submatches:
+                matchlist.append(submatch)
+            # if matches[0]:
+            #     matchlist.append(match[0])
+            # else:
+            #     matchlist.append(match[1])
+            #     matchlist.append(match[2])
+        return matchlist
+
+def grab_math_from_file(filename, split=False):
     with open(filename,mode='r',encoding='latin-1') as fh:
         text = fh.read()
     return grab_math(text, split)
