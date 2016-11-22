@@ -17,7 +17,7 @@ def substitute_eqid(filename):
         textlist = grab_inline_math(text,split=True)
         for i, x in enumerate(textlist):
             if x in eqdict:
-                textlist[i] = eqdict[x]
+                textlist[i] = "EQI" + eqdict[x] + "Q"
                 no_math = False
         if no_math:
             return
@@ -60,6 +60,9 @@ def main():
     with open(tsv,mode='r',encoding='latin-1') as fh:
         for line in fh:
             eqid, equation = line.strip().split('\t')
+            if(inline):
+                eqid = eqid[3:-1]
+                # trying to save space in memory
             equation = equation.encode().decode('unicode_escape')
             if equation not in eqdict:
                 eqdict[equation] = eqid
