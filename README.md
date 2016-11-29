@@ -19,15 +19,6 @@ As standalone components:
 ### getarxivdata.py:
 getarxivdata accepts a directory of .tex files, and in the parent directory of those .tex files, generates a metadata file of all of the files and their categories.
 
-### parsetex.py
-* Note: getarxivdata *must* be run on the folder of .tex files you're going to pass in.
-
-PREREQUISITES: numpy, matplotlib
-
-parsetex.py accepts a directory of tex files. It begins by tokenizing each expression, finding LaTeX's markup tags (e.g. \\int), before generating total token counts by category for every file in the directory.
-
-It then generates a folder of matplotlib bar graphs (stored in the parent directory of the .tex files). Each graph is sorted by the top 20 most frequently occurring tokens for that category.
-
 ## master.py
 
 Usage: `python3 master.py /path/to/texparent/ /path/to/xhtmlparent/ /path/to/jsonparent/`
