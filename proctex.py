@@ -124,17 +124,15 @@ def main():
     global eqoutpath
     global convertedpath
     global erroroutputpath
-    if(len(sys.argv)==4):
-        path = os.path.join(str(sys.argv[1]),'')
-        if not os.path.isdir(path):
-            print("Error: passed parameter is not a valid directory")
-            sys.exit()
-        convertedpath = os.path.join(str(sys.argv[2]),'')
-        eqoutpath = os.path.join(str(sys.argv[3]),'')
-    else:
-        print("Error: usage")
-        sys.exit()
-    erroroutputpath = eqoutpath[:-1] + '_errors/'
+    parser = argparse.ArgumentParser(description='Usage for JSON object generation')
+    parser.add_argument("tex_directory", help="Path to directory of .tex files")
+    parser.add_argument("xhtml_directory", help="Path to directory of .tex files")
+    parser.add_argument("output_dir", help="Path to output directory")
+    args = parser.parse_args()
+    path = os.path.abspath(args.tex_directory)
+    convertedpath = os.path.abspath(args.xhtml_directory)
+    eqoutpath = os.path.abspath(args.output_dir)
+    erroroutputpath = os.normpath(eqoutpath) + '_errors/'
     if not os.path.exists(eqoutpath):
         os.makedirs(eqoutpath)
     if not os.path.exists(erroroutputpath):
