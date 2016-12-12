@@ -13,25 +13,37 @@ def main():
     parser.add_argument("directory",help="Path to directory of .tex files")
     parser.add_argument("outfile",help="Path to output file")
     parser.add_argument("--xhtml", help="Path to directory of xhtml files")
+    parser.add_argument("--tsv", help="Path to tsv to continue loading ")
+    parser.add_argument("--parent", action="store_true", help="Set to true if this is a folder of folders of .tex files")
     args = parser.parse_args()
     directory = os.path.join(os.path.abspath(args.directory),'')
     outpath = os.path.abspath(args.outfile)
+    parent = args.parent
+    tsv = args.tsv
     xhtml = False
+    tsv_write_mode = 'w'
     if(args.xhtml):
         xhtml = os.path.abspath(args.xhtml)
     matches = []
+    unique_eqs = {}
     print("Starting timer...")
     start = time.time()
+    if(tsv):
+        with open(tsv,mode='r',encoding='latin-1') as fh:
+            for line in fh:
+                linesplit = line.split('\t')
+                eqid = linesplit[0]
+                text = linesplit[1].encode().decode('unicode_escape')
+                unique_eqs[text] = eqid
     print("Seeking .tex files...")
-    folderlist = next(os.walk(directory))[1]
-    for subfolder in folderlist:
-        print("Finding .tex files in {}".format(subfolder))
-        current_dir = os.path.join(directory,subfolder)
-        matches += gettexfiles(current_dir)
-    # for root, directories, filenames in os.walk(directory):
-    #     for filename in fnmatch.filter(filenames, '*.tex'):
-    #         matches.append(os.path.join(root, filename))
-    # matches = list(reversed(matches))
+    if(parent):
+        folderlist = next(os.walk(directory))[1]
+        for subfolder in folderlist:
+            print("Finding .tex files in {}".format(subfolder))
+            current_dir = os.path.join(directory,subfolder)
+            matches += gettexfiles(current_dir)
+    else:
+        matches = gettexfiles(directory)
     print("{} files found".format(len(matches)))
     if(xhtml):
         xhtmlmatches = {}
@@ -53,8 +65,7 @@ def main():
     # print("{} seconds".format(int(time.time()-start)))
     pool = mp.Pool(processes=mp.cpu_count())
     print("Grabbing math from files...")
-    unique_eqs = {}
-    eqcount = 0
+    eqcount = max(len(unique_eqs)-1,0)
     if(xhtml):
         math_equations = pool.imap(grab_eqs_and_filename,matches)
         for tup in math_equations:
@@ -81,7 +92,6 @@ def main():
         with open(outpath,mode='w') as fh:
             for x in unique_eqs:
                 fh.write(unique_eqs[x][0]+'\t'+repr(x)[1:-1].replace("\t","\\t")+'\t'+repr(unique_eqs[x][1])[1:-1].replace("\t","\\t")+'\n')
-        exit()
     else:
         math_equations = pool.imap(grab_math_from_file,matches)
         for doceqs in math_equations:
@@ -89,31 +99,13 @@ def main():
                 if equation not in unique_eqs:
                     unique_eqs[equation] = "EQ" + str(eqcount) + "Q"
                     eqcount+=1
+        with open(outpath,mode='w') as fh:
+            for x in unique_eqs:
+                fh.write(unique_eqs[x]+'\t'+repr(x)[1:-1].replace("\t","\\t")+'\n')
     print("{} equations".format(len(unique_eqs)))
     # print("{} seconds".format(int(time.time()-start)))
-    exit()
     pool.close()
     pool.join()
-    print("Assigning IDs to unique equations...")
-    unique_eqs = {}
-    eqcount = 0
-    while len(math_equations)>0:
-        if math_equations[-1] in unique_eqs:
-            math_equations.pop()
-            continue
-        unique_eqs[math_equations[-1]] = "EQ" + str(eqcount) + "Q"
-        # iterate over -1th element and pop as you add to unique dictionary
-        # avoids memory issues
-        math_equations.pop()
-        eqcount += 1
-    # print("{} seconds".format(int(time.time()-start)))
-    print("Found {} unique equations".format(len(unique_eqs)))
-    print("Writing to file...")
-    with open(outpath,mode='w') as fh:
-        for x in unique_eqs:
-            fh.write(unique_eqs[x]+'\t'+repr(x)[1:-1]+'\n')
-    print("Finished writing equations to file")
-    # print("{} seconds".format(int(time.time()-start)))
 
 
 if __name__ == '__main__':
