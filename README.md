@@ -1,6 +1,6 @@
 # hoptex
 
-This folder and its associated scripts can be used for the parsing and processing of a folder of .tex documents into a
+This folder and its associated scripts can be used for the parsing and processing of a folder of .tex documents into XHTML documents, and later .json files, with objects corresponding to equations.
 
 There are three main scripts in this folder: getarxivdata.py, parsetex.py,and proctex.py.
 Classes and their supporting JSON handler function are stored in core/texclasses.
