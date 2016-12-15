@@ -24,9 +24,11 @@ def generate_sanitized_document(text):
     return output
 
 def gettexfiles(path):
-    absolute_path = os.path.abspath(path) + '/'
-    file_list = glob.glob(os.path.join(absolute_path,'*.tex'))
-    return file_list
+    absolute_path = os.path.abspath(path)
+    root, folders, files =  next(os.walk(absolute_path))
+    for i, filename in enumerate(files):
+        files[i] = os.path.join(root,filename)
+    return files
 
 def removecomments(text):
     text = re.sub(r'(?m)^%+.*$','',text)
@@ -36,25 +38,25 @@ def removecomments(text):
 
 def grab_math(text, split=False):
     delim = r'|'
-    a = r'\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
-    b = r'\\begin\{multline\*?\}.*?\\end\{multline\*?\}'
-    c = r'\\begin\{gather\*?\}.*?\\end\{gather\*?\}'
-    d = r'\\begin\{align\*?\}.*?\\end\{align\*?\}'
-    e = r'\\begin\{flalign\*?\}.*?\\end\{flalign\*?\}'
-    f = r'\\begin\{math\*?\}.*?\\end\{math\*?\}'
-    g = r'[^\\]\\\[.*?\\\]'
-    h = r'\$\$[^\^].*?\$\$'
+    a = r'(?s)\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
+    b = r'(?s)\\begin\{multline\*?\}.*?\\end\{multline\*?\}'
+    c = r'(?s)\\begin\{gather\*?\}.*?\\end\{gather\*?\}'
+    d = r'(?s)\\begin\{align\*?\}.*?\\end\{align\*?\}'
+    e = r'(?s)\\begin\{flalign\*?\}.*?\\end\{flalign\*?\}'
+    f = r'(?s)\\begin\{math\*?\}.*?\\end\{math\*?\}'
+    g = r'(?s)[^\\]\\\[.*?\\\]'
+    h = r'(?s)\$\$[^\^].*?\$\$'
     exprmatch = [a,b,c,d,e,f,g,h]
     text = removecomments(text)
     if(split):
-        tomatch = r'(?s)('+delim.join(exprmatch)+r')'
+        tomatch = r'('+delim.join(exprmatch)+r')'
         matches = re.split(tomatch,text)
         for i, x in enumerate(matches):
             matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
         matches.append("")
         return matches
     else:
-        tomatch = r'(?s)' + delim.join(exprmatch)
+        tomatch =delim.join(exprmatch)
         matches = re.findall(tomatch,text)
         for i, x in enumerate(matches):
             matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
@@ -64,6 +66,7 @@ def grab_inline_math(text, split=False):
     text = removecomments(text)
     matchlist = []
     # matches = re.findall(r'(?<=[^\$])(\$[^\$]+?\$)(?=[^\$])|(?<=[^\$])(\$[^\$]+?\$)(\$[^\$]+?\$)(?=[^\$])',text)
+    text = re.sub(r'\\\$','',text)
     matches = re.findall(r'(?<=[^\$])((?:\$[^\$]+?\$)+?)(?=[^\$])',text)
     if split:
         textlist = re.split(r'(?<=[^\$])((?:\$[^\$]+?\$)+?)(?=[^\$])',text)
@@ -123,3 +126,19 @@ def getmathfromfilelist(files):
     pool.close()
     pool.join()
     return outlist
+
+def validate_folder(folder_path):
+    if not os.path.isdir(folder_path):
+        os.makedirs(folder_path)
+
+def read_tsv(filename):
+    with open(filename,mode='r',encoding='latin-1') as fh:
+        for line in fh:
+            linesplit = line.rstrip('\n').split('\t')
+            yield linesplit
+
+def mask(text):
+    return repr(text)[1:-1]
+
+def unmask(text):
+    return text.encode().decode('unicode-escape')
