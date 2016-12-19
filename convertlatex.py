@@ -1,3 +1,6 @@
+"""Script for converting a folder of .tex documents to a folder of
+.xhtml documents, using LaTeXML
+"""
 import sys #handling arguments passed to function
 import glob #file path handling
 import os #checking files and writing to/from files
@@ -10,16 +13,18 @@ from core.funcs import *
 path = ''
 outpath = ''
 
-def writesanitized(sanitized,cleanname):
+def writesanitized(sanitized, clean_file_name):
+    """Writes sanitized document text to clean_file_name"""
     global erroroutputpath
-    outfile = os.path.join(erroroutputpath,cleanname+'.tex')
-    with open(outfile,'w') as fh:
+    outfile = os.path.join(erroroutputpath, clean_file_name+'.tex')
+    with open(outfile, 'w') as fh:
         fh.write(sanitized)
 
 def genxhtml(filename):
+    """Conversion function using subprocess"""
     global outpath
-    cleanname = os.path.splitext(os.path.basename(filename))[0]
-    outfname = outpath + cleanname+'.xhtml'
+    clean_file_name = os.path.splitext(os.path.basename(filename))[0]
+    outfname = outpath + clean_file_name+'.xhtml'
     if os.path.isfile(outfname):
         # print("{}: Already generated".format(filename))
         return ""
@@ -27,33 +32,35 @@ def genxhtml(filename):
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
     output = generate_sanitized_document(text)
-    if len(output)==0:
+    if len(output) == 0:
         print("{}: Error - no body found".format(filename))
-        return("{}: Error - no body found".format(filename))
+        return "{}: Error - no body found".format(filename)
     try:
-        proc = subprocess.Popen(["latexml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
+        proc = subprocess.Popen(["latexml", "-"], stderr=PIPE, stdout=PIPE,
+        stdin=PIPE)
         stdout, stderr = proc.communicate(output.encode(), timeout=60)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML conversion failed - timeout".format(filename))
-        writesanitized(output,cleanname)
+        writesanitized(output,clean_file_name)
         return "{}: MathML conversion failed - timeout".format(filename)
     except:
         print("{}: Conversion failed".format(filename))
-        writesanitized(output,cleanname)
+        writesanitized(output,clean_file_name)
         return "{}: Conversion failed".format(filename)
     try:
-        proc = subprocess.Popen(["latexmlpost", "--format=xhtml", "-"], stderr = PIPE, stdout = PIPE, stdin = PIPE)
+        proc = subprocess.Popen(["latexmlpost", "--format=xhtml", "-"],
+        stderr=PIPE, stdout=PIPE, stdin=PIPE)
         stdout2, stderr = proc.communicate(stdout, timeout=60)
     except subprocess.TimeoutExpired:
         proc.kill()
         print("{}: MathML postprocessing failed - timeout".format(filename))
-        writesanitized(output,cleanname)
+        writesanitized(output,clean_file_name)
         return "{}: MathML postprocessing failed - timeout".format(filename)
     if len(stdout2.strip())==0:
         print("{}: Conversion failed".format(filename))
-        writesanitized(output,cleanname)
-        return("{}: Conversion failed".format(filename))
+        writesanitized(output,clean_file_name)
+        return "{}: Conversion failed".format(filename)
     stdout2 = stdout2.decode()
     stdout2 = re.sub(r'(href\=\").*?(LaTeXML\.css)(\")',r'\1\2\3',stdout2)
     stdout2 = re.sub(r'(href=\").*?(ltx-article\.css)(\")',r'\1\2\3',stdout2)
@@ -82,7 +89,8 @@ def main():
     if not os.path.exists(outpath):
         os.makedirs(outpath)
     os.chdir(outpath)
-    erroroutputpath = os.path.join(os.path.split(os.path.normpath(outpath))[0],os.path.basename(os.path.normpath(path))+'_failed')
+    erroroutputpath = os.path.join(os.path.split(os.path.normpath(outpath))[0],
+    os.path.basename(os.path.normpath(path))+'_failed')
     print("Beginning processing of {}".format(path))
     print("Generating list of files with math...")
     filelist = getmathfiles(path)

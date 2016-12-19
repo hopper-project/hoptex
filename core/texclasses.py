@@ -1,3 +1,4 @@
+"""Classes for JSON object generation"""
 import subprocess
 from subprocess import PIPE
 import os

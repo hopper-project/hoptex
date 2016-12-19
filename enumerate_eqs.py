@@ -1,3 +1,5 @@
+"""Script for the enumeration of inline display mode math.
+Generates an output tsv of the format: EQ#Q masked_equation"""
 import argparse
 import os
 import multiprocessing as mp
@@ -28,6 +30,9 @@ def main():
     unique_eqs = {}
     print("Starting timer...")
     start = time.time()
+    # 'resuming' a tsv
+    # allows enumeration to continue from a previously written tsv
+    # still writes the new tsv to the output destination
     if(tsv):
         with open(tsv,mode='r',encoding='latin-1') as fh:
             for line in fh:
@@ -36,6 +41,7 @@ def main():
                 text = linesplit[1].encode().decode('unicode_escape')
                 unique_eqs[text] = eqid
     print("Seeking .tex files...")
+    # if this is a parent directory of several folders of .tex files
     if(parent):
         folderlist = next(os.walk(directory))[1]
         for subfolder in folderlist:
@@ -45,6 +51,7 @@ def main():
     else:
         matches = gettexfiles(directory)
     print("{} files found".format(len(matches)))
+    # generate list of xhtml files, if we're given a folder to look in
     if(xhtml):
         xhtmlmatches = {}
         for root, directories, filenames in os.walk(xhtml):
@@ -65,7 +72,8 @@ def main():
     # print("{} seconds".format(int(time.time()-start)))
     pool = mp.Pool(processes=mp.cpu_count())
     print("Grabbing math from files...")
-    eqcount = max(len(unique_eqs)-1,0)
+    eqcount = len(unique_eqs)
+    # code for creating the 3-column tsv with matching xhtml docs
     if(xhtml):
         math_equations = pool.imap(grab_eqs_and_filename,matches)
         for tup in math_equations:
@@ -88,7 +96,7 @@ def main():
                     eqcount+=1
         pool.close()
         pool.join()
-        print("WRITING TO FILE")
+        print("WRITING TO FILE: {}".format(outpath))
         with open(outpath,mode='w') as fh:
             for x in unique_eqs:
                 fh.write(unique_eqs[x][0]+'\t'+repr(x)[1:-1].replace("\t","\\t")+'\t'+repr(unique_eqs[x][1])[1:-1].replace("\t","\\t")+'\n')
