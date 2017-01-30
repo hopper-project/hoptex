@@ -43,7 +43,7 @@ def makeobjs(filename):
         with open(convertedfilepath,'r') as fh:
             converted_document = fh.read()
         xhtml_equations = re.findall(r'(?s)\<table.*?\<\/table\>',converted_document)
-    newtext = removecomments(text)
+    newtext = remove_comments(text)
     document_body = re.findall(r'(?s)\\begin\{document\}(.*?)\\end\{document\}',newtext)
     if not document_body:
         print("{}: Missing body".format(filename))
