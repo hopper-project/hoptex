@@ -19,6 +19,16 @@ def main():
     outfile = args.outfile
     parent = args.parent
     directory = os.path.join(os.path.abspath(args.directory),'')
+    tsv = args.tsv
+    unique_eqs = {}
+    if tsv:
+        print("Loading equations")
+        with open(tsv,mode='r',encoding='latin-1') as fh:
+            for line in fh:
+                linesplit = line.split('\t')
+                eqid = linesplit[0]
+                text = unmask(linesplit[1])
+                unique_eqs[text] = eqid
     if(parent):
         folderlist = next(os.walk(directory))[1]
         matches = []
@@ -33,7 +43,6 @@ def main():
         pass
     pool = mp.Pool(processes=mp.cpu_count())
     print("Grabbing math from files...")
-    unique_eqs = set()
     eqcount = 0
     filecount = 0
     math_equations = pool.imap(grab_inline_math_from_file,matches)
@@ -41,13 +50,13 @@ def main():
         for doceqs in math_equations:
             for equation in doceqs:
                 if equation not in unique_eqs:
-                    eqid = "EQI" + str(eqcount) + "Q"
-                    unique_eqs.add(equation)
-                    fh.write(eqid + '\t' + repr(equation)[1:-1].replace("\t","\\t")+'\n')
+                    unique_eqs[equation] = "EQ" + str(eqcount) + "Q"
                     eqcount += 1
             filecount += 1
+        for x in unique_eqs:
+            fh.write(unique_eqs[x]+'\t'+mask(x)+'\n')
     print("{} unique equations".format(len(unique_eqs)))
-    print(eqcount)
+    print("{} new equations".format(eqcount))
 
 if __name__=='__main__':
     main()

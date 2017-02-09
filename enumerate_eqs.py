@@ -34,11 +34,12 @@ def main():
     # allows enumeration to continue from a previously written tsv
     # still writes the new tsv to the output destination
     if(tsv):
+        print("Loading equations...")
         with open(tsv,mode='r',encoding='latin-1') as fh:
             for line in fh:
                 linesplit = line.split('\t')
                 eqid = linesplit[0]
-                text = linesplit[1].encode().decode('unicode_escape')
+                text = unmask(linesplit[1])
                 unique_eqs[text] = eqid
     print("Seeking .tex files...")
     # if this is a parent directory of several folders of .tex files
@@ -109,7 +110,7 @@ def main():
                     eqcount+=1
         with open(outpath,mode='w') as fh:
             for x in unique_eqs:
-                fh.write(unique_eqs[x]+'\t'+repr(x)[1:-1].replace("\t","\\t")+'\n')
+                fh.write(unique_eqs[x]+'\t'+repr(x)[1:-1]+'\n')
     print("{} equations".format(len(unique_eqs)))
     # print("{} seconds".format(int(time.time()-start)))
     pool.close()
