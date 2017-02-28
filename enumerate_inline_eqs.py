@@ -27,7 +27,7 @@ def main():
             for line in fh:
                 linesplit = line.split('\t')
                 eqid = linesplit[0]
-                text = unmask(linesplit[1])
+                text = unmask(linesplit[1]).strip()
                 unique_eqs[text] = eqid
     if(parent):
         folderlist = next(os.walk(directory))[1]
@@ -50,7 +50,7 @@ def main():
         for doceqs in math_equations:
             for equation in doceqs:
                 if equation not in unique_eqs:
-                    unique_eqs[equation] = "EQ" + str(eqcount) + "Q"
+                    unique_eqs[equation] = "EQI" + str(eqcount) + "Q"
                     eqcount += 1
             filecount += 1
         for x in unique_eqs:

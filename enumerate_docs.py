@@ -26,7 +26,7 @@ def substitute_eqid(filename):
         textlist = grab_inline_math(text,split=True)
         for i, x in enumerate(textlist):
             if x in eqdict:
-                textlist[i] = "EQI" + str(eqdict[x]) + "Q"
+                textlist[i] = eqdict[x]
                 no_math = False
         if no_math:
             print("{}: no inline math".format(filename))
@@ -43,6 +43,8 @@ def substitute_eqid(filename):
         if no_math:
             return
         newtext = '\n'.join(textlist)
+    if outpath:
+        filename = os.path.join(outpath,os.path.basename(filename))
     with open(filename,mode='w',encoding='utf-8') as fh:
         fh.write(newtext)
 
@@ -74,16 +76,15 @@ def main():
     with open(tsv,mode='r',encoding='latin-1') as fh:
         for line in fh:
             eqid, equation = line.strip().split('\t')
-            if(inline):
-                eqid = int(eqid[3:-1])
                 # trying to save space in memory
-            equation = equation.encode().decode('unicode_escape')
+            equation = equation.encode().decode('unicode_escape').strip()
             if equation not in eqdict:
                 eqdict[equation] = eqid
             counter += 1
             if not counter % 10000:
                 gc.collect()
     print("Equation dictionary loaded.")
+    print("{} entries".format(len(eqdict)))
     pool = mp.Pool(mp.cpu_count())
     if(parent):
         filelist = []
@@ -105,7 +106,8 @@ def main():
         if not os.path.exists(outpath):
             os.makedirs(outpath)
         print("Finding all .tex files...")
-        filelist = gettexfiles(outpath)
+        filelist = gettexfiles(directory)
+        print("Found {} files".format(len(filelist)))
         print("Writing files...")
         pool.map(substitute_eqid,filelist)
         pool.close()

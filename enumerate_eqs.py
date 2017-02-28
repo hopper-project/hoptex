@@ -39,7 +39,7 @@ def main():
             for line in fh:
                 linesplit = line.split('\t')
                 eqid = linesplit[0]
-                text = unmask(linesplit[1])
+                text = unmask(linesplit[1]).strip()
                 unique_eqs[text] = eqid
     print("Seeking .tex files...")
     # if this is a parent directory of several folders of .tex files
