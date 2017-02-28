@@ -3,12 +3,38 @@ import os
 import re
 import multiprocessing as mp
 
+global a
+global b
+global c
+global d
+global e
+global f
+global g
+global i
+
+#regex patterns
+
+a = r'(?s)\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
+b = r'(?s)\\begin\{multline\*?\}.*?\\end\{multline\*?\}'
+c = r'(?s)\\begin\{gather\*?\}.*?\\end\{gather\*?\}'
+d = r'(?s)\\begin\{align\*?\}.*?\\end\{align\*?\}'
+e = r'(?s)\\begin\{flalign\*?\}.*?\\end\{flalign\*?\}'
+f = r'(?s)\\begin\{math\*?\}.*?\\end\{math\*?\}'
+g = r'(?s)(?<!\\)\\\[.*?\\\]'
+h = r'(?s)\$\$[^\^].*?\$\$'
+i = r'(?s)\\begin\{eqnarray\*?\}.*?\\end\{eqnarray\*?\}'
+
+def load_document(filename):
+    with open(filename,mode='r',encoding='latin-1') as fh:
+        text = fh.read()
+    return text
+
 def generate_sanitized_document(text):
     """Generates LaTeXML document containing only usepackage statements,
     begin & end document statements, and the extracted math.
     Returns string of the new text document
     """
-    text = removecomments(text)
+    text = remove_comments(text)
     text = re.sub(r'(?s)([^\$])(\$[^\$]*?\$)(\$[^\$]*?\$)([^\$])',r"\1\2 \3\4",text,flags=re.DOTALL)
     docbody = re.findall(r'(?s)\\begin\{document\}.*?\\end\{document\}',text)
     if not docbody:
@@ -36,46 +62,48 @@ def gettexfiles(path):
         files[i] = os.path.join(root,filename)
     return files
 
-def removecomments(text):
+def remove_comments(text):
     """Takes LaTeX document text & returns document without any comments"""
-    text = re.sub(r'(?m)^%+.*$','',text)
-    text = re.sub(r"(?m)([^\\])\%+.*?$",r'\1',text)
+    text = re.sub(r'(?<=\n)%.+?\n','',text)
+    text = re.sub(r'(?!\\)%\n','',text)
+    text = re.sub(r'(?!\\)%.*?\n','\n',text)
     text = re.sub(r'(?s)\\begin\{comment\}.*?\\end\{comment\}','',text)
     return text
 
+def remove_comment_newlines(text):
+    """Removes percentages immediately followed by newlines"""
+    text = re.sub(r'%\n','',text)
+    return text
 
 def grab_math(text, split=False):
     """Returns list of display math in the LaTeX document
     Enabling the split option returns the interspersed text, as separate
     entries in the list (e.g. text, eq, text, eq)"""
     delim = r'|'
-    a = r'(?s)\\begin\{equation\*?\}.*?\\end\{equation\*?\}'
-    b = r'(?s)\\begin\{multline\*?\}.*?\\end\{multline\*?\}'
-    c = r'(?s)\\begin\{gather\*?\}.*?\\end\{gather\*?\}'
-    d = r'(?s)\\begin\{align\*?\}.*?\\end\{align\*?\}'
-    e = r'(?s)\\begin\{flalign\*?\}.*?\\end\{flalign\*?\}'
-    f = r'(?s)\\begin\{math\*?\}.*?\\end\{math\*?\}'
-    g = r'(?s)[^\\]\\\[.*?\\\]'
-    h = r'(?s)\$\$[^\^].*?\$\$'
+    global a
+    global b
+    global c
+    global d
+    global e
+    global f
+    global g
+    global h
+    global i
     exprmatch = [a,b,c,d,e,f,g,h]
-    text = removecomments(text)
+    text = remove_comments(text)
     if(split):
         tomatch = r'('+delim.join(exprmatch)+r')'
         matches = re.split(tomatch,text)
-        for i, x in enumerate(matches):
-            matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
         matches.append("")
         return matches
     else:
         tomatch =delim.join(exprmatch)
         matches = re.findall(tomatch,text)
-        for i, x in enumerate(matches):
-            matches[i] = re.sub(r'.\\\[',"\[",x) + '\n'
         return matches
 
 def grab_inline_math(text, split=False):
     """Inline equivalent of grab_math"""
-    text = removecomments(text)
+    text = remove_comments(text)
     matchlist = []
     # matches = re.findall(r'(?<=[^\$])(\$[^\$]+?\$)(?=[^\$])|(?<=[^\$])(\$[^\$]+?\$)(\$[^\$]+?\$)(?=[^\$])',text)
     text = re.sub(r'\\\$','',text)
@@ -121,7 +149,7 @@ def hasmath(filename):
     equations in the text"""
     with open(filename, mode='r', encoding='latin-1') as f1:
         text = f1.read()
-    text = removecomments(text)
+    text = remove_comments(text)
     finds = grab_math(text)
     return (filename, len(finds))
 
