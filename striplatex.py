@@ -22,7 +22,12 @@ def cleanfile(filename):
     text = re.sub(r'\\def.+','',text)
     text = re.sub(r'\\section\*?\{(.+?)\}',r'\1',text)
     text = re.sub(r'\\def.+|\\\@ifundefined.+|(?s)\\begin\{thebibliography\}.+?\\end\{thebibliography\}|(?s)\\begin\{eqnarray\*?\}.+?\\end\{eqnarray\*?\}|\\[\w@]+(?:\[.+?\])?(?:\{.+?\})*|\[.+?\](?:\{.+?\})?|\{cm\}','',text)
-    text = re.sub(r'\}\n|\n{3,}','',text)
+    text = re.sub(r'\}','',text)
+    text = re.sub(r'\{','',text)
+    text = re.sub(r'\(\)','',text)
+    text = re.sub(r'\}','',text)
+    text = re.sub(r'\\','',text)
+    text = re.sub(r'\n{3,}','',text)
     text = text.strip()
     with open(os.path.join(outpath,os.path.splitext(os.path.basename(filename))[0]+'.txt3'),mode='w',encoding='utf-8') as fh:
         fh.write(text)
