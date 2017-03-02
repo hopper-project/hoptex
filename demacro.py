@@ -25,7 +25,7 @@ global debug
 global debug_path
 
 debug = False
-debug_path = './debug'
+debug_path = './debug/'
 
 r0 = r'(?s)\\g?def\s*(?P<name>\\[A-Za-z@]+|\\.)\s*'
 r1 = r'(?P<sep1>[^#\{]+)?(?P<arg1>#1)?(?P<sep2>[^#\{]+)?'
@@ -819,7 +819,7 @@ def demacro_file(path):
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = int(newlines/10)
+    timeout = max(int(newlines/5),120)
     if debug:
         timeout = 10000
     macrodict = {}
