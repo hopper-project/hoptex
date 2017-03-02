@@ -25,7 +25,6 @@ global debug
 global debug_path
 
 debug = False
-timeout = 120
 debug_path = './debug'
 
 r0 = r'(?s)\\g?def\s*(?P<name>\\[A-Za-z@]+|\\.)\s*'
@@ -820,7 +819,7 @@ def demacro_file(path):
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = int(newlines/3)
+    timeout = int(newlines/10)
     if debug:
         timeout = 10000
     macrodict = {}
@@ -1046,7 +1045,6 @@ def untar_and_demacro_folder(archive_folder,dest):
     for archive in archive_list:
         untar_and_demacro(archive,dest)
 
-
 def main():
     global debug
     global debug_path
@@ -1072,6 +1070,7 @@ def main():
         debug_path = args.debug
     validate_folder(debug_path)
     validate_folder(output_path)
+    debug = False
     if not os.path.exists(input_path):
         ValueError("Input does not exist: {}".format(args.input))
     if args.dtar:
