@@ -1,4 +1,5 @@
-"""
+"""Module for removing macros from LaTeX documents
+
 Parse macros in LaTeX source code. Supported macros include:
     - newcommand/renewcommand(*)
     - DeclareMathOperator
@@ -6,29 +7,27 @@ Parse macros in LaTeX source code. Supported macros include:
     - input
 """
 
-import sys
 import re
 import os
-import multiprocessing as mp
-import time #probably not needed
-import argparse
-import tarfile
 import time
-
-
+import sys
+import tarfile
+import multiprocessing as mp
+import shutil
 
 from core.funcs import *
 
-global diag_message
 global timeout
 global rcp
-global outdirectory
+global output_path
+global debug
+global debug_path
 
-diag_message = False
-timeout = 10
-rcp = ['\\def','\\newcommand','\\renewcommand','\\DeclareMathOperator']
+debug = False
+timeout = 120
+debug_path = './debug'
 
-r0 = r'(?s)\\def\s*(?P<name>\\[\w@]+|\\.)\s*'
+r0 = r'(?s)\\g?def\s*(?P<name>\\[A-Za-z@]+|\\.)\s*'
 r1 = r'(?P<sep1>[^#\{]+)?(?P<arg1>#1)?(?P<sep2>[^#\{]+)?'
 r2 = r'(?P<arg2>#2)?(?P<sep3>[^#\{]+)?'
 r3 = r'(?P<arg3>#3)?(?P<sep4>[^#\{]+)?'
@@ -42,25 +41,47 @@ r9 = r'(?P<arg9>#9)?(?P<sep10>[^#\{]+)?(?=\{)'
 #Regex pattern for seeking & retrieving args & separators for def
 def_pattern = r0+r1+r2+r3+r4+r5+r6+r7+r8+r9
 
-math_pattern = r"\\DeclareMathOperator(\*)?"
+math_pattern = r"\\DeclareMathOperator\*?"
 
-def_token = r'\\def(?![A-z])'
+# def_token = r'\\g?def\s*(?:\\[A-Za-z@]+|\\.)'
 
-input_pattern = r'\\input\s*\{\s*([^\s\\]+)\}|\\input(?![A-za-z@])\s*([^\s\\]+)'
+def_token = r'\\g?def(?![A-Za-z@])'
+
+input_pattern = r'\\input\s*\{\s*([^\s\\]+)\}|\\input(?![A-Za-z@])\s*([^\s\\]+)'
 
 newcommand_pattern = r'\\newcommand\*?'
 
-renewcomand_pattern = r'\\renewcommand\*?'
+renewcommand_pattern = r'\\renewcommand\*?'
+
+search_pattern = r'(?P<def>'+def_pattern+')'+r'|(?P<newcommand>'+newcommand_pattern+r')'+\
+    r'|(?P<renewcommand>'+renewcommand_pattern+r')'+r'|(?P<mathoperator>'+math_pattern+r')'
+
+macro_pattern= '|'.join([def_token,newcommand_pattern,renewcommand_pattern,math_pattern])
 
 begin_document = r'\\begin\{document\}'
+
+nested_arg_pattern = r'(?s)(\\#|[^\\])(#{2,})([1-9])'
+
+arg_pattern = r'(?s)(?<![#\\])#'
+
+# single_token_group = r'(?<!\\)\{(\\[A-Za-z\@\*]+(?:\{[A-Za-z\@\*]+\})?)(?<!\\)\}'
+
+single_token_group = r'(?<!\\)\{(\\[A-Za-z\@\*]+)(?<!\\)\}'
+
+delim_token_group = r'(?<!\\)\{((?:\\begin|\\end|\\\[|\\\])(?:\{[A-Za-z\@\*]+\})?|\${1,2}|\\\[|\\\])(?<!\\)\}'
+
+macro_token_group = r'(?<!\\)\{\s*(\\((?:re)?newcommand\*?)|\\g?def|\\DeclareMathOperator\*?)(?<!\\)\s*\}'
+
+isundefined_pattern = r'\\isundefined\s*\{\s*(\\[A-Za-z\@\*]*)\s*\}'
+
 """
 A lot of the code below is necessary because Python has been taking 5 years and counting
-to put the vastly superior 'regex' module from PyPI into stdlib
+to put the superior 'regex' module from PyPI into stdlib
 """
 
 def verbose(*args):
-    global diag_message
-    if diag_message:
+    global debug
+    if debug:
         for text in args:
             print(text)
 
@@ -77,7 +98,8 @@ def balanced_delim_checker(text,delim):
                     stack.pop()
                     continue
                 return False
-    return True
+    if len(stack)==0:
+        return True
 
 def balanced_brackets(text):
     return balanced_delim_checker(text,"[]")
@@ -95,17 +117,47 @@ def take_while(text_evaluator, text):
 
 def take_group(text):
     group = []
+    backslash_count = 0
     if text[0]=='{':
         stack = []
-        for i,character in enumerate(text):
+        for i, character in enumerate(text):
             group.append(character)
-            if character=='{':
-                stack.append(character)
+            if character=='\\':
+                backslash_count+=1
+                continue
+            elif character=='{':
+                if backslash_count%2==0:
+                    stack.append(character)
             elif character=='}':
-                stack.pop()
+                if backslash_count%2==0:
+                    stack.pop()
                 if len(stack)==0:
                     break
-        return (''.join(group),text[i+1:])
+            backslash_count=0
+        return(''.join(group),text[i+1:])
+    else:
+        return('',text)
+
+def take_param(text):
+    group = []
+    backslash_count = 0
+    if text[0]=='[':
+        stack = []
+        for i, character in enumerate(text):
+            group.append(character)
+            if character=='\\':
+                backslash_count+=1
+                continue
+            elif character=='[':
+                if backslash_count%2==0:
+                    stack.append(character)
+            elif character==']':
+                if backslash_count%2==0:
+                    stack.pop()
+                if len(stack)==0:
+                    break
+            backslash_count=0
+        return(''.join(group),text[i+1:])
     else:
         return('',text)
 
@@ -122,13 +174,13 @@ def take_token(text):
     token = []
     if text[0]=='\\':
         token.append('\\')
-        if not re.match(r'[\w@\*]',text[1]):
+        if not re.match(r'[A-Za-z@\*]',text[1]):
             if text[1]=='\\':
                 return('',text)
             token.append(text[1])
             return (''.join(token),text[2:])
         for i, character in enumerate(text[1:]):
-            if re.match(r'[\w@\*]',character):
+            if re.match(r'[A-Za-z@\*]',character):
                 token.append(character)
             else:
                 break
@@ -153,21 +205,6 @@ def take_match(text,match_text):
             raise ValueError('Match not found')
     return (''.join(match),text[len(match):])
 
-def take_param(text):
-    param = []
-    if text[0]=='[':
-        stack = []
-        for i, character in enumerate(text):
-            param.append(character)
-            if character=='[':
-                stack.append(character)
-            if character==']':
-                stack.pop()
-                if len(stack)==0:
-                    break
-        return (''.join(param),text[len(param):])
-    else:
-        return('',text)
 
 def take_word(text):
     word = []
@@ -203,23 +240,71 @@ def parse(text,sequence):
         output.append(a)
     return (output,b)
 
-def extract_group(text):
-    if balanced_braces(text) and text[0]=='{':
-        return text[1:-1]
-    else:
-        return text
+def escape(text):
+    return text.replace("\\","\\\\")
 
-def extract_group_total(text):
-    while balanced_braces(text) and text[0]=='{':
-        text = text[1:-1]
+# def extract_group(text):
+#     if balanced_braces(text) and text[0]=='{' and text[-1]=='}':
+#         return text[1:-1]
+#     else:
+#         return text
+#
+# def extract_group_total(text):
+#     while balanced_braces(text) and text[0]=='{' and text[-1]=='}':
+#         text = text[1:-1]
+#     return text
+
+# def enclose_in_group(text):
+#     if balanced_braces(text) and text[0]=='{' and text[0]=='}':
+#         return text
+#     else:
+#         return '{' + text + '}'
+
+
+def is_group(text):
+    stack = []
+    backslash_count = 0
+    if len(text)==0:
+        return False
+    if text[0]!='{':
+        return False
+    for i, character in enumerate(text):
+        if i>0:
+            if len(stack)==0:
+                return False
+        if character=='{':
+            if backslash_count%2==0:
+                stack.append('{')
+            backslash_count = 0
+        elif character=='}':
+            if backslash_count%2==0:
+                if len(stack)>0:
+                    stack.pop()
+                else:
+                    return False
+            backslash_count = 0
+        elif character=='\\':
+            backslash_count += 1
+        else:
+            backslash_count = 0
+    if len(stack)==0:
+        return True
+    return False
+
+def reduce_group(text):
+    while is_group(text):
+        text = text[1:-1].strip()
+    return '{' + text + '}'
+
+def extract_group(text):
+    while is_group(text):
+        text = text[1:-1].strip()
     return text
 
 def enclose_in_group(text):
-    if balanced_braces(text) and text[0]=='{':
+    if is_group(text):
         return text
-    else:
-        return '{' + text + '}'
-
+    return '{'+text+'}'
 
 def num_valid(items):
     val = 0
@@ -227,6 +312,20 @@ def num_valid(items):
         if item:
             val += 1
     return val
+
+def reduce_arguments(text):
+    match = re.search(nested_arg_pattern,text)
+    new = []
+    while match:
+        new.append(text[:match.start()])
+        match_text = match.group(0)
+        pounds = match.group(2)
+        new_text = match.group(1) + pounds[:int(len(pounds)/2)] + match.group(3)
+        new.append(new_text)
+        text = text[match.end():]
+        match = re.search(nested_arg_pattern,text)
+    new.append(text)
+    return(''.join(new))
 
 #Parsing sequences
 newcommand_sequence = [take_token, take_whitespace, take_general,
@@ -241,8 +340,6 @@ def_input_sequence = [take_token,take_whitespace]
 
 renewcommand_sequence = newcommand_sequence
 
-sbalsup = r"""\newcommand\wbalsup [1]{  This is the Wikibook about LaTeX supported by #1}"""
-
 class macro:
     """Template for the macro class - stores def, newcommand, renewcommand,
     and DeclareMathOperator.
@@ -256,6 +353,8 @@ class macro:
         self.type = self.default = self.definition = self.text = ''
         self.asterisk = ''
         self.arg_count = 0
+        self.valid = True
+        self.contains_macro_defs = False
 
     def macro_text(self):
         global verbose
@@ -265,7 +364,6 @@ class macro:
     def load_def(self, match_obj,text):
         #copies over to avoid mutating the original def list
         global verbose
-        global rcp
         dictionary = match_obj.groupdict()
         self.parameter_text = match_obj.group(0)
         self.sep1 = dictionary['sep1']
@@ -292,22 +390,26 @@ class macro:
         self.definition = take_group(text)[0]
         self.type = "\\def"
         self.text = self.parameter_text + self.definition
-        for name in rcp:
-            match_pattern = re.escape(name)
-            if re.search(match_pattern+r'(?![\w\@])',self.definition):
-                self.text = ''
-                self.definition = ''
-                verbose("Encountered nested definition - erasing")
-        if re.search(r'(?<!\\)#{2,}[0-9]',self.definition):
-            print("Nested macros detected erasing")
+        match_pattern = re.escape(self.name)
+        if self.name == '':
+            self.valid = False
+            return
+        if re.search(match_pattern+r'(?![A-Za-z\@])',self.definition):
             self.definition = ''
-        self.definition = re.sub(re.escape(self.name),'',self.definition)
-        verbose("def")
+            verbose("Encountered nested definition - erasing1")
+            verbose(self.definition)
+            verbose(self.name)
+        # if re.search(r'(?<!\\)#{2,}[0-9]',self.definition):
+        #     print("Nested macros detected erasing")
+        #     self.definition = ''
+        self.definition = re.sub(re.escape(self.name)+r'(?![A-Za-z\@\*])','',self.definition)
+        if re.search(macro_pattern,self.definition):
+            self.contains_macro_defs = True
+        verbose("Loading def")
         verbose("{} arguments".format(self.arg_count))
         verbose(self.name)
         verbose(self.definition)
         verbose("end def")
-
 
     def load_mathoperator(self,text, starting):
         results = parse(text,math_operator_sequence)[0]
@@ -318,17 +420,62 @@ class macro:
         self.arg1 = enclose_in_group(results[1])
         self.arg2 = enclose_in_group(results[3])
         self.name = extract_group(self.arg1)
-        verbose("Mathoperator")
+        verbose("Loading Mathoperator")
         verbose(self.arg1)
         verbose(self.arg2)
         verbose("End mathoperator")
 
     def load_newcommand(self,text):
-        global rcp
-        results = parse(text,newcommand_sequence)[0]
+        try:
+            results = parse(text,newcommand_sequence)[0]
+        except:
+            self.valid = False
+            return
         self.text = ''.join(results)
         self.type = results[0]
-        self.name = extract_group_total(results[2]).strip()
+        self.name = extract_group(results[2])
+        self.arg_count = results[4]
+        self.default = results[6]
+        self.definition = results[8]
+        if self.name == '':
+            self.valid = False
+            return
+        if self.arg_count:
+            try:
+                self.arg_count = int(self.arg_count[1:-1])
+            except:
+                match = re.search(r'[0-9]',self.arg_count)
+                if match:
+                    self.arg_count = int(match.group(0))
+                else:
+                    print(self.arg_count)
+                    ValueError("Error parsing argcount: {}".format(self.arg_count))
+        else:
+            self.arg_count = 0
+        self.definition = re.sub(re.escape(self.name)+r'(?![A-Za-z\@\*])','',self.definition)
+        if re.search(macro_pattern,self.definition):
+            self.contains_macro_defs = True
+        verbose("Loading newcommand: {}".format(self.name))
+        verbose("Default parameter: {}".format(self.default))
+        verbose("{} args".format(self.arg_count))
+        verbose(self.definition)
+        verbose("End newcommand")
+
+    def load_renewcommand(self,text):
+        try:
+            results = parse(text,newcommand_sequence)[0]
+        except:
+            self.valid = False
+            return
+        self.text = ''.join(results)
+        self.type = results[0]
+        if self.type[-1]=='*':
+            self.asterisk = '*'
+            self.type = self.type[:-1]
+        self.name = extract_group(results[2])
+        if self.name == '':
+            self.valid = False
+            return
         self.arg_count = results[4]
         self.default = results[6]
         self.definition = results[8]
@@ -336,82 +483,89 @@ class macro:
             try:
                 self.arg_count = int(self.arg_count[1:-1])
             except:
-                print(self.arg_count)
-                ValueError("Error parsing argcount: {}".format(self.arg_count))
+                match = re.search(r'[0-9]',self.arg_count)
+                if match:
+                    self.arg_count = int(match.group(0))
+                else:
+                    print(self.arg_count)
+                    ValueError("Error parsing argcount: {}".format(self.arg_count))
         else:
             self.arg_count = 0
-        for name in rcp:
-            match_pattern = re.escape(name)
-            if re.search(match_pattern+r'(?![\w\@])',self.definition):
-                self.text = ''
-                self.definition = ''
-                verbose("Encountered nested definition - erasing")
-        self.definition = re.sub(re.escape(self.name),'',self.definition)
-        verbose("newcommand: {}".format(self.name))
+        # for name in rcp:
+        #     match_pattern = re.escape(name)
+        #     if re.search(match_pattern+r'(?![A-Za-z\@])',self.definition):
+        #         self.text = ''
+        #         self.definition = ''
+        #         verbose("Encountered nested definition - erasing2")
+        if re.search(macro_pattern,self.definition):
+            self.contains_macro_defs = True
+        verbose("Loading renewcommand: {}".format(self.name))
         verbose("Default parameter: {}".format(self.default))
         verbose("{} args".format(self.arg_count))
         verbose(self.definition)
-        verbose("End newcommand")
-
-    def load_renewcommand(self,text):
-        results = parse(text,newcommand_sequence)[0]
-        self.text = ''.join(results)
-        self.type = results[0]
-        if self.type[-1]=='*':
-            self.asterisk = '*'
-            self.type = self.type[:-1]
-        self.name = extract_group_total(results[2]).strip()
-        self.arg_count = results[4]
-        self.default = results[6]
-        self.definition = results[8]
-        if self.arg_count:
-            self.arg_count = int(self.arg_count[1:-1])
-        else:
-            self.arg_count = 0
-        for name in rcp:
-            match_pattern = re.escape(name)
-            if re.search(match_pattern+r'(?![\w\@])',self.definition):
-                self.text = ''
-                self.definition = ''
-                verbose("Encountered nested definition - erasing")
+        verbose("End renewcommand")
+        self.definition = re.sub(re.escape(self.name)+r'(?![A-Za-z\@\*])','',self.definition)
 
 
     def substitute_arguments(self, arglist, default_arg=''):
         """Accepts a list of the values of args, returns definition with args"""
         text = self.definition
+        text = re.sub(r'(\\#)#','\1 #',text)
         if self.type=='\\def':
             for i, arg in enumerate(arglist):
-                text = text.replace('#'+str(i+1),arg)
+                verbose("Definition")
+                verbose(text)
+                verbose("Passed argument:")
+                verbose(arg)
+                verbose("Index: {}".format(i))
+                new_pattern = arg_pattern+str(i+1)
+                text = re.sub(new_pattern,escape(arg),text)
+                # text = text.replace('#'+str(i+1),arg)
+            text = reduce_arguments(text)
             return(text)
-        elif self.type=='\\newcommand':
+        elif self.type=='\\newcommand' or self.type=='\\newcommand*':
             verbose("Newcommand arglist: {}".format(arglist))
             if self.default:
                 if default_arg:
-                    verbose("Replacing with new default")
-                    text = text.replace('#1',default_arg[1:-1])
+                    verbose("Replacing with new default: {}".format(default_arg))
+                    text = re.sub(arg_pattern+'1',escape(default_arg[1:-1]),
+                    text)
                 else:
                     verbose("Replacing with original default")
-                    text = text.replace('#1',self.default[1:-1])
-                #check for whether or not a new default exists
+                    text = re.sub(arg_pattern+'1',escape(self.default[1:-1]),
+                    text)
                 for i, arg in enumerate(arglist):
-                    text = text.replace('#'+str(i+2),arg)
+                    text = re.sub(arg_pattern+str(i+2),escape(arg),text)
+                text = reduce_arguments(text)
                 return text
             else:
                 for i, arg in enumerate(arglist):
-                    text = text.replace('#'+str(i+1),arg)
+                    text = re.sub(arg_pattern+str(i+1),escape(arg),text)
+                    # text = text.replace('#'+str(i+1),arg)
+                text = reduce_arguments(text)
                 return text
-        elif self.type=='\\renewcommand':
+        elif self.type=='\\renewcommand' or self.type=='\\renewcommand*':
+            verbose("Renewcommand arglist: {}".format(arglist))
             if self.default:
                 if default_arg:
-                    text = text.replace('#1',default_arg[1:-1])
+                    verbose("Replacing with new default")
+                    text = re.sub(arg_pattern+'1',escape(default_arg[1:-1]),
+                    text)
+                    # text = text.replace('#1',default_arg[1:-1])
                 else:
-                    text = text.replace('#1',self.default[1:-1])
-                    for i, arg in enumerate(arglist):
-                        text = text.replace('#'+str(i+2),arg)
-                    return text
+                    verbose("Replacing with original default")
+                    text = re.sub(arg_pattern+'1',escape(self.default[1:-1]),text)
+                    # text = text.replace('#1',self.default[1:-1])
+                for i, arg in enumerate(arglist):
+                    text = re.sub(arg_pattern+str(i+2),escape(arg),text)
+                    # text = text.replace('#'+str(i+2),arg)
+                text = reduce_arguments(text)
+                return text
             else:
                 for i, arg in enumerate(arglist):
-                    text = text.replace('#'+str(i+1),arg)
+                    text = re.sub(arg_pattern+str(i+1),escape(arg),text)
+                    # text = text.replace('#'+str(i+1),arg)
+                text = reduce_arguments(text)
                 return text
         else:
             pass
@@ -451,6 +605,7 @@ class macro:
             return(self.substitute_arguments(parsed),b)
         elif self.type == '\\renewcommand':
             verbose("Returning renewcommand")
+            verbose(self.name)
             a, b = take_token(text)
             if self.arg_count == 0:
                 return(self.definition,b)
@@ -459,6 +614,7 @@ class macro:
             a, b = take_whitespace(b)
             num_args = self.arg_count
             if default:
+                verbose("NEW DEFAULT: {}".format(default))
                 num_args -= 1
             parsing = [take_general, take_whitespace] * (num_args-1)
             parsing.append(take_general)
@@ -478,7 +634,7 @@ class macro:
                 verbose("NEW DEFAULT: {}".format(default))
             a, b = take_whitespace(b)
             num_args = self.arg_count
-            if default:
+            if self.default:
                 num_args -= 1
             verbose("argument count: {}".format(self.arg_count))
             parsing = [take_general,take_whitespace]*(num_args-1)
@@ -486,7 +642,7 @@ class macro:
             results, b = parse(b,parsing)
             results = [results[x] for x in range(0,len(results)+1,2)]
             verbose("results: {}".format(results))
-            verbose("Substituted",self.substitute_arguments(results,default))
+            # verbose("Substituted",self.substitute_arguments(results,default))
             return(self.substitute_arguments(results,default),b)
         elif self.type == "\\DeclareMathOperator":
             a, b = take_token(text)
@@ -494,22 +650,6 @@ class macro:
         else:
             a, b = take_general(text)
             return("",b)
-
-
-examplestr = r"""\def\graph#1#2#3{
-\begin{figure}[htb]
-\centering
-\includegraphics[width=3.5 in]{#1}
-%\centerline{\epsfxsize = 4 in \epsffile{#1}} \caption{#2}
-\label{#3}
-\end{figure}
-}"""
-
-tokentest = r'\token is here'
-
-simpletest = r'\def \lf {\left}'
-
-multiline = r'\def\va{{\bf a}} \def\vb{{\bf b}} \def\vc{{\bf c}} \def\vd{{\bf d}}'
 
 def find_main_file(folder):
     """Iterates over every document in the folder, and returns the path to the
@@ -527,7 +667,19 @@ def find_main_file(folder):
     return ""
 
 
-doctext = load_document('macroexamples.tex')
+def isundefined_sub(isundefined_dict,text):
+    match = re.search(isundefined_pattern,text)
+    while match:
+        sub_string = 'isundefined'+str(len(isundefined_dict))
+        isundefined_dict[sub_string] = match.group(0)
+        text = text.replace(match.group(0),sub_string)
+        match = re.search(isundefined_pattern,text)
+    return text
+
+def undo_isundefined_sub(isundefined_dict,text):
+    for item in isundefined_dict:
+        text = text.replace(item,isundefined_dict[item])
+    return text
 
 def load_inputs(path):
     with open(path,mode='r',encoding='latin-1') as fh:
@@ -564,89 +716,150 @@ def load_inputs(path):
     text = remove_comments(text)
     return text
 
+def sub_single_token_groups(text):
+    while True:
+        text, count = re.subn(delim_token_group,r'\1',text)
+        if count==0:
+            break
+    return text
+
+def substitute_macro_groups(text):
+    while True:
+        text, count = re.subn(macro_token_group,r'\1',text)
+        if count==0:
+            break
+    return text
+
+def load_and_remove_macros(macrodict,text):
+    """Mutate macrodict to include new macros
+    Return new_macros boolean & text"""
+    new_macros = False
+    match = re.search(search_pattern,text)
+    text = substitute_macro_groups(text)
+    # verbose("Beginning search:")
+    # verbose(text)
+    while match:
+        new_macros = True
+        if match.group('def'):
+            #def
+            # match = re.search(def_pattern,text)
+            if match==None:
+                print("DEF MATCH NOT FOUND")
+                print(text)
+                print("END DEF MATCH")
+                match = re.search(search_pattern,text)
+            new_macro = macro()
+            new_macro.load_def(match,text[match.end():])
+            macro_def = new_macro.definition
+            macro_name = re.escape(new_macro.name)
+            if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
+                print("{}: Recursive macros detected: aborting2".format(macro_name))
+                return(False,"")
+            if new_macro.valid:
+                macrodict[new_macro.name]=new_macro
+                text = text.replace(new_macro.macro_text(),"")
+            else:
+                print("{}: Invalid def macro, aborting".format(new_macro.name))
+                return(False,"")
+        elif match.group('newcommand'):
+            #newcommand(*)
+            # match = re.search(newcommand_pattern,text)
+            new_macro = macro()
+            new_macro.load_newcommand(text[match.start():])
+            # verbose("Loaded {}".format(new_macro.name))
+            macro_def = new_macro.definition
+            macro_name = re.escape(new_macro.name)
+            if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
+                print("{}: Recursive macros detected: aborting6".format(new_macro.name))
+                print(macro_name)
+                return(False,"")
+            if new_macro.valid:
+                macrodict[new_macro.name]=new_macro
+                text = text.replace(new_macro.macro_text(),"")
+            else:
+                print("{}: Invalid newcommand macro, aborting".format(new_macro.name))
+                return(False,"")
+        elif match.group('renewcommand'):
+            #renewcommand(*)
+            # match = re.search(renewcommand_pattern,text)
+            new_macro = macro()
+            new_macro.load_renewcommand(text[match.start():])
+            macro_def = new_macro.definition
+            macro_name = re.escape(new_macro.name)
+            if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
+                print("{}: Recursive macros detected: aborting7".format(new_macro.name))
+                print(macro_name)
+                return(False,"")
+            if new_macro.valid:
+                macrodict[new_macro.name]=new_macro
+                text = text.replace(new_macro.macro_text(),"")
+            else:
+                print("{}: Invalid renewcommand macro".format(new_macro.name))
+                return(False,"")
+        elif match.group('mathoperator'):
+            #DeclareMathOperator
+            # match = re.search(math_pattern,text)
+            new_macro = macro()
+            new_macro.load_mathoperator(text[match.end():],match.group(0))
+            macro_def = new_macro.definition
+            macro_name = re.escape(new_macro.name)
+            if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
+                print("{}: Recursive macros detected: aborting4".format(new_macro.name))
+                return(False,"")
+            if new_macro.valid:
+                macrodict[new_macro.name]=new_macro
+                text = text.replace(new_macro.macro_text(),"")
+            else:
+                print("{}: Invalid math macro, aborting.".format(new_macro.name))
+                return(False,"")
+        match = re.search(search_pattern,text)
+    return(new_macros,text)
 
 def demacro_file(path):
+    global debug
     start_time = time.time()
     text = load_inputs(path)
-    # print("Inputs document")
-    # print(text)
-    # Read in macro statements
-    macro_types = ['\\newcommand','\\def']
+    newlines  = len(re.findall(r'\n',text))
+    timeout = int(newlines/3)
+    if debug:
+        timeout = 10000
     macrodict = {}
-    for match in re.finditer(def_pattern,text):
-        new_macro = macro()
-        new_macro.load_def(match,text[match.end():])
-        macro_def = new_macro.definition
-        macro_name = re.escape(new_macro.name)
-        if re.search(macro_name+r'(?![\w\*@])',macro_def):
-            print("{}: Recursive macros detected: aborting2".format(path))
-            return("")
-        for macro_type in macro_types:
-            if re.search(re.escape(macro_type)+r'(?![\w\*@])',macro_def):
-                print("{}: Nested macros detected: aborting3".format(path))
-                return("")
-        macrodict[new_macro.name]=new_macro
-        # text = text.replace(new_macro.macro_text(),"")
-    for match in re.finditer(math_pattern,text):
-        new_macro = macro()
-        new_macro.load_mathoperator(text[match.end():],match.group(0))
-        macro_def = new_macro.definition
-        macro_name = re.escape(new_macro.name)
-        if re.search(macro_name+r'(?![\w\*@])',macro_def):
-            print("{}: Recursive macros detected: aborting4".format(path))
-            return("")
-        for macro_type in macro_types:
-            if re.search(re.escape(macro_type)+r'(?![\w\*@])',macro_def):
-                print("{}: Nested macros detected: aborting5".format(path))
-                return("")
-        macrodict[new_macro.name]=new_macro
-        # text = text.replace(new_macro.macro_text(),"")
-    for match in re.finditer(newcommand_pattern,text):
-        new_macro = macro()
-        new_macro.load_newcommand(text[match.start():])
-        macro_def = new_macro.definition
-        macro_name = re.escape(new_macro.name)
-        if re.search(macro_name+r'(?![\w\*@])',macro_def):
-            print("{}: Recursive macros detected: aborting6".format(path))
-            print(macro_name)
-            return("")
-        for macro_type in macro_types:
-            if re.search(re.escape(macro_type)+r'(?![\w\*@])',macro_def):
-                print(macro_def)
-                print("{}: Nested macros detected: aborting7".format(path))
-                return("")
-        macrodict[new_macro.name]=new_macro
-        # text = text.replace(new_macro.macro_text(),"")
-    nameset = set(macrodict.keys())
+    new_macros = True
+    changed = True
+    macro_blacklist = set()
+    new_macros, text = load_and_remove_macros(macrodict,text)
     if len(macrodict)==0:
         return text
-    changed = True
-    for item in macrodict:
-        text = text.replace(macrodict[item].macro_text(),"")
-    while changed:
+    isundefined_dict = {}
+    text = isundefined_sub(isundefined_dict,text)
+    while (new_macros or changed):
+        new_macros = False
+        changed = False
+        substituted_macro_defs = False
         for item in macrodict:
+            if item in macro_blacklist:
+                continue
             while(True):
+                text = sub_single_token_groups(text)
                 tomatch = re.escape(macrodict[item].name)
-                # print("Search token: {}".format(tomatch))
                 try:
-                    match = re.search(tomatch+r'(?=[^\w\@\*])',text)
+                    match = re.search(tomatch+r'(?![A-Za-z\@\*])',text)
                 except:
                     ValueError("TOMATCH: {}".format(tomatch))
                 if not match:
-                    changed = False
                     break
-                # print(match.group(0))
-                # print(match.start())
+                changed = True
                 index = match.start()
                 before, expression = text[:index], text[index:]
+                verbose("Substituting arguments")
                 try:
                     substituted, after = macrodict[item].parse_expression(expression)
                 except Exception as inst:
-                    print("Error: failure to parse expression {}".format(
-                    macrodict[item].name
+                    print("{}: Error: failure to parse expression {} - removing macro".format(
+                    path,macrodict[item].name
                     ))
-                    print(str(inst))
-                    return("")
+                    macro_blacklist.add(macrodict[item].name)
+                    break
                 merging = []
                 merging.append(before)
                 if before[-1]=='\n':
@@ -661,21 +874,37 @@ def demacro_file(path):
                     merging.append('\n')
                 merging.append(after)
                 text = ''.join(merging)
+                if macrodict[item].contains_macro_defs:
+                    substituted_macro_defs = True
+                # print("CURRENT TEXT:")
+                # print(text)
                 current_time = time.time()
+                text = isundefined_sub(isundefined_dict,text)
+                text = sub_single_token_groups(text)
                 if current_time > start_time + timeout:
-                    print("{}: Timed out".format(path))
+                    print("{}: Timed out ({} seconds)".format(path,int(current_time-start_time)))
                     return("")
-                # print("NEW DOC LENGTH: {}".format(len(text)))
+                if substituted_macro_defs:
+                    verbose("Searching for new macros...")
+                    new_macros, text = load_and_remove_macros(macrodict,text)
+                    verbose("Finished searching")
+                text = re.sub(r'\n{3,}','\n\n',text)
+                verbose(len(text))
+                if new_macros:
+                    break
+            if new_macros:
+                break
+    text = undo_isundefined_sub(isundefined_dict,text)
     text = re.sub(r'\n{3,}','\n\n',text)
-    verbose("{}: COMPLETE".format(path))
+    text = sub_single_token_groups(text)
     return text
 
-def demacro_folder(path):
+def demacro_archive(path):
     main = find_main_file(path)
     if not main:
         print("{}: Main file not found".format(path))
         return
-    # print(main)
+    print("Starting: {}".format(main))
     new_text = demacro_file(main)
     if not new_text:
         print("{}: returned blank document".format(main))
@@ -683,65 +912,174 @@ def demacro_folder(path):
         print("{}: COMPLETE".format(main))
     return new_text
 
-with open('macroexamples.tex','r') as fh:
-    origtext = fh.read()
+"""The following functions are all involved with the following pipeline:
+    .tar->folder of .tar.gz -> folder of raw .tex directories"""
 
+def untarballs(folder,dest=''):
+    if not dest:
+        dest = folder
+    else:
+        validate_folder(dest)
+    for fname in next(os.walk(folder))[2]:
+        if fname.endswith("tar.gz"):
+            try:
+                tar = tarfile.open(os.path.join(folder,fname),"r:gz")
+                tar.extractall(dest)
+                tar.close()
+            except Exception as inst:
+                print("{}: Unable to extract".format(fname))
+                print(inst)
+    for fname in next(os.walk(dest))[2]:
+        if fname.endswith(".tar.gz"):
+            os.remove(os.path.join(folder,fname))
+
+def untar(archive,dest=''):
+    if not dest:
+        dest = os.path.split(archive)[0]
+    else:
+        validate_folder(dest)
+    try:
+        tar = tarfile.open(archive,"r:")
+        tar.extractall(path=dest)
+        tar.close()
+    except Exception as inst:
+        print("{}: Extraction failed".format(archive))
+        print(inst)
+
+
+def untar_folder(folder,dest):
+    """.tar->folder of .tar.gz"""
+    if dest:
+        validate_folder(dest)
+    else:
+        dest = folder
+    for fname in next(os.walk(folder))[2]:
+        if fname.endswith('.tar'):
+            untar(os.path.join(folder,fname),dest)
+
+def untarballs_folder(folder,dest=''):
+    """folder of folders .tar.gz->folder of raw .tex dirs"""
+    for fname in next(os.walk(folder))[1]:
+        untarballs(os.path.join(folder,fname),dest)
+
+def total_extract(archive,dest):
+    """.tar->folder of raw .tex"""
+    untar(archive,dest)
+    fname = os.path.splitext(os.path.split(archive)[1])[0]
+    untarballs(os.path.join(dest,fname))
+
+def total_extract_folder(folder,dest=''):
+    """folder of tars.tar->folder of folders of raw .tex"""
+    untar_folder(folder,dest)
+    untarballs_folder(dest,'')
 
 def mapped(folder):
-    global outdirectory
-    outdirectory = os.path.normpath(outdirectory)
+    """Side thing, please ignore"""
+    global output_path
+    output_path = os.path.normpath(output_path)
     print(folder)
-    new_text = demacro_folder(folder)
+    new_text = demacro_archive(folder)
     new_name = os.path.split(os.path.normpath(folder))[1]
     if(new_text):
-        with open(outdirectory+'/'+new_name+'.tex','w') as fh:
+        with open(output_path+'/'+new_name+'.tex','w') as fh:
             fh.write(new_text)
     else:
         mainfile =  find_main_file(folder)
         if mainfile:
             text = load_inputs(mainfile)
             filename = os.path.basename(mainfile)
-            with open('/media/jay/Data/ml_debug/'+filename,'w') as fh:
+            with open('/media/jay/Data/combined_debug/'+new_name+'.tex','w') as fh:
                 fh.write(text)
 
-def untarballs(folder,dest=''):
-    if not dest:
-        dest = folder
+def demacro_mapped(folder):
+    """Wrapper function for handling in/out paths & failed document output"""
+    global output_path
+    global debug_path
+    output_path = os.path.normpath(output_path)
+    new_text = demacro_archive(folder)
+    new_name = os.path.split(os.path.normpath(folder))[1]
+    if(new_text):
+        with open(output_path+'/'+new_name+'.tex','w') as fh:
+            fh.write(new_text)
+    else:
+        mainfile =  find_main_file(folder)
+        if mainfile:
+            text = load_inputs(mainfile)
+            filename = os.path.basename(mainfile)
+            with open(debug_path+new_name+'.tex','w') as fh:
+                fh.write(text)
+
+def demacro_folder(folder):
+    """Demacro a folder of raw .tex directories in place"""
+    global output_path
+    global debug_path
+    folder = os.path.abspath(folder)
+    folderlist = next(os.walk(folder))[1]
+    folderlist = [os.path.join(folder,item) for item in folderlist]
+    pool = mp.Pool(mp.cpu_count())
+    pool.map(demacro_mapped,folderlist)
+    pool.close()
+    pool.join()
+    for fname in folderlist:
+        shutil.rmtree(fname,ignore_errors=True)
+
+def demacro_and_untar(archive,dest):
+    """Untar archive to folder & demacro. e.g. 1506.tar to example/1506 should
+    just pass 'example' into dest"""
+    global output_path
+    global debug_path
+    new_name = os.path.split(os.path.splitext(archive)[0])[1]
+    output_path = os.path.join(dest,new_name)
+    validate_folder(output_path)
+    total_extract(archive,dest)
+    demacro_folder(output_path)
+
+def demacro_and_untar_folder(archive_folder,dest):
+    """demacro_and_untar, but for a folder of .tar files"""
+    global output_path
+    global debug_path
+    validate_folder(debug_path)
     validate_folder(dest)
-    for fname in next(os.walk(folder))[2]:
-        if fname.endswith("tar.gz"):
-            tar = tarfile.open(os.path.join(folder,fname),"r:gz")
-            tar.extractall(dest)
-            tar.close()
-
-def untar(archive):
-    tar = tarfile.open(archive,"r:")
-    tar.extractall()
-    tar.close()
-
+    archive_list = [os.path.join(archive_folder,fname) for fname in next(os.walk(archive_folder))[2] if fname.endswith('.tar')]
+    for archive in archive_list:
+        demacro_and_untar(archive,dest)
 
 
 def main():
+    global debug
+    global debug_path
+    global output_path
     parser = argparse.ArgumentParser(description='Expands LaTeX macros')
     parser.add_argument('input', help='Input file/directory')
-    parser.add_argument('output', help='Ouptut file/directory')
-    parser.add_argument('-d', '--directory', action='store_true',
-    help='Indicates that input & output are dictories')
-    parser.add_argument('-v', '--verbose', action='store_true',
+    parser.add_argument('output', help='Output directory')
+    parser.add_argument('--dtar', action='store_true',
+    help='Indicate that input is a directory of .tar files')
+    parser.add_argument('--dgz',action='store_true',
+    help='Indicate that input is a directory of .tar.gz files')
+    parser.add_argument('--verbose', action='store_true',
     help='Enable verbose output')
-    parser.add_argument('-k','--keep', action='store_true',
-    help='Keeps untarred directories in output directory')
-    parser.add_argument('-o', '--oldConvention', action='store_true',
-    help='use this flag when applying demacro to submissions before 04/2007')
+    parser.add_argument('--debug',help='Path to store failed files')
+    parser.add_argument('--tar',action='store_true',
+    help='Indicate that input is a single .tar file')
+    # parser.add_argument('-o', '--oldConvention', action='store_true',
+    # help='use this flag when applying demacro to submissions before 04/2007')
     args = parser.parse_args()
-    pool = mp.Pool(mp.cpu_count())
-    root, folders, files = next(os.walk(args.input))
-    folderlist = [os.path.join(root, foldername) for foldername in folders]
-    main_files = pool.map(find_main_file,folderlist)
-    pool.map(find_macros,folderlist)
-    pool.close()
-    pool.join()
-    return 0
+    input_path = args.input
+    output_path = args.output
+    if args.debug:
+        debug_path = args.debug
+    validate_folder(debug_path)
+    validate_folder(output)
+    if not os.path.exists(input_path):
+        ValueError("Input does not exist: {}".format(args.input))
+    if args.dtar:
+        demacro_and_untar_folder(input_path,output_path)
+    elif args.dgz:
+        folder_name = os.path.basename(os.path.normpath(input_path))
+        untarballs(input_path,os.path.join(output_path,folder_name))
+        demacro_folder(os.path.join(output_path,folder_name))
+    elif args.tar:
+        demacro_and_untar(archive,output_path)
 
 if __name__=='__main__':
     main()
