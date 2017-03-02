@@ -14,6 +14,7 @@ import sys
 import tarfile
 import multiprocessing as mp
 import shutil
+import argparse
 
 from core.funcs import *
 
@@ -66,9 +67,9 @@ arg_pattern = r'(?s)(?<![#\\])#'
 
 # single_token_group = r'(?<!\\)\{(\\[A-Za-z\@\*]+(?:\{[A-Za-z\@\*]+\})?)(?<!\\)\}'
 
-single_token_group = r'(?<!\\)\{(\\[A-Za-z\@\*]+)(?<!\\)\}'
+single_token_group = r'(?<!\\)\{\s*(\\[A-Za-z\@\*]+)(?<!\\)\s*\}'
 
-delim_token_group = r'(?<!\\)\{((?:\\begin|\\end|\\\[|\\\])(?:\{[A-Za-z\@\*]+\})?|\${1,2}|\\\[|\\\])(?<!\\)\}'
+delim_token_group = r'(?<!\\)\{\s*((?:\\begin|\\end|\\\[|\\\])(?:\{[A-Za-z\@\*]+\})?|\${1,2}|\\\[|\\\])(?<!\\)\s*\}'
 
 macro_token_group = r'(?<!\\)\{\s*(\\((?:re)?newcommand\*?)|\\g?def|\\DeclareMathOperator\*?)(?<!\\)\s*\}'
 
@@ -666,7 +667,6 @@ def find_main_file(folder):
             return os.path.join(folder,filename)
     return ""
 
-
 def isundefined_sub(isundefined_dict,text):
     match = re.search(isundefined_pattern,text)
     while match:
@@ -880,12 +880,12 @@ def demacro_file(path):
                 # print(text)
                 current_time = time.time()
                 text = isundefined_sub(isundefined_dict,text)
-                text = sub_single_token_groups(text)
                 if current_time > start_time + timeout:
                     print("{}: Timed out ({} seconds)".format(path,int(current_time-start_time)))
                     return("")
                 if substituted_macro_defs:
                     verbose("Searching for new macros...")
+                    text = sub_single_token_groups(text)
                     new_macros, text = load_and_remove_macros(macrodict,text)
                     verbose("Finished searching")
                 text = re.sub(r'\n{3,}','\n\n',text)
@@ -1010,7 +1010,7 @@ def demacro_mapped(folder):
                 fh.write(text)
 
 def demacro_folder(folder):
-    """Demacro a folder of raw .tex directories in place"""
+    """Demacro a folder of raw .tex directories"""
     global output_path
     global debug_path
     folder = os.path.abspath(folder)
@@ -1023,7 +1023,7 @@ def demacro_folder(folder):
     for fname in folderlist:
         shutil.rmtree(fname,ignore_errors=True)
 
-def demacro_and_untar(archive,dest):
+def untar_and_demacro(archive,dest):
     """Untar archive to folder & demacro. e.g. 1506.tar to example/1506 should
     just pass 'example' into dest"""
     global output_path
@@ -1031,18 +1031,20 @@ def demacro_and_untar(archive,dest):
     new_name = os.path.split(os.path.splitext(archive)[0])[1]
     output_path = os.path.join(dest,new_name)
     validate_folder(output_path)
+    print("{}: Extracting".format(archive))
     total_extract(archive,dest)
+    print("{}: Extraction complete".format(archive))
     demacro_folder(output_path)
 
-def demacro_and_untar_folder(archive_folder,dest):
-    """demacro_and_untar, but for a folder of .tar files"""
+def untar_and_demacro_folder(archive_folder,dest):
+    """untar_and_demacro, but for a folder of .tar files"""
     global output_path
     global debug_path
     validate_folder(debug_path)
     validate_folder(dest)
     archive_list = [os.path.join(archive_folder,fname) for fname in next(os.walk(archive_folder))[2] if fname.endswith('.tar')]
     for archive in archive_list:
-        demacro_and_untar(archive,dest)
+        untar_and_demacro(archive,dest)
 
 
 def main():
@@ -1069,17 +1071,19 @@ def main():
     if args.debug:
         debug_path = args.debug
     validate_folder(debug_path)
-    validate_folder(output)
+    validate_folder(output_path)
     if not os.path.exists(input_path):
         ValueError("Input does not exist: {}".format(args.input))
     if args.dtar:
-        demacro_and_untar_folder(input_path,output_path)
+        untar_and_demacro_folder(input_path,output_path)
     elif args.dgz:
         folder_name = os.path.basename(os.path.normpath(input_path))
         untarballs(input_path,os.path.join(output_path,folder_name))
         demacro_folder(os.path.join(output_path,folder_name))
     elif args.tar:
-        demacro_and_untar(archive,output_path)
+        untar_and_demacro(archive,output_path)
+    else:
+        demacro_folder(input_path)
 
 if __name__=='__main__':
     main()
