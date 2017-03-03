@@ -174,8 +174,6 @@ def take_token(text):
     if text[0]=='\\':
         token.append('\\')
         if not re.match(r'[A-Za-z@\*]',text[1]):
-            if text[1]=='\\':
-                return('',text)
             token.append(text[1])
             return (''.join(token),text[2:])
         for i, character in enumerate(text[1:]):
@@ -186,6 +184,7 @@ def take_token(text):
         return(''.join(token),text[len(token):])
     else:
         return('',text)
+
 
 def take_argument(text):
     if re.match(r'#[1-9]',text):
@@ -241,24 +240,6 @@ def parse(text,sequence):
 
 def escape(text):
     return text.replace("\\","\\\\")
-
-# def extract_group(text):
-#     if balanced_braces(text) and text[0]=='{' and text[-1]=='}':
-#         return text[1:-1]
-#     else:
-#         return text
-#
-# def extract_group_total(text):
-#     while balanced_braces(text) and text[0]=='{' and text[-1]=='}':
-#         text = text[1:-1]
-#     return text
-
-# def enclose_in_group(text):
-#     if balanced_braces(text) and text[0]=='{' and text[0]=='}':
-#         return text
-#     else:
-#         return '{' + text + '}'
-
 
 def is_group(text):
     stack = []
@@ -655,14 +636,14 @@ def find_main_file(folder):
     file with begin/end document statements
     """
     folder = os.path.abspath(folder)
-    files = next(os.walk(folder))[2]
-    for filename in files:
-        if os.path.splitext(filename)[1].lower()!='.tex':
-            continue
-        with open(os.path.join(folder,filename),mode='r',encoding='latin-1') as fh:
-            text = fh.read()
-        if re.search(r'(?s)\\begin\{document\}.*?\\end\{document\}',text):
-            return os.path.join(folder,filename)
+    for root, dirs, files, in os.walk(folder):
+        for filename in files:
+            if os.path.splitext(filename)[1].lower()!='.tex':
+                continue
+            with open(os.path.join(root,filename),mode='r',encoding='latin-1') as fh:
+                text = fh.read()
+            if re.search(r'(?s)\\begin\{document\}.*?\\end\{document\}',text):
+                return os.path.join(root,filename)
     return ""
 
 def isundefined_sub(isundefined_dict,text):
@@ -716,7 +697,6 @@ def load_inputs(path):
 
 def sub_single_token_groups(text):
     while True:
-        print("SUBBING")
         text, count = re.subn(delim_token_group,r'\1',text)
         if count==0:
             break
@@ -733,8 +713,8 @@ def load_and_remove_macros(macrodict,text):
     """Mutate macrodict to include new macros
     Return new_macros boolean & text"""
     new_macros = False
-    match = re.search(search_pattern,text)
     text = substitute_macro_groups(text)
+    match = re.search(search_pattern,text)
     # verbose("Beginning search:")
     # verbose(text)
     while match:
