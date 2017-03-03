@@ -716,6 +716,7 @@ def load_inputs(path):
 
 def sub_single_token_groups(text):
     while True:
+        print("SUBBING")
         text, count = re.subn(delim_token_group,r'\1',text)
         if count==0:
             break
