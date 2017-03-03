@@ -990,10 +990,12 @@ def demacro_folder(folder):
     folder = os.path.abspath(folder)
     folderlist = next(os.walk(folder))[1]
     folderlist = [os.path.join(folder,item) for item in folderlist]
+    print("{}: Beginning processing...".format(folder))
     pool = mp.Pool(mp.cpu_count())
     pool.map(demacro_mapped,folderlist)
     pool.close()
     pool.join()
+    print("Processing complete")
     for fname in folderlist:
         shutil.rmtree(fname,ignore_errors=True)
 
