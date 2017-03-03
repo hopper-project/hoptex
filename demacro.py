@@ -996,8 +996,8 @@ def demacro_folder(folder):
     pool.close()
     pool.join()
     print("Processing complete")
-    for fname in folderlist:
-        shutil.rmtree(fname,ignore_errors=True)
+    # for fname in folderlist:
+    #     shutil.rmtree(fname,ignore_errors=True)
 
 def untar_and_demacro(archive,dest):
     """Untar archive to folder & demacro. e.g. 1506.tar to example/1506 should
