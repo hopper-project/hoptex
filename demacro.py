@@ -18,7 +18,6 @@ import argparse
 
 from core.funcs import *
 
-global timeout
 global rcp
 global output_path
 global debug
@@ -819,9 +818,7 @@ def demacro_file(path):
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = max(int(newlines/5),120)
-    if debug:
-        timeout = 10000
+    timeout = 480
     macrodict = {}
     new_macros = True
     changed = True
@@ -838,8 +835,8 @@ def demacro_file(path):
         for item in macrodict:
             if item in macro_blacklist:
                 continue
+            text = sub_single_token_groups(text)
             while(True):
-                text = sub_single_token_groups(text)
                 tomatch = re.escape(macrodict[item].name)
                 try:
                     match = re.search(tomatch+r'(?![A-Za-z\@\*])',text)
@@ -875,8 +872,6 @@ def demacro_file(path):
                 text = ''.join(merging)
                 if macrodict[item].contains_macro_defs:
                     substituted_macro_defs = True
-                # print("CURRENT TEXT:")
-                # print(text)
                 current_time = time.time()
                 text = isundefined_sub(isundefined_dict,text)
                 if current_time > start_time + timeout:
@@ -884,10 +879,8 @@ def demacro_file(path):
                     return("")
                 if substituted_macro_defs:
                     verbose("Searching for new macros...")
-                    text = sub_single_token_groups(text)
                     new_macros, text = load_and_remove_macros(macrodict,text)
                     verbose("Finished searching")
-                text = re.sub(r'\n{3,}','\n\n',text)
                 verbose(len(text))
                 if new_macros:
                     break
@@ -972,24 +965,6 @@ def total_extract_folder(folder,dest=''):
     untar_folder(folder,dest)
     untarballs_folder(dest,'')
 
-def mapped(folder):
-    """Side thing, please ignore"""
-    global output_path
-    output_path = os.path.normpath(output_path)
-    print(folder)
-    new_text = demacro_archive(folder)
-    new_name = os.path.split(os.path.normpath(folder))[1]
-    if(new_text):
-        with open(output_path+'/'+new_name+'.tex','w') as fh:
-            fh.write(new_text)
-    else:
-        mainfile =  find_main_file(folder)
-        if mainfile:
-            text = load_inputs(mainfile)
-            filename = os.path.basename(mainfile)
-            with open('/media/jay/Data/combined_debug/'+new_name+'.tex','w') as fh:
-                fh.write(text)
-
 def demacro_mapped(folder):
     """Wrapper function for handling in/out paths & failed document output"""
     global output_path
@@ -1033,7 +1008,9 @@ def untar_and_demacro(archive,dest):
     print("{}: Extracting".format(archive))
     total_extract(archive,dest)
     print("{}: Extraction complete".format(archive))
+    print("{}: Beginning demacro...".format(archive))
     demacro_folder(output_path)
+    print("{}: Demacro complete".format(archive))
 
 def untar_and_demacro_folder(archive_folder,dest):
     """untar_and_demacro, but for a folder of .tar files"""
