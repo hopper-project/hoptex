@@ -818,7 +818,7 @@ def demacro_file(path):
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = 480
+    timeout = 240
     macrodict = {}
     new_macros = True
     changed = True
