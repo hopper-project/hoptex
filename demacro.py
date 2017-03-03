@@ -559,6 +559,7 @@ class macro:
             if a[0]!=self.name:
                 verbose("CRITICAL ERROR: MISMATCHED TOKEN")
                 verbose("EXPECTED: {}, MATCHED: {}DELIM".format(self.name,a[0]))
+                raise ValueError("Token mismatch")
             if self.arg_count==0:
                 return (self.definition, b)
             else:
@@ -795,11 +796,14 @@ def load_and_remove_macros(macrodict,text):
     return(new_macros,text)
 
 def demacro_file(path):
+    global diag_message
     global debug
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = 120
+    timeout = max(120,int(newlines/20))
+    if debug:
+        timeout = 10000
     macrodict = {}
     new_macros = True
     changed = True
@@ -818,6 +822,7 @@ def demacro_file(path):
                 continue
             text = sub_single_token_groups(text)
             while(True):
+                text = sub_single_token_groups(text)
                 tomatch = re.escape(macrodict[item].name)
                 try:
                     match = re.search(tomatch+r'(?![A-Za-z\@\*])',text)
@@ -855,16 +860,16 @@ def demacro_file(path):
                     substituted_macro_defs = True
                 current_time = time.time()
                 text = isundefined_sub(isundefined_dict,text)
+                text = sub_single_token_groups(text)
                 if current_time > start_time + timeout:
                     print("{}: Timed out ({} seconds)".format(path,int(current_time-start_time)))
                     return("")
-                if substituted_macro_defs:
-                    verbose("Searching for new macros...")
-                    new_macros, text = load_and_remove_macros(macrodict,text)
-                    verbose("Finished searching")
+                text = re.sub(r'\n{3,}','\n\n',text)
                 verbose(len(text))
-                if new_macros:
-                    break
+            if substituted_macro_defs:
+                verbose("Searching for new macros...")
+                new_macros, text = load_and_remove_macros(macrodict,text)
+                verbose("Finished searching")
             if new_macros:
                 break
     text = undo_isundefined_sub(isundefined_dict,text)
