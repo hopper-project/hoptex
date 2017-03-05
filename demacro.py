@@ -17,12 +17,13 @@ import shutil
 import argparse
 
 from core.funcs import *
-
+global diag_message
 global rcp
 global output_path
 global debug
 global debug_path
 
+diag_message = False
 debug = False
 debug_path = './debug/'
 
@@ -945,9 +946,11 @@ def untarballs_folder(folder,dest=''):
 
 def total_extract(archive,dest):
     """.tar->folder of raw .tex"""
+    print("Extracting {}".format(archive))
     untar(archive,dest)
     fname = os.path.splitext(os.path.split(archive)[1])[0]
     untarballs(os.path.join(dest,fname))
+    print("Extraction complete")
 
 def total_extract_folder(folder,dest=''):
     """folder of tars.tar->folder of folders of raw .tex"""
