@@ -29,7 +29,7 @@ debug = False
 timeout = 120
 debug_path = './debug/'
 
-r0 = r'(?s)\\g?def\s*(?P<name>\\[A-Za-z@]+|\\.)\s*'
+r0 = r'(?s)\\(?:e|g)?def\s*(?P<name>\\[A-Za-z@]+|\\.)\s*'
 r1 = r'(?P<sep1>[^#\{]+)?(?P<arg1>#1)?(?P<sep2>[^#\{]+)?'
 r2 = r'(?P<arg2>#2)?(?P<sep3>[^#\{]+)?'
 r3 = r'(?P<arg3>#3)?(?P<sep4>[^#\{]+)?'
@@ -41,13 +41,15 @@ r8 = r'(?P<arg8>#8)?(?P<sep9>[^#\{]+)?'
 r9 = r'(?P<arg9>#9)?(?P<sep10>[^#\{]+)?(?=\{)'
 
 #Regex pattern for seeking & retrieving args & separators for def
-def_pattern = r0+r1+r2+r3+r4+r5+r6+r7+r8+r9
+# def_pattern = r0+r1+r2+r3+r4+r5+r6+r7+r8+r9
+
+# A truly monstrous regular expression, from a less civilized age
+
+def_pattern = r'(?s)\\(?:e|g)?def\s*(?P<name>\\[A-Za-z@\*]+|\\.)\s*(?:(?P<sep1>[^\{#]*)(?P<arg1>#1)(?P<sep2>[^\{#]*)(?:(?P<arg2>#2)(?P<sep3>[^\{#]*)(?:(?P<arg3>#3)(?P<sep4>[^\{#]*)(?:(?P<arg4>#4)(?P<sep5>[^\{#]*)(?:(?P<arg5>#5)(?P<sep6>[^\{#]*)(?:(?P<arg6>#6)(?P<sep7>[^\{#]*)(?:(?P<arg7>#7)(?P<sep8>[^\{#]*)(?:(?P<arg8>#8)(?P<sep9>[^\{#]*)(?:(?P<arg9>#9)(?P<sep10>[^\{#]*))?)?)?)?)?)?)?)?)?(?=\{)'
 
 math_pattern = r"\\DeclareMathOperator\*?"
 
-# def_token = r'\\g?def\s*(?:\\[A-Za-z@]+|\\.)'
-
-def_token = r'\\g?def(?![A-Za-z@])'
+def_token = r'\\(?:e|g)?def(?![A-Za-z@])'
 
 input_pattern = r'\\input\s*\{\s*([^\s\\]+)\}|\\input(?![A-Za-z@])\s*([^\s\\]+)'
 
@@ -62,7 +64,9 @@ macro_pattern= '|'.join([def_token,newcommand_pattern,renewcommand_pattern,math_
 
 begin_document = r'\\begin\{document\}'
 
-nested_arg_pattern = r'(?s)(\\#|[^\\])(#{2,})([1-9])'
+# nested_arg_pattern = r'(?s)(\\#|[^\\])(#{2,})([1-9])'
+
+nested_arg_pattern = r'(?<!\\)((?:##)+)([1-9])'
 
 arg_pattern = r'(?s)(?<![#\\])#'
 
@@ -72,7 +76,7 @@ single_token_group = r'(?<!\\)\{(\\[A-Za-z\@\*]+)(?<!\\)\}'
 
 delim_token_group = r'(?<!\\)\{((?:\\begin|\\end|\\\[|\\\])(?:\{[A-Za-z\@\*]+\})?|\${1,2}|\\\[|\\\])(?<!\\)\}'
 
-macro_token_group = r'(?<!\\)\{\s*(\\((?:re)?newcommand\*?)|\\g?def|\\DeclareMathOperator\*?)(?<!\\)\s*\}'
+macro_token_group = r'(?<!\\)\{\s*(\\((?:re)?newcommand\*?)|\\(?:e|g)?def|\\DeclareMathOperator\*?)(?<!\\)\s*\}'
 
 isundefined_pattern = r'\\isundefined\s*\{\s*(\\[A-Za-z\@\*]*)\s*\}'
 
@@ -243,24 +247,6 @@ def parse(text,sequence):
 def escape(text):
     return text.replace("\\","\\\\")
 
-# def extract_group(text):
-#     if balanced_braces(text) and text[0]=='{' and text[-1]=='}':
-#         return text[1:-1]
-#     else:
-#         return text
-#
-# def extract_group_total(text):
-#     while balanced_braces(text) and text[0]=='{' and text[-1]=='}':
-#         text = text[1:-1]
-#     return text
-
-# def enclose_in_group(text):
-#     if balanced_braces(text) and text[0]=='{' and text[0]=='}':
-#         return text
-#     else:
-#         return '{' + text + '}'
-
-
 def is_group(text):
     stack = []
     backslash_count = 0
@@ -319,8 +305,8 @@ def reduce_arguments(text):
     while match:
         new.append(text[:match.start()])
         match_text = match.group(0)
-        pounds = match.group(2)
-        new_text = match.group(1) + pounds[:int(len(pounds)/2)] + match.group(3)
+        pounds = match.group(1)
+        new_text = pounds[:int(len(pounds)/2)] + match.group(2)
         new.append(new_text)
         text = text[match.end():]
         match = re.search(nested_arg_pattern,text)
@@ -420,6 +406,7 @@ class macro:
         self.arg1 = enclose_in_group(results[1])
         self.arg2 = enclose_in_group(results[3])
         self.name = extract_group(self.arg1)
+        self.definition = "\\operatorname"+self.asterisk+self.arg2
         verbose("Loading Mathoperator")
         verbose(self.arg1)
         verbose(self.arg2)
@@ -433,6 +420,9 @@ class macro:
             return
         self.text = ''.join(results)
         self.type = results[0]
+        if self.type[-1]=='*':
+            self.asterisk = '*'
+            self.type = self.type[:-1]
         self.name = extract_group(results[2])
         self.arg_count = results[4]
         self.default = results[6]
@@ -506,18 +496,17 @@ class macro:
         verbose("End renewcommand")
         self.definition = re.sub(re.escape(self.name)+r'(?![A-Za-z\@\*])','',self.definition)
 
-
     def substitute_arguments(self, arglist, default_arg=''):
         """Accepts a list of the values of args, returns definition with args"""
         text = self.definition
         text = re.sub(r'(\\#)#','\1 #',text)
         if self.type=='\\def':
             for i, arg in enumerate(arglist):
-                verbose("Definition")
+                verbose("definition")
                 verbose(text)
                 verbose("Passed argument:")
                 verbose(arg)
-                verbose("Index: {}".format(i))
+                verbose("Argument index: {}".format(i))
                 new_pattern = arg_pattern+str(i+1)
                 text = re.sub(new_pattern,escape(arg),text)
                 # text = text.replace('#'+str(i+1),arg)
@@ -737,8 +726,6 @@ def load_and_remove_macros(macrodict,text):
     new_macros = False
     match = re.search(search_pattern,text)
     text = substitute_macro_groups(text)
-    # verbose("Beginning search:")
-    # verbose(text)
     while match:
         new_macros = True
         if match.group('def'):
@@ -813,7 +800,11 @@ def load_and_remove_macros(macrodict,text):
             else:
                 print("{}: Invalid math macro, aborting.".format(new_macro.name))
                 return(False,"")
+        # verbose("ABOUT TO SEARCH")
+        # verbose(text)
+        # verbose("Searching...")
         match = re.search(search_pattern,text)
+        # verbose("SEARCH COMPLETE")
     return(new_macros,text)
 
 def demacro_file(path):
@@ -822,7 +813,7 @@ def demacro_file(path):
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = max(120,int(newlines/20))
+    timeout = 300
     if debug:
         timeout = 10000
     macrodict = {}
@@ -842,8 +833,8 @@ def demacro_file(path):
             if item in macro_blacklist:
                 continue
             text = sub_single_token_groups(text)
+            substituted_macro_defs = False
             while(True):
-                text = sub_single_token_groups(text)
                 tomatch = re.escape(macrodict[item].name)
                 try:
                     match = re.search(tomatch+r'(?![A-Za-z\@\*])',text)
@@ -852,31 +843,37 @@ def demacro_file(path):
                 if not match:
                     break
                 changed = True
-                index = match.start()
-                before, expression = text[:index], text[index:]
-                verbose("Substituting arguments")
-                try:
-                    substituted, after = macrodict[item].parse_expression(expression)
-                except Exception as inst:
-                    print("{}: Error: failure to parse expression {} - removing macro".format(
-                    path,macrodict[item].name
-                    ))
-                    macro_blacklist.add(macrodict[item].name)
-                    break
-                merging = []
-                merging.append(before)
-                if before[-1]=='\n':
-                    merging.append('')
+                if macrodict[item].arg_count==0:
+                    verbose("Regex sub: {}".format(item))
+                    escaped_name = re.escape(item)+r'(?![A-Za-z\@\*])'
+                    macro_def = escape(reduce_arguments(macrodict[item].definition))
+                    text = re.sub(escaped_name,macro_def,text)
                 else:
-                    merging.append('\n')
-                merging.append(substituted)
-                if len(after)>0:
-                    if after[0]=='\n':
+                    index = match.start()
+                    before, expression = text[:index], text[index:]
+                    verbose("Substituting arguments")
+                    try:
+                        substituted, after = macrodict[item].parse_expression(expression)
+                    except Exception as inst:
+                        print("{}: Error: failure to parse expression {} - removing macro".format(
+                        path,macrodict[item].name
+                        ))
+                        macro_blacklist.add(macrodict[item].name)
+                        break
+                    merging = []
+                    merging.append(before)
+                    if before[-1]=='\n':
                         merging.append('')
-                else:
-                    merging.append('\n')
-                merging.append(after)
-                text = ''.join(merging)
+                    else:
+                        merging.append('\n')
+                    merging.append(substituted)
+                    if len(after)>0:
+                        if after[0]=='\n':
+                            merging.append('')
+                    else:
+                        merging.append('\n')
+                    merging.append(after)
+                    text = ''.join(merging)
                 if macrodict[item].contains_macro_defs:
                     substituted_macro_defs = True
                 current_time = time.time()
@@ -885,14 +882,12 @@ def demacro_file(path):
                 if current_time > start_time + timeout:
                     print("{}: Timed out ({} seconds)".format(path,int(current_time-start_time)))
                     return("")
-                if substituted_macro_defs:
-                    verbose("Searching for new macros...")
-                    new_macros, text = load_and_remove_macros(macrodict,text)
-                    verbose("Finished searching")
                 text = re.sub(r'\n{3,}','\n\n',text)
                 verbose(len(text))
-                if new_macros:
-                    break
+            if substituted_macro_defs:
+                verbose("Searching for new macros...")
+                new_macros, text = load_and_remove_macros(macrodict,text)
+                verbose("Finished searching")
             if new_macros:
                 break
     text = undo_isundefined_sub(isundefined_dict,text)
@@ -1096,8 +1091,25 @@ def testing4alt():
     end = time.time()
     print("Runtime: {}".format((end-start)))
 
+def testing5alt():
+    global outdirectory
+    start = time.time()
+    path = '/media/jay/Data/0704'
+    folderlist = next(os.walk(path))[1]
+    folderlist = [os.path.join(path,item) for item in folderlist]
+    print("{} folders".format(len(folderlist)))
+    outdirectory = '/media/jay/Data/0704_new/'
+    validate_folder(outdirectory)
+    # pool = mp.Pool(mp.cpu_count())
+    # pool.map(mapped,folderlist)
+    # pool.close()
+    # pool.join()
+    for item in folderlist:
+        mapped(item)
+    end = time.time()
+    print("Runtime: {}".format((end-start)))
 
-bugpath = '/media/jay/Data/0704/0704.1683'
+bugpath = '/media/jay/Data/0704/0704.2030'
 bugfile = find_main_file(bugpath)
 
 def testing5():
