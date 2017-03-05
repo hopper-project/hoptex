@@ -1060,6 +1060,8 @@ def main():
     debug = False
     if not os.path.exists(input_path):
         ValueError("Input does not exist: {}".format(args.input))
+    if args.timeout:
+        timeout = int(args.timeout)
     if args.dtar:
         demacro_and_untar_folder(input_path,output_path)
     elif args.dgz:
