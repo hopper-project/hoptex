@@ -468,12 +468,6 @@ class macro:
                     ValueError("Error parsing argcount: {}".format(self.arg_count))
         else:
             self.arg_count = 0
-        # for name in rcp:
-        #     match_pattern = re.escape(name)
-        #     if re.search(match_pattern+r'(?![A-Za-z\@])',self.definition):
-        #         self.text = ''
-        #         self.definition = ''
-        #         verbose("Encountered nested definition - erasing2")
         if re.search(macro_pattern,self.definition):
             self.contains_macro_defs = True
         verbose("Loading renewcommand: {}".format(self.name))
@@ -787,11 +781,7 @@ def load_and_remove_macros(macrodict,text):
             else:
                 print("{}: Invalid math macro, aborting.".format(new_macro.name))
                 return(False,"")
-        # verbose("ABOUT TO SEARCH")
-        # verbose(text)
-        # verbose("Searching...")
         match = re.search(search_pattern,text)
-        # verbose("SEARCH COMPLETE")
     return(new_macros,text)
 
 def demacro_file(path):
