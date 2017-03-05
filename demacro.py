@@ -22,10 +22,12 @@ global rcp
 global output_path
 global debug
 global debug_path
+global timeout
 
 diag_message = False
 debug = False
 debug_path = './debug/'
+timeout = 240
 
 #Regex pattern for seeking & retrieving args & separators for def
 # def_pattern = r0+r1+r2+r3+r4+r5+r6+r7+r8+r9
@@ -35,7 +37,6 @@ debug_path = './debug/'
 def_pattern = r'(?s)\\(?:e|g)?def\s*(?P<name>\\[A-Za-z@\*]+|\\.)\s*(?:(?P<sep1>[^\{#]*)(?P<arg1>#1)(?P<sep2>[^\{#]*)(?:(?P<arg2>#2)(?P<sep3>[^\{#]*)(?:(?P<arg3>#3)(?P<sep4>[^\{#]*)(?:(?P<arg4>#4)(?P<sep5>[^\{#]*)(?:(?P<arg5>#5)(?P<sep6>[^\{#]*)(?:(?P<arg6>#6)(?P<sep7>[^\{#]*)(?:(?P<arg7>#7)(?P<sep8>[^\{#]*)(?:(?P<arg8>#8)(?P<sep9>[^\{#]*)(?:(?P<arg9>#9)(?P<sep10>[^\{#]*))?)?)?)?)?)?)?)?)?(?=\{)'
 
 math_pattern = r"\\DeclareMathOperator\*?"
-
 
 def_token = r'\\g?def(?![A-Za-z@])'
 
@@ -796,10 +797,10 @@ def load_and_remove_macros(macrodict,text):
 def demacro_file(path):
     global diag_message
     global debug
+    global timeout
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = 300
     if debug:
         timeout = 10000
     macrodict = {}
@@ -1033,6 +1034,7 @@ def main():
     global debug
     global debug_path
     global output_path
+    global timeout
     parser = argparse.ArgumentParser(description='Expands LaTeX macros')
     parser.add_argument('input', help='Input file/directory')
     parser.add_argument('output', help='Output directory')
@@ -1045,6 +1047,7 @@ def main():
     parser.add_argument('--debug',help='Path to store failed files')
     parser.add_argument('--tar',action='store_true',
     help='Indicate that input is a single .tar file')
+    parser.add_argument('--timeout',help='Declare custom timeout')
     # parser.add_argument('-o', '--oldConvention', action='store_true',
     # help='use this flag when applying demacro to submissions before 04/2007')
     args = parser.parse_args()
