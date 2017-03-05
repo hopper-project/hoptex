@@ -861,11 +861,12 @@ def demacro_file(path):
                     return("")
                 text = re.sub(r'\n{3,}','\n\n',text)
                 verbose(len(text))
+            init_length = len(macrodict)
             if substituted_macro_defs:
                 verbose("Searching for new macros...")
                 new_macros, text = load_and_remove_macros(macrodict,text)
                 verbose("Finished searching")
-            if new_macros:
+            if new_macros or init_length != len(macrodict):
                 break
     text = undo_isundefined_sub(isundefined_dict,text)
     text = re.sub(r'\n{3,}','\n\n',text)
@@ -1038,6 +1039,10 @@ def main():
     parser.add_argument('--tar',action='store_true',
     help='Indicate that input is a single .tar file')
     parser.add_argument('--timeout',help='Declare custom timeout')
+    parser.add_argument('--folder',action='store_true',
+    help='Indicate that input is folder corresponding to a single .tex document')
+    parser.add_argument('--file',action='store_true',
+    help='Indicate that input is a single .tex file')
     # parser.add_argument('-o', '--oldConvention', action='store_true',
     # help='use this flag when applying demacro to submissions before 04/2007')
     args = parser.parse_args()
@@ -1060,8 +1065,12 @@ def main():
         demacro_folder(os.path.join(output_path,folder_name))
     elif args.tar:
         demacro_and_untar(archive,output_path)
-    else:
-        demacro_folder(input_path)
+    elif args.folder:
+        pass
+    elif args.file:
+        text = demacro_file(input_path)
+        with open(output_path,'w') as fh:
+            fh.write(text)
 
 if __name__=='__main__':
     main()
