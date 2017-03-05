@@ -26,23 +26,15 @@ global debug_path
 debug = False
 debug_path = './debug/'
 
-r0 = r'(?s)\\g?def\s*(?P<name>\\[A-Za-z@]+|\\.)\s*'
-r1 = r'(?P<sep1>[^#\{]+)?(?P<arg1>#1)?(?P<sep2>[^#\{]+)?'
-r2 = r'(?P<arg2>#2)?(?P<sep3>[^#\{]+)?'
-r3 = r'(?P<arg3>#3)?(?P<sep4>[^#\{]+)?'
-r4 = r'(?P<arg4>#4)?(?P<sep5>[^#\{]+)?'
-r5 = r'(?P<arg5>#5)?(?P<sep6>[^#\{]+)?'
-r6 = r'(?P<arg6>#6)?(?P<sep7>[^#\{]+)?'
-r7 = r'(?P<arg7>#7)?(?P<sep8>[^#\{]+)?'
-r8 = r'(?P<arg8>#8)?(?P<sep9>[^#\{]+)?'
-r9 = r'(?P<arg9>#9)?(?P<sep10>[^#\{]+)?(?=\{)'
-
 #Regex pattern for seeking & retrieving args & separators for def
-def_pattern = r0+r1+r2+r3+r4+r5+r6+r7+r8+r9
+# def_pattern = r0+r1+r2+r3+r4+r5+r6+r7+r8+r9
+
+# A truly monstrous regular expression, from a less civilized age
+
+def_pattern = r'(?s)\\(?:e|g)?def\s*(?P<name>\\[A-Za-z@\*]+|\\.)\s*(?:(?P<sep1>[^\{#]*)(?P<arg1>#1)(?P<sep2>[^\{#]*)(?:(?P<arg2>#2)(?P<sep3>[^\{#]*)(?:(?P<arg3>#3)(?P<sep4>[^\{#]*)(?:(?P<arg4>#4)(?P<sep5>[^\{#]*)(?:(?P<arg5>#5)(?P<sep6>[^\{#]*)(?:(?P<arg6>#6)(?P<sep7>[^\{#]*)(?:(?P<arg7>#7)(?P<sep8>[^\{#]*)(?:(?P<arg8>#8)(?P<sep9>[^\{#]*)(?:(?P<arg9>#9)(?P<sep10>[^\{#]*))?)?)?)?)?)?)?)?)?(?=\{)'
 
 math_pattern = r"\\DeclareMathOperator\*?"
 
-# def_token = r'\\g?def\s*(?:\\[A-Za-z@]+|\\.)'
 
 def_token = r'\\g?def(?![A-Za-z@])'
 
@@ -79,8 +71,8 @@ to put the superior 'regex' module from PyPI into stdlib
 """
 
 def verbose(*args):
-    global debug
-    if debug:
+    global diag_message
+    if diag_message:
         for text in args:
             print(text)
 
@@ -184,7 +176,6 @@ def take_token(text):
         return(''.join(token),text[len(token):])
     else:
         return('',text)
-
 
 def take_argument(text):
     if re.match(r'#[1-9]',text):
@@ -299,8 +290,8 @@ def reduce_arguments(text):
     while match:
         new.append(text[:match.start()])
         match_text = match.group(0)
-        pounds = match.group(2)
-        new_text = match.group(1) + pounds[:int(len(pounds)/2)] + match.group(3)
+        pounds = match.group(1)
+        new_text = pounds[:int(len(pounds)/2)] + match.group(2)
         new.append(new_text)
         text = text[match.end():]
         match = re.search(nested_arg_pattern,text)
@@ -400,6 +391,7 @@ class macro:
         self.arg1 = enclose_in_group(results[1])
         self.arg2 = enclose_in_group(results[3])
         self.name = extract_group(self.arg1)
+        self.definition = "\\operatorname"+self.asterisk+self.arg2
         verbose("Loading Mathoperator")
         verbose(self.arg1)
         verbose(self.arg2)
@@ -413,6 +405,9 @@ class macro:
             return
         self.text = ''.join(results)
         self.type = results[0]
+        if self.type[-1]=='*':
+            self.asterisk = '*'
+            self.type = self.type[:-1]
         self.name = extract_group(results[2])
         self.arg_count = results[4]
         self.default = results[6]
@@ -486,18 +481,17 @@ class macro:
         verbose("End renewcommand")
         self.definition = re.sub(re.escape(self.name)+r'(?![A-Za-z\@\*])','',self.definition)
 
-
     def substitute_arguments(self, arglist, default_arg=''):
         """Accepts a list of the values of args, returns definition with args"""
         text = self.definition
         text = re.sub(r'(\\#)#','\1 #',text)
         if self.type=='\\def':
             for i, arg in enumerate(arglist):
-                verbose("Definition")
+                verbose("definition")
                 verbose(text)
                 verbose("Passed argument:")
                 verbose(arg)
-                verbose("Index: {}".format(i))
+                verbose("Argument index: {}".format(i))
                 new_pattern = arg_pattern+str(i+1)
                 text = re.sub(new_pattern,escape(arg),text)
                 # text = text.replace('#'+str(i+1),arg)
@@ -557,9 +551,9 @@ class macro:
         if self.type=='\\def':
             a, b = parse(text,def_input_sequence)
             if a[0]!=self.name:
-                verbose("CRITICAL ERROR: MISMATCHED TOKEN")
+                verbose("ERROR: MISMATCHED TOKEN")
                 verbose("EXPECTED: {}, MATCHED: {}DELIM".format(self.name,a[0]))
-                raise ValueError("Token mismatch")
+                Exception("Parsing failed")
             if self.arg_count==0:
                 return (self.definition, b)
             else:
@@ -647,6 +641,7 @@ def find_main_file(folder):
                 return os.path.join(root,filename)
     return ""
 
+
 def isundefined_sub(isundefined_dict,text):
     match = re.search(isundefined_pattern,text)
     while match:
@@ -714,10 +709,8 @@ def load_and_remove_macros(macrodict,text):
     """Mutate macrodict to include new macros
     Return new_macros boolean & text"""
     new_macros = False
-    text = substitute_macro_groups(text)
     match = re.search(search_pattern,text)
-    # verbose("Beginning search:")
-    # verbose(text)
+    text = substitute_macro_groups(text)
     while match:
         new_macros = True
         if match.group('def'):
@@ -792,7 +785,11 @@ def load_and_remove_macros(macrodict,text):
             else:
                 print("{}: Invalid math macro, aborting.".format(new_macro.name))
                 return(False,"")
+        # verbose("ABOUT TO SEARCH")
+        # verbose(text)
+        # verbose("Searching...")
         match = re.search(search_pattern,text)
+        # verbose("SEARCH COMPLETE")
     return(new_macros,text)
 
 def demacro_file(path):
@@ -801,7 +798,7 @@ def demacro_file(path):
     start_time = time.time()
     text = load_inputs(path)
     newlines  = len(re.findall(r'\n',text))
-    timeout = max(120,int(newlines/20))
+    timeout = 300
     if debug:
         timeout = 10000
     macrodict = {}
@@ -821,8 +818,8 @@ def demacro_file(path):
             if item in macro_blacklist:
                 continue
             text = sub_single_token_groups(text)
+            substituted_macro_defs = False
             while(True):
-                text = sub_single_token_groups(text)
                 tomatch = re.escape(macrodict[item].name)
                 try:
                     match = re.search(tomatch+r'(?![A-Za-z\@\*])',text)
@@ -831,31 +828,37 @@ def demacro_file(path):
                 if not match:
                     break
                 changed = True
-                index = match.start()
-                before, expression = text[:index], text[index:]
-                verbose("Substituting arguments")
-                try:
-                    substituted, after = macrodict[item].parse_expression(expression)
-                except Exception as inst:
-                    print("{}: Error: failure to parse expression {} - removing macro".format(
-                    path,macrodict[item].name
-                    ))
-                    macro_blacklist.add(macrodict[item].name)
-                    break
-                merging = []
-                merging.append(before)
-                if before[-1]=='\n':
-                    merging.append('')
+                if macrodict[item].arg_count==0:
+                    verbose("Regex sub: {}".format(item))
+                    escaped_name = re.escape(item)+r'(?![A-Za-z\@\*])'
+                    macro_def = escape(reduce_arguments(macrodict[item].definition))
+                    text = re.sub(escaped_name,macro_def,text)
                 else:
-                    merging.append('\n')
-                merging.append(substituted)
-                if len(after)>0:
-                    if after[0]=='\n':
+                    index = match.start()
+                    before, expression = text[:index], text[index:]
+                    verbose("Substituting arguments")
+                    try:
+                        substituted, after = macrodict[item].parse_expression(expression)
+                    except Exception as inst:
+                        print("{}: Error: failure to parse expression {} - removing macro".format(
+                        path,macrodict[item].name
+                        ))
+                        macro_blacklist.add(macrodict[item].name)
+                        break
+                    merging = []
+                    merging.append(before)
+                    if before[-1]=='\n':
                         merging.append('')
-                else:
-                    merging.append('\n')
-                merging.append(after)
-                text = ''.join(merging)
+                    else:
+                        merging.append('\n')
+                    merging.append(substituted)
+                    if len(after)>0:
+                        if after[0]=='\n':
+                            merging.append('')
+                    else:
+                        merging.append('\n')
+                    merging.append(after)
+                    text = ''.join(merging)
                 if macrodict[item].contains_macro_defs:
                     substituted_macro_defs = True
                 current_time = time.time()
@@ -890,8 +893,6 @@ def demacro_archive(path):
         print("{}: COMPLETE".format(main))
     return new_text
 
-"""The following functions are all involved with the following pipeline:
-    .tar->folder of .tar.gz -> folder of raw .tex directories"""
 
 def untarballs(folder,dest=''):
     if not dest:
@@ -924,6 +925,8 @@ def untar(archive,dest=''):
         print("{}: Extraction failed".format(archive))
         print(inst)
 
+"""The following functions are all involved with the following pipeline:
+    .tar->folder of .tar.gz -> folder of raw .tex directories"""
 
 def untar_folder(folder,dest):
     """.tar->folder of .tar.gz"""
@@ -936,7 +939,7 @@ def untar_folder(folder,dest):
             untar(os.path.join(folder,fname),dest)
 
 def untarballs_folder(folder,dest=''):
-    """folder of folders .tar.gz->folder of raw .tex dirs"""
+    """folder of .tar.gz->folder of raw .tex dirs"""
     for fname in next(os.walk(folder))[1]:
         untarballs(os.path.join(folder,fname),dest)
 
@@ -951,15 +954,33 @@ def total_extract_folder(folder,dest=''):
     untar_folder(folder,dest)
     untarballs_folder(dest,'')
 
-def demacro_mapped(folder):
-    """Wrapper function for handling in/out paths & failed document output"""
-    global output_path
-    global debug_path
-    output_path = os.path.normpath(output_path)
+def mapped(folder):
+    """Side thing, please ignore"""
+    global outdirectory
+    outdirectory = os.path.normpath(outdirectory)
+    print(folder)
     new_text = demacro_archive(folder)
     new_name = os.path.split(os.path.normpath(folder))[1]
     if(new_text):
-        with open(output_path+'/'+new_name+'.tex','w') as fh:
+        with open(outdirectory+'/'+new_name+'.tex','w') as fh:
+            fh.write(new_text)
+    else:
+        mainfile =  find_main_file(folder)
+        if mainfile:
+            text = load_inputs(mainfile)
+            filename = os.path.basename(mainfile)
+            with open('/media/jay/Data/combined_debug/'+new_name+'.tex','w') as fh:
+                fh.write(text)
+
+def demacro_mapped(folder):
+    """Wrapper function for handling in/out paths & failed document output"""
+    global outdirectory
+    global debug_path
+    outdirectory = os.path.normpath(outdirectory)
+    new_text = demacro_archive(folder)
+    new_name = os.path.split(os.path.normpath(folder))[1]
+    if(new_text):
+        with open(outdirectory+'/'+new_name+'.tex','w') as fh:
             fh.write(new_text)
     else:
         mainfile =  find_main_file(folder)
@@ -970,45 +991,40 @@ def demacro_mapped(folder):
                 fh.write(text)
 
 def demacro_folder(folder):
-    """Demacro a folder of raw .tex directories"""
-    global output_path
+    """Demacro a folder of raw .tex directories in place"""
+    global outdirectory
     global debug_path
     folder = os.path.abspath(folder)
     folderlist = next(os.walk(folder))[1]
     folderlist = [os.path.join(folder,item) for item in folderlist]
-    print("{}: Beginning processing...".format(folder))
     pool = mp.Pool(mp.cpu_count())
     pool.map(demacro_mapped,folderlist)
     pool.close()
     pool.join()
-    print("Processing complete")
-    # for fname in folderlist:
-    #     shutil.rmtree(fname,ignore_errors=True)
+    for fname in folderlist:
+        shutil.rmtree(fname,ignore_errors=True)
 
-def untar_and_demacro(archive,dest):
+def demacro_and_untar(archive,dest):
     """Untar archive to folder & demacro. e.g. 1506.tar to example/1506 should
     just pass 'example' into dest"""
-    global output_path
+    global outdirectory
     global debug_path
     new_name = os.path.split(os.path.splitext(archive)[0])[1]
-    output_path = os.path.join(dest,new_name)
-    validate_folder(output_path)
-    print("{}: Extracting".format(archive))
+    outdirectory = os.path.join(dest,new_name)
+    validate_folder(outdirectory)
     total_extract(archive,dest)
-    print("{}: Extraction complete".format(archive))
-    print("{}: Beginning demacro...".format(archive))
-    demacro_folder(output_path)
-    print("{}: Demacro complete".format(archive))
+    demacro_folder(outdirectory)
 
-def untar_and_demacro_folder(archive_folder,dest):
-    """untar_and_demacro, but for a folder of .tar files"""
-    global output_path
+def demacro_and_untar_folder(archive_folder,dest):
+    """demacro_and_untar, but for a folder of .tar files"""
+    global outdirectory
     global debug_path
     validate_folder(debug_path)
     validate_folder(dest)
     archive_list = [os.path.join(archive_folder,fname) for fname in next(os.walk(archive_folder))[2] if fname.endswith('.tar')]
     for archive in archive_list:
-        untar_and_demacro(archive,dest)
+        demacro_and_untar(archive,dest)
+
 
 def main():
     global debug
@@ -1039,13 +1055,13 @@ def main():
     if not os.path.exists(input_path):
         ValueError("Input does not exist: {}".format(args.input))
     if args.dtar:
-        untar_and_demacro_folder(input_path,output_path)
+        demacro_and_untar_folder(input_path,output_path)
     elif args.dgz:
         folder_name = os.path.basename(os.path.normpath(input_path))
         untarballs(input_path,os.path.join(output_path,folder_name))
         demacro_folder(os.path.join(output_path,folder_name))
     elif args.tar:
-        untar_and_demacro(archive,output_path)
+        demacro_and_untar(archive,output_path)
     else:
         demacro_folder(input_path)
 
