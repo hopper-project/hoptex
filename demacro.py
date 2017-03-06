@@ -849,8 +849,9 @@ def demacro_file(path):
                         break
                     merging = []
                     merging.append(before)
-                    if before[-1]=='\n':
-                        merging.append('')
+                    if len(before)>0:
+                        if before[-1]=='\n':
+                            merging.append('')
                     else:
                         merging.append('\n')
                     merging.append(substituted)
