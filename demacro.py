@@ -711,7 +711,6 @@ def load_and_remove_macros(macrodict,text):
     match = re.search(search_pattern,text)
     text = substitute_macro_groups(text)
     while match:
-        new_macros = True
         if match.group('def'):
             #def
             # match = re.search(def_pattern,text)
@@ -726,13 +725,14 @@ def load_and_remove_macros(macrodict,text):
             macro_name = re.escape(new_macro.name)
             if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
                 print("{}: Recursive macros detected: aborting2".format(macro_name))
-                return(False,"")
+                return(new_macros,"")
             if new_macro.valid:
                 macrodict[new_macro.name]=new_macro
+                new_macros = True
                 text = text.replace(new_macro.macro_text(),"")
             else:
                 print("{}: Invalid def macro, aborting".format(new_macro.name))
-                return(False,"")
+                return(new_macros,"")
         elif match.group('newcommand'):
             #newcommand(*)
             # match = re.search(newcommand_pattern,text)
@@ -744,13 +744,14 @@ def load_and_remove_macros(macrodict,text):
             if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
                 print("{}: Recursive macros detected: aborting6".format(new_macro.name))
                 print(macro_name)
-                return(False,"")
+                return(new_macros,"")
             if new_macro.valid:
                 macrodict[new_macro.name]=new_macro
+                new_macros = True
                 text = text.replace(new_macro.macro_text(),"")
             else:
                 print("{}: Invalid newcommand macro, aborting".format(new_macro.name))
-                return(False,"")
+                return(new_macros,"")
         elif match.group('renewcommand'):
             #renewcommand(*)
             # match = re.search(renewcommand_pattern,text)
@@ -761,13 +762,14 @@ def load_and_remove_macros(macrodict,text):
             if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
                 print("{}: Recursive macros detected: aborting7".format(new_macro.name))
                 print(macro_name)
-                return(False,"")
+                return(new_macros,"")
             if new_macro.valid:
                 macrodict[new_macro.name]=new_macro
+                new_macros = True
                 text = text.replace(new_macro.macro_text(),"")
             else:
                 print("{}: Invalid renewcommand macro".format(new_macro.name))
-                return(False,"")
+                return(new_macros,"")
         elif match.group('mathoperator'):
             #DeclareMathOperator
             # match = re.search(math_pattern,text)
@@ -777,13 +779,14 @@ def load_and_remove_macros(macrodict,text):
             macro_name = re.escape(new_macro.name)
             if re.search(macro_name+r'(?![A-Za-z\*@])',macro_def):
                 print("{}: Recursive macros detected: aborting4".format(new_macro.name))
-                return(False,"")
+                return(new_macros,"")
             if new_macro.valid:
                 macrodict[new_macro.name]=new_macro
                 text = text.replace(new_macro.macro_text(),"")
+                new_macros = True
             else:
                 print("{}: Invalid math macro, aborting.".format(new_macro.name))
-                return(False,"")
+                return(new_macros,"")
         match = re.search(search_pattern,text)
     return(new_macros,text)
 
@@ -800,7 +803,11 @@ def demacro_file(path):
     new_macros = True
     changed = True
     macro_blacklist = set()
-    new_macros, text = load_and_remove_macros(macrodict,text)
+    try:
+        new_macros, text = load_and_remove_macros(macrodict,text)
+    except:
+        print("{}: Error encountered when loading macros".format(path))
+        return("")
     if len(macrodict)==0:
         return text
     isundefined_dict = {}
@@ -867,7 +874,11 @@ def demacro_file(path):
             init_length = len(macrodict)
             if substituted_macro_defs:
                 verbose("Searching for new macros...")
-                new_macros, text = load_and_remove_macros(macrodict,text)
+                try:
+                    new_macros, text = load_and_remove_macros(macrodict,text)
+                except:
+                    print("{}: Error encountered when loading macros".format(path))
+                    return("")
                 verbose("Finished searching")
             if new_macros or init_length != len(macrodict):
                 break
@@ -954,13 +965,13 @@ def total_extract_folder(folder,dest=''):
 
 def mapped(folder):
     """Side thing, please ignore"""
-    global outdirectory
-    outdirectory = os.path.normpath(outdirectory)
+    global output_path
+    output_path = os.path.normpath(output_path)
     print(folder)
     new_text = demacro_archive(folder)
     new_name = os.path.split(os.path.normpath(folder))[1]
     if(new_text):
-        with open(outdirectory+'/'+new_name+'.tex','w') as fh:
+        with open(output_path+'/'+new_name+'.tex','w') as fh:
             fh.write(new_text)
     else:
         mainfile =  find_main_file(folder)
@@ -972,13 +983,13 @@ def mapped(folder):
 
 def demacro_mapped(folder):
     """Wrapper function for handling in/out paths & failed document output"""
-    global outdirectory
+    global output_path
     global debug_path
-    outdirectory = os.path.normpath(outdirectory)
+    output_path = os.path.normpath(output_path)
     new_text = demacro_archive(folder)
     new_name = os.path.split(os.path.normpath(folder))[1]
     if(new_text):
-        with open(outdirectory+'/'+new_name+'.tex','w') as fh:
+        with open(output_path+'/'+new_name+'.tex','w') as fh:
             fh.write(new_text)
     else:
         mainfile =  find_main_file(folder)
@@ -990,7 +1001,7 @@ def demacro_mapped(folder):
 
 def demacro_folder(folder):
     """Demacro a folder of raw .tex directories in place"""
-    global outdirectory
+    global output_path
     global debug_path
     folder = os.path.abspath(folder)
     folderlist = next(os.walk(folder))[1]
@@ -1005,17 +1016,17 @@ def demacro_folder(folder):
 def demacro_and_untar(archive,dest):
     """Untar archive to folder & demacro. e.g. 1506.tar to example/1506 should
     just pass 'example' into dest"""
-    global outdirectory
+    global output_path
     global debug_path
     new_name = os.path.split(os.path.splitext(archive)[0])[1]
-    outdirectory = os.path.join(dest,new_name)
-    validate_folder(outdirectory)
+    output_path = os.path.join(dest,new_name)
+    validate_folder(output_path)
     total_extract(archive,dest)
-    demacro_folder(outdirectory)
+    demacro_folder(output_path)
 
 def demacro_and_untar_folder(archive_folder,dest):
     """demacro_and_untar, but for a folder of .tar files"""
-    global outdirectory
+    global output_path
     global debug_path
     validate_folder(debug_path)
     validate_folder(dest)
@@ -1029,6 +1040,7 @@ def main():
     global debug_path
     global output_path
     global timeout
+    global output_path
     parser = argparse.ArgumentParser(description='Expands LaTeX macros')
     parser.add_argument('input', help='Input file/directory')
     parser.add_argument('output', help='Output directory')
