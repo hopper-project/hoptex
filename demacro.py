@@ -57,8 +57,6 @@ nested_arg_pattern = r'(?s)(\\#|[^\\])(#{2,})([1-9])'
 
 arg_pattern = r'(?s)(?<![#\\])#'
 
-# single_token_group = r'(?<!\\)\{(\\[A-Za-z\@\*]+(?:\{[A-Za-z\@\*]+\})?)(?<!\\)\}'
-
 single_token_group = r'(?<!\\)\{\s*(\\[A-Za-z\@\*]+)(?<!\\)\s*\}'
 
 delim_token_group = r'(?<!\\)\{\s*((?:\\begin|\\end|\\\[|\\\])(?:\{[A-Za-z\@\*]+\})?|\${1,2}|\\\[|\\\])(?<!\\)\s*\}'
@@ -687,11 +685,16 @@ def load_inputs(path):
     text = remove_comments(text)
     return text
 
-def sub_single_token_groups(text):
+def sub_single_token_groups(text,token=''):
     while True:
         text, count = re.subn(delim_token_group,r'\1',text)
         if count==0:
             break
+    if token:
+        while True:
+            text, count = re.subn('\{\s*('+re.escape(token)+')\s*\}',r'\1',text)
+            if count==0:
+                break
     return text
 
 def substitute_macro_groups(text):
@@ -809,7 +812,7 @@ def demacro_file(path):
         for item in macrodict:
             if item in macro_blacklist:
                 continue
-            text = sub_single_token_groups(text)
+            text = sub_single_token_groups(text,item)
             substituted_macro_defs = False
             while(True):
                 tomatch = re.escape(macrodict[item].name)
@@ -1069,8 +1072,9 @@ def main():
         pass
     elif args.file:
         text = demacro_file(input_path)
-        with open(output_path,'w') as fh:
-            fh.write(text)
+        # with open(output_path,'w') as fh:
+        #     fh.write(text)
+        print(text)
 
 if __name__=='__main__':
     main()
