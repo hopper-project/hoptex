@@ -1001,7 +1001,7 @@ def demacro_mapped(folder):
                 fh.write(text)
 
 def demacro_folder(folder):
-    """Demacro a folder of raw .tex directories in place"""
+    """Demacro a folder of raw .tex directories"""
     global output_path
     global debug_path
     folder = os.path.abspath(folder)
@@ -1059,6 +1059,10 @@ def main():
     help='Indicate that input is folder corresponding to a single .tex document')
     parser.add_argument('--file',action='store_true',
     help='Indicate that input is a single .tex file')
+    parser.add_argument('--fileprint',action='store_true',
+    help="Indicate that input is a single .tex file, and to print (not write) output")
+    parser.add_argument('--edgz',action='store_true',
+    help='Indicate that folder contains extracted .tar.gz folders')
     # parser.add_argument('-o', '--oldConvention', action='store_true',
     # help='use this flag when applying demacro to submissions before 04/2007')
     args = parser.parse_args()
@@ -1082,12 +1086,16 @@ def main():
     elif args.tar:
         demacro_and_untar(archive,output_path)
     elif args.folder:
-        pass
+        demacro_archive(input_path)
     elif args.file:
         text = demacro_file(input_path)
-        # with open(output_path,'w') as fh:
-        #     fh.write(text)
+        with open(output_path,'w') as fh:
+            fh.write(text)
+    elif args.fileprint:
+        text = demacro_file(input_path)
         print(text)
+    elif args.edgz:
+        demacro_folder(input_path)
 
 if __name__=='__main__':
     main()
