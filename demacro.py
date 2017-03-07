@@ -1005,14 +1005,14 @@ def demacro_folder(folder):
     global output_path
     global debug_path
     folder = os.path.abspath(folder)
-    folderlist = next(os.walk(folder))[1]
-    folderlist = [os.path.join(folder,item) for item in folderlist]
+    folders = next(os.walk(folder))[1]
+    folderlist = [os.path.join(folder,item) for item in folders]
     pool = mp.Pool(mp.cpu_count())
     pool.map(demacro_mapped,folderlist)
     pool.close()
     pool.join()
-    for fname in folderlist:
-        shutil.rmtree(fname,ignore_errors=True)
+    # for fname in folderlist:
+    #     shutil.rmtree(fname,ignore_errors=True)
 
 def demacro_and_untar(archive,dest):
     """Untar archive to folder & demacro. e.g. 1506.tar to example/1506 should
