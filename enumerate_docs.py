@@ -35,11 +35,12 @@ def substitute_eqid(filename):
     else:
         textlist = grab_math(text,split=True)
         for i, x in enumerate(textlist):
-            if x in eqdict:
-                textlist[i] = eqdict[x]
-                no_math = False
-            else:
-                textlist[i] = textlist[i].strip()
+            if is_math(x):
+                if flatten_equation(x) in eqdict:
+                    textlist[i] = eqdict[flatten_equation(x)]
+                    no_math = False
+                else:
+                    textlist[i] = textlist[i].strip()
         if no_math:
             return
         newtext = '\n'.join(textlist)
@@ -73,16 +74,26 @@ def main():
     print("Generating equation dictionary...")
     eqdict = {}
     counter = 0
-    with open(tsv,mode='r',encoding='latin-1') as fh:
-        for line in fh:
-            eqid, equation = line.strip().split('\t')
-                # trying to save space in memory
-            equation = equation.encode().decode('unicode_escape').strip()
-            if equation not in eqdict:
-                eqdict[equation] = eqid
-            counter += 1
-            if not counter % 10000:
-                gc.collect()
+    if inline:
+        with open(tsv,mode='r',encoding='latin-1') as fh:
+            for line in fh:
+                eqid, equation = line.strip().split('\t')
+                equation = equation.encode().decode('unicode_escape').strip()
+                if equation not in eqdict:
+                    eqdict[equation] = eqid
+                counter += 1
+    else:
+            with open(tsv,mode='r',encoding='latin-1') as fh:
+                for line in fh:
+                    contents = line.strip().split('\t')
+                    if len(contents)==2:
+                        eqid, equation = contents
+                        equation  = unmask(equation)
+                        eqdict[flatten_equation(equation)] = eqid
+                    elif len(contents)==3:
+                        eqid, sub_ids, equation = contents
+                        equation = unmask(equation)
+                        eqdict[flatten_equation(equation)] = eqid
     print("Equation dictionary loaded.")
     print("{} entries".format(len(eqdict)))
     pool = mp.Pool(mp.cpu_count())

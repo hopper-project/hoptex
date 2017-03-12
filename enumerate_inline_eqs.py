@@ -50,7 +50,7 @@ def main():
         for doceqs in math_equations:
             for equation in doceqs:
                 if equation not in unique_eqs:
-                    unique_eqs[equation] = "EQI" + str(eqcount) + "Q"
+                    unique_eqs[equation] = "EQIX" + str(eqcount) + "Q"
                     eqcount += 1
             filecount += 1
         for x in unique_eqs:

@@ -24,6 +24,91 @@ g = r'(?s)(?<!\\)\\\[.*?\\\]'
 h = r'(?s)\$\$[^\^].*?\$\$'
 i = r'(?s)\\begin\{eqnarray\*?\}.*?\\end\{eqnarray\*?\}'
 
+# named capturing versions of the respective equations above
+ca = r'(?s)(?P<equation>\\begin\{equation\*?\}(?P<math>.*?)\\end\{equation\*?\})'
+cb = r'(?s)(?P<multline>\\begin\{multline\*?\}(?P<math>.*?)\\end\{multline\*?\})'
+cc = r'(?s)(?P<gather>\\begin\{gather\*?\}(?P<math>.*?)\\end\{gather\*?\})'
+cd = r'(?s)(?P<align>\\begin\{align\*?\}(?P<math>.*?)\\end\{align\*?\})'
+ce = r'(?s)(?P<flalign>\\begin\{flalign\*?\}(?P<math>.*?)\\end\{flalign\*?\})'
+cf = r'(?s)(?P<dmath>\\begin\{math\*?\}(?P<math>.*?)\\end\{math\*?\})'
+cg = r'(?s)(?P<bracket>(?<!\\)\\\[(?P<math>.*?)\\\])'
+ch = r'(?s)(?P<dollarsign>\$\$(?P<math>[^\^].*?)\$\$)'
+ci = r'(?s)(?P<eqnarray>\\begin\{eqnarray\*?\}(?P<math>.*?)\\end\{eqnarray\*?\})'
+
+r1 = r'\\nonumber(?![A-Za-z\@\*])'
+r2 = r'\\tag(?![A-Za-z\@\*])'
+r3 = r'(?<!\\)&'
+r4 = r'\\hspace\{.+?\}'
+r5 = r'\\times(?![A-Za-z\@\*])'
+r6 = r'\\lefteqn(?![A-Za-z\@\*])'
+r7 = r'\\righteqn(?![A-Za-z\@\*])'
+r8 = r'\\qedhere(?![A-Za-z\@\*])'
+r9 = r'\\label\{.+?\}'
+r10 = r'\\q{0,1}quad'
+
+to_remove = [r1,r2,r3,r4,r5,r6,r7,r8,r9,r10]
+
+multiline_list = [cb,cc,cd,ce,ci]
+
+expr_list = [a,b,c,d,e,f,g,h,i]
+
+cap_expr_list = [ca,cb,cc,cd,ce,cf,cg,ch,ci]
+
+non_capture_math = r'('+'|'.join(expr_list)+r')'
+
+beq = "\\begin{equation}"
+eeq = "\\end{equation}"
+balign = "\\begin{align}"
+ealign = "\\end{align}"
+
+def is_math(text):
+    if re.match(non_capture_math,text):
+        return True
+    return False
+
+def remove_whitespace(text):
+    text = re.sub(r'\s','',text)
+    return text
+
+def enforce_newlines(text):
+    """Ensures a newline character after LaTeX newline"""
+    text = re.sub(r'\\\\(?!\n)',r'\\\\\n',text)
+    return text
+
+def sanitize_equation(text,complete=False):
+    """Removes non-mathematical modifiers"""
+    text = enforce_newlines(text)
+    for expr in to_remove:
+        text = re.sub(expr,'',text)
+    if complete:
+        text = re.sub(r'(?:\\\\)+','',text)
+    else:
+        text = re.sub(r'(?:\\\\)+',r'\\\\',text)
+    return text
+
+def split_multiline(text):
+    textlist = re.split(r'\\\\',text)
+    for i, x in enumerate(textlist):
+        textlist[i] = remove_whitespace(x)
+    return textlist
+
+def standardize_equation(text):
+    """Removes delimiters, sanitizes equation"""
+    for expr in cap_expr_list:
+        match = re.match(expr,text)
+        if match:
+            new_eq = sanitize_equation(match.group('math'))
+            return new_eq
+
+def flatten_equation(text):
+    text = remove_whitespace(standardize_equation(text))
+    return text
+
+def split_multiline(text):
+    """Splits flattened text on LaTeX newline & returns as list"""
+    init_list = flatten_equation(text).split("\\\\")
+    return [item for item in init_list if item!='']
+
 def load_document(filename):
     with open(filename,mode='r',encoding='latin-1') as fh:
         text = fh.read()
@@ -186,3 +271,17 @@ def mask(text):
 def unmask(text):
     """Converts the 'masked' equation back to its original form"""
     return text.encode().decode('unicode-escape')
+
+
+sample_eq = r"""\begin{align}
+poobah &= 40 \label{this is cool} \\
+x &= y
+\end{align}"""
+
+seq2 = r'\begin{equation}32+40x=y^2\end{equation}'
+
+seq2alt = r'$$32+40x = y^2$$'
+
+seq3 = r'''\begin{align} poobah =40 \label{this is different}\\
+x = y
+\end{align}'''

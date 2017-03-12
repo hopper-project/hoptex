@@ -28,6 +28,7 @@ def main():
         xhtml = os.path.abspath(args.xhtml)
     matches = []
     unique_eqs = {}
+    unique_meqs = {}
     print("Starting timer...")
     start = time.time()
     # 'resuming' a tsv
@@ -74,10 +75,11 @@ def main():
     pool = mp.Pool(processes=mp.cpu_count())
     print("Grabbing math from files...")
     eqcount = len(unique_eqs)
+    meqcount = 0
     # code for creating the 3-column tsv with matching xhtml docs
     if(xhtml):
-        math_equations = pool.imap(grab_eqs_and_filename,matches)
-        for tup in math_equations:
+        all_math = pool.imap(grab_eqs_and_filename,matches)
+        for tup in all_math:
             xhtmlMath = False
             xhtmlMathMatch = False
             processedname = os.path.join(os.path.split(os.path.split(filename)[0])[1],os.path.splitext(os.path.split(filename)[1])[0])
@@ -102,16 +104,41 @@ def main():
             for x in unique_eqs:
                 fh.write(unique_eqs[x][0]+'\t'+repr(x)[1:-1].replace("\t","\\t")+'\t'+repr(unique_eqs[x][1])[1:-1].replace("\t","\\t")+'\n')
     else:
-        math_equations = pool.imap(grab_math_from_file,matches)
-        for doceqs in math_equations:
-            for equation in doceqs:
-                if equation not in unique_eqs:
-                    unique_eqs[equation] = "EQ" + str(eqcount) + "Q"
-                    eqcount+=1
+        all_math = pool.imap(grab_math_from_file,matches)
+        for document_equations in all_math:
+            for equation in document_equations:
+                std_eq = standardize_equation(equation)
+                # removed delimiters
+                snt_eq = sanitize_equation(equation)
+                # removed environment-specific tags
+                flt_eq = flatten_equation(equation)
+                # standardized, no whitespace
+                for expr in cap_expr_list:
+                    match = re.match(expr,equation)
+                    if match:
+                        if expr in multiline_list:
+                            split_eqs = split_multiline(equation)
+                            sub_ids = []
+                            for sub_eq in split_eqs:
+                                if sub_eq not in unique_eqs:
+                                    unique_eqs[sub_eq] = ("EQDS"+str(eqcount)+"Q",beq+sub_eq+eeq)
+                                    eqcount += 1
+                                sub_ids.append(unique_eqs[sub_eq][0])
+                            unique_meqs[flt_eq] = ("EQDM"+str(meqcount)+"Q",",".join(sub_ids),balign+std_eq+ealign)
+                            meqcount += 1
+                        else:
+                            if flt_eq not in unique_eqs:
+                                unique_eqs[flt_eq] = ("EQDS"+str(eqcount)+"Q",beq+std_eq+eeq)
+                                eqcount += 1
         with open(outpath,mode='w') as fh:
             for x in unique_eqs:
-                fh.write(unique_eqs[x]+'\t'+repr(x)[1:-1]+'\n')
+                EQID, eqtext = unique_eqs[x]
+                fh.write(EQID+'\t'+mask(eqtext)+'\n')
+            for x in unique_meqs:
+                EQID, sub_ids, flt_eq = unique_meqs[x]
+                fh.write(EQID+'\t'+sub_ids+'\t'+mask(flt_eq)+'\n')
     print("{} equations".format(len(unique_eqs)))
+    print("{} display equations".format(len(unique_meqs)))
     # print("{} seconds".format(int(time.time()-start)))
     pool.close()
     pool.join()
