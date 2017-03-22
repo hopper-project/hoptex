@@ -79,7 +79,7 @@ def main():
         exit()
     path = os.path.abspath(os.path.join(str(sys.argv[1]),''))
     if not os.path.isdir(path):
-        print("Error: {} is not a valid directory".format(x))
+        print("Error: {} is not a valid directory".format(path))
         sys.exit()
     if len(sys.argv)==3:
         outpath = os.path.join(sys.argv[2],'')
