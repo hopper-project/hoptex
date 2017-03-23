@@ -7,6 +7,7 @@ import os #checking files and writing to/from files
 import re
 import multiprocessing as mp
 import subprocess
+import argparse
 from subprocess import PIPE
 from core.funcs import *
 
@@ -66,37 +67,32 @@ def genxhtml(filename):
     stdout2 = re.sub(r'(href=\").*?(ltx-article\.css)(\")',r'\1\2\3',stdout2)
     with open(outfname,'w') as fh:
         fh.write(stdout2)
-    # print("{}: Finish".format(filename))
     return ""
 
 def main():
+    parser = argparse.ArgumentParser(description='Conversion of sanitized LaTeX documents to XHTML')
+    parser.add_argument("directory",help="Path to directory of .tex files")
+    parser.add_argument("xhtml_dir",help="Path to xhtml output directory")
+    args = parser.parse_args()
     origdir = os.getcwd()
     global path
     global outpath
     global erroroutputpath
-    if len(sys.argv)==1:
-        print("Error: must pass in one or more valid directories")
-        exit()
-    path = os.path.abspath(os.path.join(str(sys.argv[1]),''))
+    path = args.directory
+    outpath = args.xhtml_dir
     if not os.path.isdir(path):
         print("Error: {} is not a valid directory".format(path))
         sys.exit()
-    if len(sys.argv)==3:
-        outpath = os.path.join(sys.argv[2],'')
-    else:
-        outpath = path[:-1] + '_converted/'
     outpath = os.path.join(os.path.abspath(outpath),'')
-    if not os.path.exists(outpath):
-        os.makedirs(outpath)
+    validate_folder(outpath)
     os.chdir(outpath)
     erroroutputpath = os.path.join(os.path.split(os.path.normpath(outpath))[0],
     os.path.basename(os.path.normpath(path))+'_failed')
+    validate_folder(erroroutputpath)
     print("Beginning processing of {}".format(path))
     print("Generating list of files with math...")
     filelist = getmathfiles(path)
     print("Generation complete.")
-    if not os.path.isdir(erroroutputpath):
-        os.makedirs(erroroutputpath)
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))
     print("Beginning processing...")
