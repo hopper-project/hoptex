@@ -19,9 +19,9 @@ def substitute_eqid(filename):
     global outpath
     global inline
     no_math = True
-    print(filename)
     with open(filename,mode='r',encoding='latin-1') as fh:
         text = fh.read()
+    text = clean_inline_math(text)
     if(inline):
         textlist = grab_inline_math(text,split=True)
         for i, x in enumerate(textlist):
@@ -33,17 +33,22 @@ def substitute_eqid(filename):
             return
         newtext = ''.join(textlist)
     else:
-        textlist = grab_math(text,split=True)
-        for i, x in enumerate(textlist):
-            if is_math(x):
-                if flatten_equation(x) in eqdict:
-                    textlist[i] = eqdict[flatten_equation(x)]
-                    no_math = False
+        # math = grab_math(text)
+        for equation in grab_math(text):
+            flat_eq = flatten_equation(equation)
+            if flat_eq in eqdict:
+                text = text.replace(equation,eqdict[flat_eq])
+            elif equation in eqdict:
+                text = text.replace(equation,eqdict[equation])
+            else:
+                print("Enumeration error: {} TRUE".format(filename))
+                for expr in to_remove:
+                    if re.search(expr,equation):
+                        print("Enumeration error: {} TRUE".format(filename))
+                        break
                 else:
-                    textlist[i] = textlist[i].strip()
-        if no_math:
-            return
-        newtext = '\n'.join(textlist)
+                    print("Enumeration error: {}: FALSE".format(filename))
+        newtext = text
     if outpath:
         filename = os.path.join(outpath,os.path.basename(filename))
     with open(filename,mode='w',encoding='utf-8') as fh:
@@ -55,11 +60,11 @@ def main():
     global inline
     parser = argparse.ArgumentParser(description=\
     'Usage for equation enumeration')
+    parser.add_argument("directory",help="Path to directory of .tex files, or demacro (if the flag is specified)")
     parser.add_argument("tsv",
     help="Path to .tsv of enumerated equations (output of enumerateeqs.py)")
     parser.add_argument("--parent", action='store_true',
     help="Use flag if the specified directory is the parent of .tex file directories")
-    parser.add_argument("directory",help="Path to directory of .tex files, or demacro (if the flag is specified)")
     parser.add_argument("--outpath",help="Path to output directory (WARNING: if this flag is not used with an output directory, it will overwrite the .tex files in place)")
     parser.add_argument("--inline", action='store_true', help="Use flag if enumerating inline equations")
     args = parser.parse_args()
@@ -93,7 +98,7 @@ def main():
                     elif len(contents)==3:
                         eqid, sub_ids, equation = contents
                         equation = unmask(equation)
-                        eqdict[flatten_equation(equation)] = eqid
+                        eqdict[equation] = eqid
     print("Equation dictionary loaded.")
     print("{} entries".format(len(eqdict)))
     pool = mp.Pool(mp.cpu_count())

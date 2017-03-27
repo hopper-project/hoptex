@@ -7,6 +7,12 @@ import fnmatch
 from core.funcs import *
 import time
 
+# Delimiters for assembling
+beq = "\\begin{equation}"
+eeq = "\\end{equation}"
+balign = "\\begin{align}"
+ealign = "\\end{align}"
+
 def grab_eqs_and_filename(filename):
     return((filename,grab_math_from_file(filename)))
 
@@ -120,29 +126,31 @@ def main():
                             split_eqs = split_multiline(equation)
                             sub_ids = []
                             for sub_eq in split_eqs:
+                                sub_eq = remove_whitespace(sanitize_equation(sub_eq,complete=True))
                                 if sub_eq not in unique_eqs:
                                     unique_eqs[sub_eq] = ("EQDS"+str(eqcount)+"Q",beq+sub_eq+eeq)
                                     eqcount += 1
                                 sub_ids.append(unique_eqs[sub_eq][0])
-                            unique_meqs[flt_eq] = ("EQDM"+str(meqcount)+"Q",",".join(sub_ids),balign+std_eq+ealign)
+                            unique_meqs[equation] = ("EQDM"+str(meqcount)+"Q",",".join(sub_ids),equation)
                             meqcount += 1
+                            break
                         else:
                             if flt_eq not in unique_eqs:
                                 unique_eqs[flt_eq] = ("EQDS"+str(eqcount)+"Q",beq+std_eq+eeq)
                                 eqcount += 1
+                            break
         with open(outpath,mode='w') as fh:
             for x in unique_eqs:
                 EQID, eqtext = unique_eqs[x]
                 fh.write(EQID+'\t'+mask(eqtext)+'\n')
             for x in unique_meqs:
-                EQID, sub_ids, flt_eq = unique_meqs[x]
-                fh.write(EQID+'\t'+sub_ids+'\t'+mask(flt_eq)+'\n')
-    print("{} equations".format(len(unique_eqs)))
-    print("{} display equations".format(len(unique_meqs)))
+                EQID, sub_ids, eqtext = unique_meqs[x]
+                fh.write(EQID+'\t'+sub_ids+'\t'+mask(eqtext)+'\n')
+    print("{} single line equations".format(len(unique_eqs)))
+    print("{} multiline equations".format(len(unique_meqs)))
     # print("{} seconds".format(int(time.time()-start)))
     pool.close()
     pool.join()
-
 
 if __name__ == '__main__':
     main()
