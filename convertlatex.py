@@ -8,6 +8,8 @@ import re
 import multiprocessing as mp
 import subprocess
 import argparse
+import time
+import datetime
 from subprocess import PIPE
 from core.funcs import *
 
@@ -70,6 +72,7 @@ def genxhtml(filename):
     return ""
 
 def main():
+    start_time = time.time()
     parser = argparse.ArgumentParser(description='Conversion of sanitized LaTeX documents to XHTML')
     parser.add_argument("directory",help="Path to directory of .tex files")
     parser.add_argument("xhtml_dir",help="Path to xhtml output directory")
@@ -101,9 +104,13 @@ def main():
         for message in outlist:
             if len(message)>0:
                 fh.write(message+'\n')
+        end_time = time.time()
+        total_time = str(datetime.timedelta(seconds=int(end_time-start_time)))
+        fh.write("TIME (hh:mm:ss): {}\n".format(total_time))
     pool.close()
     pool.join()
     os.chdir(origdir)
+    print("TIME: {}".format(total_time))
 
 
 if __name__ == '__main__':
