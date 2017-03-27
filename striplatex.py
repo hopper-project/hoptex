@@ -32,7 +32,7 @@ def cleanfile(filename):
     with open(os.path.join(outpath,os.path.splitext(os.path.basename(filename))[0]+'.txt3'),mode='w',encoding='utf-8') as fh:
         fh.write(text)
     if len(mathmatches)>0:
-        print(filename)
+        print(filename, len(mathmatches))
     return len(mathmatches)
 
 def main():
