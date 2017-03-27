@@ -886,6 +886,9 @@ def demacro_file(path):
     text = undo_isundefined_sub(isundefined_dict,text)
     text = re.sub(r'\n{3,}','\n\n',text)
     text = sub_single_token_groups(text)
+    if not grab_body(text):
+        print("{}: No body found".format(path))
+        return("")
     return text
 
 def demacro_archive(path):
@@ -1011,8 +1014,10 @@ def demacro_folder(folder):
     pool.map(demacro_mapped,folderlist)
     pool.close()
     pool.join()
-    # for fname in folderlist:
-    #     shutil.rmtree(fname,ignore_errors=True)
+    folders = next(os.walk(output_path))[1]
+    outfolderlist = [os.path.join(output_path,item) for item in folders]
+    for fname in outfolderlist:
+        shutil.rmtree(fname,ignore_errors=True)
 
 def demacro_and_untar(archive,dest):
     """Untar archive to folder & demacro. e.g. 1506.tar to example/1506 should
@@ -1039,6 +1044,7 @@ def demacro_and_untar_folder(archive_folder,dest):
 def main():
     global debug
     global debug_path
+    global input_path
     global output_path
     global timeout
     global output_path
