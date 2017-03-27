@@ -2,6 +2,7 @@ import glob
 import os
 import re
 import multiprocessing as mp
+import gc
 
 global a
 global b
@@ -56,10 +57,27 @@ cap_expr_list = [ca,cb,cc,cd,ce,cf,cg,ch,ci]
 
 non_capture_math = r'('+'|'.join(expr_list)+r')'
 
-beq = "\\begin{equation}"
-eeq = "\\end{equation}"
-balign = "\\begin{align}"
-ealign = "\\end{align}"
+inline_pattern =r'(?<=[^\$])((?:\$[^\$]+?\$)+?)(?=[^\$])'
+
+# REGEX FOR SEARCHING
+bdoc = r"\\begin{document}"
+edoc = r"\\end{document}"
+
+body_pattern = r'(?s)\\begin{document}.*?\\end{document}'
+
+# Functions used throughout the hoptex library go here
+
+def grab_body(text):
+    text = remove_comments(text)
+    match = re.search(body_pattern,text)
+    if match:
+        return match.group(0)
+    else:
+        return ''
+
+def remove_inline_math(text):
+    text = re.sub(inline_pattern,'',text)
+    return text
 
 def is_math(text):
     if re.match(non_capture_math,text):
@@ -67,33 +85,30 @@ def is_math(text):
     return False
 
 def remove_whitespace(text):
+    """Believe it or not, this function removes whitespace from text"""
     text = re.sub(r'\s','',text)
     return text
+
+def split_multiline(text):
+    """Splits an equation environment on the LaTeX newline ('\\\\') character"""
+    textlist = re.split(r'\\\\',text)
+    for i, x in enumerate(textlist):
+        textlist[i] = remove_whitespace(x)
+    return textlist
 
 def enforce_newlines(text):
     """Ensures a newline character after LaTeX newline"""
     text = re.sub(r'\\\\(?!\n)',r'\\\\\n',text)
     return text
 
-def sanitize_equation(text,complete=False):
-    """Removes non-mathematical modifiers"""
-    text = enforce_newlines(text)
+def sanitize_equation(text, complete=False):
     for expr in to_remove:
         text = re.sub(expr,'',text)
     if complete:
         text = re.sub(r'(?:\\\\)+','',text)
-    else:
-        text = re.sub(r'(?:\\\\)+',r'\\\\',text)
     return text
 
-def split_multiline(text):
-    textlist = re.split(r'\\\\',text)
-    for i, x in enumerate(textlist):
-        textlist[i] = remove_whitespace(x)
-    return textlist
-
 def standardize_equation(text):
-    """Removes delimiters, sanitizes equation"""
     for expr in cap_expr_list:
         match = re.match(expr,text)
         if match:
@@ -105,9 +120,10 @@ def flatten_equation(text):
     return text
 
 def split_multiline(text):
-    """Splits flattened text on LaTeX newline & returns as list"""
-    init_list = flatten_equation(text).split("\\\\")
-    return [item for item in init_list if item!='']
+    text = flatten_equation(text)
+    newtextlist = re.split(r'(?:\\\\)+',text)
+    return newtextlist
+
 
 def load_document(filename):
     with open(filename,mode='r',encoding='latin-1') as fh:
@@ -116,16 +132,15 @@ def load_document(filename):
 
 def generate_sanitized_document(text):
     """Generates LaTeXML document containing only usepackage statements,
-    begin & end document statements, and the extracted math.
+    begin & end document statements, and math found between the begin and end
+    document statements.
     Returns string of the new text document
     """
     text = remove_comments(text)
-    text = re.sub(r'(?s)([^\$])(\$[^\$]*?\$)(\$[^\$]*?\$)([^\$])',r"\1\2 \3\4",text,flags=re.DOTALL)
-    docbody = re.findall(r'(?s)\\begin\{document\}.*?\\end\{document\}',text)
-    if not docbody:
+    text = remove_inline_math(text)
+    if not (re.search(bdoc,text) and re.search(edoc,text)):
         return ""
-    docbody = docbody[0]
-    body = grab_math(docbody)
+    body = grab_math(text)
     packages = re.findall(r'(?s)\\usepackage(?:\[.*?\])?\{.*?\}',text)
     docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
     """Uses documentclass article if no custom document class is specified"""
@@ -136,8 +151,13 @@ def generate_sanitized_document(text):
         docclass = '\\documentclass{article}\n'
     preamble = [docclass] + packages + ['\\begin{document}\n']
     postamble = ["\\end{document}"]
-    output = '\n'.join(preamble+body+postamble)
+    output = '\n\n'.join(preamble+body+postamble)
     return output
+
+def sanitized_doc_from_file(filename):
+    with open(filename,mode='r',encoding='latin-1') as fh:
+        text = fh.read()
+    return generate_sanitized_document(text)
 
 def gettexfiles(path):
     """Returns list of absolute paths to .tex files in a folder at path"""
@@ -150,8 +170,8 @@ def gettexfiles(path):
 def remove_comments(text):
     """Takes LaTeX document text & returns document without any comments"""
     text = re.sub(r'(?<=\n)%.+?\n','',text)
-    text = re.sub(r'(?!\\)%\n','',text)
-    text = re.sub(r'(?!\\)%.*?\n','\n',text)
+    text = re.sub(r'(?<!\\)%\n','',text)
+    text = re.sub(r'(?<!\\)%.*?\n','\n',text)
     text = re.sub(r'(?s)\\begin\{comment\}.*?\\end\{comment\}','',text)
     return text
 
@@ -160,41 +180,40 @@ def remove_comment_newlines(text):
     text = re.sub(r'%\n','',text)
     return text
 
+def clean_inline_math(text):
+    text = remove_comments(text)
+    text = re.sub(r'(?<!\\)((?:\\\\)*)(\\\$)','\1escapeddollarsign',text)
+    matches = re.findall(inline_pattern,text)
+    for match in matches:
+        sub_eqs = re.findall(r'(?s)\$.+?\$',match)
+        if len(sub_eqs)>0:
+            new_inline_text = ' '.join(sub_eqs)
+            text  = text.replace(match,new_inline_text)
+    text = re.sub(ch,r' \1 ',text)
+    text = re.sub('escapeddollarsign',r'\\\$',text)
+    return text
+
 def grab_math(text, split=False):
     """Returns list of display math in the LaTeX document
     Enabling the split option returns the interspersed text, as separate
     entries in the list (e.g. text, eq, text, eq)"""
-    delim = r'|'
-    global a
-    global b
-    global c
-    global d
-    global e
-    global f
-    global g
-    global h
-    global i
-    exprmatch = [a,b,c,d,e,f,g,h]
-    text = remove_comments(text)
+    text = grab_body(text)
+    text = clean_inline_math(text)
     if(split):
-        tomatch = r'('+delim.join(exprmatch)+r')'
-        matches = re.split(tomatch,text)
-        matches.append("")
+        matches = re.split(non_capture_math,text)
         return matches
     else:
-        tomatch =delim.join(exprmatch)
-        matches = re.findall(tomatch,text)
+        matches = re.findall(non_capture_math,text)
         return matches
 
 def grab_inline_math(text, split=False):
     """Inline equivalent of grab_math"""
-    text = remove_comments(text)
+    text = grab_body(text)
+    text = clean_inline_math(text)
     matchlist = []
-    # matches = re.findall(r'(?<=[^\$])(\$[^\$]+?\$)(?=[^\$])|(?<=[^\$])(\$[^\$]+?\$)(\$[^\$]+?\$)(?=[^\$])',text)
-    text = re.sub(r'\\\$','',text)
-    matches = re.findall(r'(?<=[^\$])((?:\$[^\$]+?\$)+?)(?=[^\$])',text)
+    matches = re.findall(inline_pattern,text)
     if split:
-        textlist = re.split(r'(?<=[^\$])((?:\$[^\$]+?\$)+?)(?=[^\$])',text)
+        textlist = re.split(inline_pattern,text)
         newtextlist = []
         matches = set(matches)
         for text in textlist:
@@ -210,11 +229,6 @@ def grab_inline_math(text, split=False):
             submatches = re.findall(r'\$.+?\$',match)
             for submatch in submatches:
                 matchlist.append(submatch)
-            # if matches[0]:
-            #     matchlist.append(match[0])
-            # else:
-            #     matchlist.append(match[1])
-            #     matchlist.append(match[2])
         return matchlist
 
 def grab_math_from_file(filename, split=False):
@@ -271,17 +285,3 @@ def mask(text):
 def unmask(text):
     """Converts the 'masked' equation back to its original form"""
     return text.encode().decode('unicode-escape')
-
-
-sample_eq = r"""\begin{align}
-poobah &= 40 \label{this is cool} \\
-x &= y
-\end{align}"""
-
-seq2 = r'\begin{equation}32+40x=y^2\end{equation}'
-
-seq2alt = r'$$32+40x = y^2$$'
-
-seq3 = r'''\begin{align} poobah =40 \label{this is different}\\
-x = y
-\end{align}'''
