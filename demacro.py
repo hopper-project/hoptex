@@ -967,23 +967,6 @@ def total_extract_folder(folder,dest=''):
     untar_folder(folder,dest)
     untarballs_folder(dest,'')
 
-def mapped(folder):
-    """Side thing, please ignore"""
-    global output_path
-    output_path = os.path.normpath(output_path)
-    print(folder)
-    new_text = demacro_archive(folder)
-    new_name = os.path.split(os.path.normpath(folder))[1]
-    if(new_text):
-        with open(output_path+'/'+new_name+'.tex','w') as fh:
-            fh.write(new_text)
-    else:
-        mainfile =  find_main_file(folder)
-        if mainfile:
-            text = load_inputs(mainfile)
-            filename = os.path.basename(mainfile)
-            with open('/media/jay/Data/combined_debug/'+new_name+'.tex','w') as fh:
-                fh.write(text)
 
 def demacro_mapped(folder):
     """Wrapper function for handling in/out paths & failed document output"""
@@ -1040,17 +1023,26 @@ def demacro_and_untar_folder(archive_folder,dest):
     for archive in archive_list:
         demacro_and_untar(archive,dest)
 
+def recombine_file(tex_folder_path,output_file):
+    """Compiles the entire document into a single file,
+    and writes to specified file"""
+    text = load_inputs(find_main_file(tex_folder_path))
+    with open(output_path,'w') as fh:
+        fh.write(text)
+
 
 def main():
     global debug
     global debug_path
+    global diag_message
     global input_path
     global output_path
     global timeout
     global output_path
-    parser = argparse.ArgumentParser(description='Expands LaTeX macros')
+    parser = argparse.ArgumentParser(
+    description='Expands LaTeX macros. Default: demacro a single folder of .tex files')
     parser.add_argument('input', help='Input file/directory')
-    parser.add_argument('output', help='Output directory')
+    parser.add_argument('output', help='Output file/directory')
     parser.add_argument('--dtar', action='store_true',
     help='Indicate that input is a directory of .tar files')
     parser.add_argument('--dgz',action='store_true',
@@ -1065,8 +1057,6 @@ def main():
     help='Indicate that input is folder corresponding to a single .tex document')
     parser.add_argument('--file',action='store_true',
     help='Indicate that input is a single .tex file')
-    parser.add_argument('--fileprint',action='store_true',
-    help="Indicate that input is a single .tex file, and to print (not write) output")
     parser.add_argument('--edgz',action='store_true',
     help='Indicate that folder contains extracted .tar.gz folders')
     # parser.add_argument('-o', '--oldConvention', action='store_true',
@@ -1078,6 +1068,8 @@ def main():
         debug_path = args.debug
     validate_folder(debug_path)
     validate_folder(output_path)
+    if args.verbose:
+        diag_message = True
     debug = False
     if not os.path.exists(input_path):
         ValueError("Input does not exist: {}".format(args.input))
@@ -1097,11 +1089,14 @@ def main():
         text = demacro_file(input_path)
         with open(output_path,'w') as fh:
             fh.write(text)
-    elif args.fileprint:
-        text = demacro_file(input_path)
-        print(text)
     elif args.edgz:
         demacro_folder(input_path)
+    else:
+        text = demacro_file(input_path)
+        print(text)
 
-if __name__=='__main__':
-    main()
+if sys.flags.interactive:
+    pass
+else:
+    if __name__=='__main__':
+        main()
