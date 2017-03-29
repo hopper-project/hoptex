@@ -84,6 +84,13 @@ def is_math(text):
         return True
     return False
 
+def is_multiline(text):
+    """Returns True if expression is align,flalign,eqnarray,gather, or multline"""
+    for expr in multiline_list:
+        if re.match(expr,text):
+            return True
+    return False
+
 def remove_whitespace(text):
     """Believe it or not, this function removes whitespace from text"""
     text = re.sub(r'\s','',text)
