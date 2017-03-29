@@ -15,6 +15,7 @@ import tarfile
 import multiprocessing as mp
 import shutil
 import argparse
+import datetime
 
 from core.funcs import *
 global diag_message
@@ -1032,6 +1033,7 @@ def recombine_file(tex_folder_path,output_file):
 
 
 def main():
+    start_time = time.time()
     global debug
     global debug_path
     global diag_message
@@ -1075,6 +1077,7 @@ def main():
         ValueError("Input does not exist: {}".format(args.input))
     if args.timeout:
         timeout = int(args.timeout)
+        print("New timeout: {} s".format(timeout))
     if args.dtar:
         demacro_and_untar_folder(input_path,output_path)
     elif args.dgz:
@@ -1094,6 +1097,9 @@ def main():
     else:
         text = demacro_file(input_path)
         print(text)
+    end_time = time.time()
+    total_time = str(datetime.timedelta(seconds=int(end_time-start_time)))
+    print(total_time)
 
 if sys.flags.interactive:
     pass
