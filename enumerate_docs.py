@@ -44,10 +44,10 @@ def substitute_eqid(filename):
                 print("Enumeration error: {} TRUE".format(filename))
                 for expr in to_remove:
                     if re.search(expr,equation):
-                        print("Enumeration error: {} TRUE".format(filename))
+                        print("Enumeration error: {} Multiline".format(filename))
                         break
                 else:
-                    print("Enumeration error: {}: FALSE".format(filename))
+                    print("Enumeration error: {}: Single line".format(filename))
         newtext = text
     if outpath:
         filename = os.path.join(outpath,os.path.basename(filename))
