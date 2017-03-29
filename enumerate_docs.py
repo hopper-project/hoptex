@@ -41,7 +41,6 @@ def substitute_eqid(filename):
             elif equation in eqdict:
                 text = text.replace(equation,eqdict[equation])
             else:
-                print("Enumeration error: {} TRUE".format(filename))
                 for expr in to_remove:
                     if re.search(expr,equation):
                         print("Enumeration error: {} Multiline".format(filename))
