@@ -27,8 +27,12 @@ def tsvgrab(filename):
     outlist = []
     with open(filename,'r') as fh:
         for line in fh:
-            eqid, eqtext = line.split('\t')
-            eqtext = eqtext.encode().decode('unicode_escape').strip()
+            linesplit = line.strip().split('\t')
+            if len(linesplit)==2:
+                eqid, eqtext = linesplit
+            elif len(linesplit)==3:
+                eqid, subeqs, eqtext = linesplit
+            eqtext = unmask(eqtext)
             if subset:
                 if eqid.lower() in subset:
                     outlist.append(cleantuple((eqid, eqtext)))
@@ -53,7 +57,7 @@ def render(tup):
             stdout, stderr = proc.communicate(rendertext, timeout=90)
             stderr = stderr.decode()
             if len(stderr)>0:
-                print("{}: {}".format(filepath,stderr))
+                print("Failed: {}, {}".format(filepath,text))
                 return("{}: {}\n".format(filepath,stderr))
     except:
         try:
