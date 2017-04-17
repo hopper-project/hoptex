@@ -30,9 +30,6 @@ debug = False
 debug_path = './debug/'
 timeout = 240
 
-#Regex pattern for seeking & retrieving args & separators for def
-# def_pattern = r0+r1+r2+r3+r4+r5+r6+r7+r8+r9
-
 # A truly monstrous regular expression, from a less civilized age
 
 def_pattern = r'(?s)\\(?:e|g)?def\s*(?P<name>\\[A-Za-z@\*]+|\\.)\s*(?:(?P<sep1>[^\{#]*)(?P<arg1>#1)(?P<sep2>[^\{#]*)(?:(?P<arg2>#2)(?P<sep3>[^\{#]*)(?:(?P<arg3>#3)(?P<sep4>[^\{#]*)(?:(?P<arg4>#4)(?P<sep5>[^\{#]*)(?:(?P<arg5>#5)(?P<sep6>[^\{#]*)(?:(?P<arg6>#6)(?P<sep7>[^\{#]*)(?:(?P<arg7>#7)(?P<sep8>[^\{#]*)(?:(?P<arg8>#8)(?P<sep9>[^\{#]*)(?:(?P<arg9>#9)(?P<sep10>[^\{#]*))?)?)?)?)?)?)?)?)?(?=\{)'
