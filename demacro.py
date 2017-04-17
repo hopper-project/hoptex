@@ -907,24 +907,28 @@ def demacro_archive(path):
 
 
 def untarballs(folder,dest=''):
+    """Folder of .tar.gz -> Folder of tex file directories"""
+    global old_convention
     if not dest:
         dest = folder
     else:
         validate_folder(dest)
-    for fname in next(os.walk(folder))[2]:
-        if fname.endswith("tar.gz"):
-            try:
-                tar = tarfile.open(os.path.join(folder,fname),"r:gz")
-                tar.extractall(dest)
-                tar.close()
-            except Exception as inst:
-                print("{}: Unable to extract".format(fname))
-                print(inst)
+    for root, folders, files in os.walk(folder):
+        for fname in files:
+            if fname.endswith("tar.gz"):
+                try:
+                    tar = tarfile.open(os.path.join(root,fname),"r:gz")
+                    tar.extractall(dest)
+                    tar.close()
+                except Exception as inst:
+                    print("{}: Unable to extract".format(fname))
+                    print(inst)
     for fname in next(os.walk(dest))[2]:
         if fname.endswith(".tar.gz"):
             os.remove(os.path.join(folder,fname))
 
 def untar(archive,dest=''):
+    """.tar-> folder of .tar.gz"""
     if not dest:
         dest = os.path.split(archive)[0]
     else:
@@ -941,7 +945,7 @@ def untar(archive,dest=''):
     .tar->folder of .tar.gz -> folder of raw .tex directories"""
 
 def untar_folder(folder,dest):
-    """.tar->folder of .tar.gz"""
+    """dir of .tar->dir of folders of .tar.gz"""
     if dest:
         validate_folder(dest)
     else:
@@ -967,7 +971,6 @@ def total_extract_folder(folder,dest=''):
     """folder of tars.tar->folder of folders of raw .tex"""
     untar_folder(folder,dest)
     untarballs_folder(dest,'')
-
 
 def demacro_mapped(folder):
     """Wrapper function for handling in/out paths & failed document output"""
@@ -1008,10 +1011,17 @@ def demacro_and_untar(archive,dest):
     just pass 'example' into dest"""
     global output_path
     global debug_path
+    global old_convention
     new_name = os.path.split(os.path.splitext(archive)[0])[1]
     output_path = os.path.join(dest,new_name)
     validate_folder(output_path)
     total_extract(archive,dest)
+    if old_convention:
+        tgz_list = []
+        original_folders = [os.path.join(output_path,folder) for folder in next(os.walk(dest))[1]]
+        for folder in original_folders:
+            untarballs(folder,output_path)
+            shutil.rmtree(folder,ignore_errors=True)
     demacro_folder(output_path)
 
 def demacro_and_untar_folder(archive_folder,dest):
@@ -1031,7 +1041,6 @@ def recombine_file(tex_folder_path,output_file):
     with open(output_path,'w') as fh:
         fh.write(text)
 
-
 def main():
     start_time = time.time()
     global debug
@@ -1041,6 +1050,7 @@ def main():
     global output_path
     global timeout
     global output_path
+    global old_convention
     parser = argparse.ArgumentParser(
     description='Expands LaTeX macros. Default: demacro a single folder of .tex files')
     parser.add_argument('input', help='Input file/directory')
@@ -1061,11 +1071,12 @@ def main():
     help='Indicate that input is a single .tex file')
     parser.add_argument('--edgz',action='store_true',
     help='Indicate that folder contains extracted .tar.gz folders')
-    # parser.add_argument('-o', '--oldConvention', action='store_true',
-    # help='use this flag when applying demacro to submissions before 04/2007')
+    parser.add_argument('-o', '--old_convention', action='store_true',
+    help='use this flag when applying demacro to submissions before 04/2007')
     args = parser.parse_args()
     input_path = args.input
     output_path = args.output
+    old_convention = args.old_convention
     if args.debug:
         debug_path = args.debug
     validate_folder(debug_path)
@@ -1085,7 +1096,7 @@ def main():
         untarballs(input_path,os.path.join(output_path,folder_name))
         demacro_folder(os.path.join(output_path,folder_name))
     elif args.tar:
-        demacro_and_untar(archive,output_path)
+        demacro_and_untar(input_path,output_path)
     elif args.folder:
         demacro_archive(input_path)
     elif args.file:
