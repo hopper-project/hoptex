@@ -13,7 +13,7 @@ def mse(filename):
     cleanname = os.path.splitext(os.path.basename(filename))[0]
     with open(filename, mode='r', encoding='latin-1') as fh:
         text = fh.read()
-    text = removecomments(text)
+    text = remove_comments(text)
     packages = re.findall(r'\\usepackage(?:\[.*?\])?\{.*?\}',text)
     packages = '\n'.join(packages)
     stylefile = os.path.join(outpath,cleanname+'.sty')
