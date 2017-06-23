@@ -33,10 +33,10 @@ def genxhtml(filename):
     global outpath
     global timeout
     clean_file_name = os.path.splitext(os.path.basename(filename))[0]
-    outfname = outpath + clean_file_name+'.xhtml'
-    outrawname = outpath+clean_file_name+'.txt'
-    outdir = outpath + clean_file_name
-    validate_folder(outdir)
+    outfname = os.path.join(outpath, clean_file_name+'.xhtml')
+    outfname = os.path.join(outpath, clean_file_name+'.xhtml')
+    outrawname = os.path.join(outpath, clean_file_name+'.txt')
+
     if os.path.isfile(outfname):
         # print("{}: Already generated".format(filename))
         return ""
@@ -70,6 +70,8 @@ def genxhtml(filename):
         writesanitized(output,clean_file_name)
         return "{}: MathML postprocessing failed - timeout".format(filename)
     # try:
+    #     outdir = os.path.join(outpath + clean_file_name)
+    #     validate_folder(outdir)
     #     proc = subprocess.Popen(["latexmlpost", "--format=html5", "--destination="+os.path.join(outdir,clean_file_name)+".html", "--mathimages", "-"],
     #     stderr=PIPE, stdout=PIPE, stdin=PIPE)
     #     stdout3, stderr = proc.communicate(stdout, timeout=timeout)
