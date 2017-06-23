@@ -34,7 +34,7 @@ def genxhtml(filename):
     global timeout
     clean_file_name = os.path.splitext(os.path.basename(filename))[0]
     outfname = outpath + clean_file_name+'.xhtml'
-    outrawname = output+clean_file_name+'.txt'
+    outrawname = outpath+clean_file_name+'.txt'
     outdir = outpath + clean_file_name
     validate_folder(outdir)
     if os.path.isfile(outfname):
