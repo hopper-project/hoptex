@@ -12,7 +12,6 @@ global e
 global f
 global g
 global i
-global j
 
 #regex patterns
 
@@ -25,7 +24,6 @@ f = r'(?s)\\begin\{math\*?\}.*?\\end\{math\*?\}'
 g = r'(?s)(?<!\\)\\\[.*?\\\]'
 h = r'(?s)\$\$[^\^].*?\$\$'
 i = r'(?s)\\begin\{eqnarray\*?\}.*?\\end\{eqnarray\*?\}'
-j = r'(?s)\\\[.*?\\\]'
 
 # named capturing versions of the respective equations above
 ca = r'(?s)(?P<equation>\\begin\{equation\*?\}(?P<math>.*?)\\end\{equation\*?\})'
@@ -53,7 +51,7 @@ to_remove = [r1,r2,r3,r4,r5,r6,r7,r8,r9,r10]
 
 multiline_list = [cb,cc,cd,ce,ci]
 
-expr_list = [a,b,c,d,e,f,g,h,i,j]
+expr_list = [a,b,c,d,e,f,g,h,i]
 
 cap_expr_list = [ca,cb,cc,cd,ce,cf,cg,ch,ci]
 
@@ -212,7 +210,7 @@ def grab_math(text, split=False):
         matches = re.split(non_capture_math,text)
         return matches
     else:
-        matches = re.findall(non_capture_math,text)
+        matches = re.findall(non_capture_math,text,re.MULTILINE)
         return matches
 
 def grab_inline_math(text, split=False):
