@@ -81,23 +81,27 @@ def main():
     if inline:
         with open(tsv,mode='r',encoding='latin-1') as fh:
             for line in fh:
-                eqid, equation = line.strip().split('\t')
+                eqid, equation, freq, _ = line.strip().split('\t')
+                if 'EQIX' not in eqid:
+                    continue
                 equation = equation.encode().decode('unicode_escape').strip()
                 if equation not in eqdict:
                     eqdict[equation] = eqid
                 counter += 1
     else:
-            with open(tsv,mode='r',encoding='latin-1') as fh:
-                for line in fh:
-                    contents = line.strip().split('\t')
-                    if len(contents)==2:
-                        eqid, equation = contents
-                        equation  = unmask(equation)
-                        eqdict[flatten_equation(equation)] = eqid
-                    elif len(contents)==3:
-                        eqid, sub_ids, equation = contents
-                        equation = unmask(equation)
-                        eqdict[equation] = eqid
+        with open(tsv,mode='r',encoding='latin-1') as fh:
+            for line in fh:
+                contents = line.strip().split('\t')
+                if 'EQIX' in contents[0]:
+                    continue
+                if len(contents)==4:
+                    eqid, equation, _, _ = contents
+                    equation  = unmask(equation)
+                    eqdict[flatten_equation(equation)] = eqid
+                elif len(contents)==5:
+                    eqid, sub_ids, equation, _, _ = contents
+                    equation = unmask(equation)
+                    eqdict[equation] = eqid
     print("Equation dictionary loaded.")
     print("{} entries".format(len(eqdict)))
     pool = mp.Pool(mp.cpu_count())
