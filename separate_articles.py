@@ -19,12 +19,13 @@ def separate_eqs(**kwargs):
     article_eq_dict = defaultdict(int)
 
     for eq in reader:
-        article_id = eq[3]
+        article_ids = eq[3].split(',')
         eq_id = eq[0]
         eq_freq = int(eq[2])
 
         if eq_freq > 1:
-            article_eq_dict[article_id] = 1 # Flag to indicate article is nonsingular
+            for article_id in article_ids:
+                article_eq_dict[article_id] = 1 # Flag to indicate article is nonsingular
 
     for aid in article_eq_dict.keys():
         print(aid)
