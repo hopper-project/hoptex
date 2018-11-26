@@ -16,26 +16,36 @@ def separate_eqs(**kwargs):
     nonsing_file = open(os.path.join(PATH, 'nonsingular_articles.txt'), 'w+')
     # nonsing_writer = csv.writer(nonsing_file, delimiter='\t')
 
+    article_to_eq = defaultdict(list)
+    eq_to_article = defaultdict(list)
+
     article_id_set = set()
-    article_eq_dict = defaultdict(int)
 
     for eq in reader:
         article_ids = eq[3].split(',')
-        for article_id in article_ids:
-            article_id_set.add(article_id)
         eq_id = eq[0]
         eq_freq = int(eq[2])
 
-        if eq_freq > 1:
-            for article_id in article_ids:
-                article_eq_dict[article_id] = 1 # Flag to indicate article is nonsingular
+        for article_id in article_ids:
+            article_id_set.add(article_id)
+            article_to_eq[article_id].append(eq_id)
+
+        eq_to_article[eq_id] += article_ids
+
+        # if eq_freq > 1:
+            # for article_id in article_ids:
+                # article_eq_dict[article_id] = 1 # Flag to indicate article is nonsingular
 
     for aid in article_id_set:
-        # print(aid)
-        if article_eq_dict[aid] == 0:
-            sing_file.write(aid + '\n')
+        nonsing_flag = 0
+        for eq_id in article_to_eq[aid]:
+            if len(eq_to_article[eq_id]) > 1:
+                nonsing_flag = 1
+
+        if nonsing_flag:
+            nonsing_file.write(aid + '.tex' + '\n')
         else:
-            nonsing_file.write(aid + '\n')
+            sing_file.write(aid + '.tex' + '\n')
 
     eqs_file.close()
     sing_file.close()
