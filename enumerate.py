@@ -18,6 +18,8 @@ eeq = "\\end{equation}"
 balign = "\\begin{align}"
 ealign = "\\end{align}"
 
+
+
 def substitute_eqid(filename):
     """Substitutes equations in document with their respective inline
     equations"""
@@ -50,9 +52,13 @@ def substitute_eqid(filename):
                 for expr in to_remove:
                     if re.search(expr,equation):
                         print("Enumeration error: {} Multiline".format(filename))
+                        print(equation)
+                        count += 1
                         break
                 else:
                     print("Enumeration error: {}: Single line".format(filename))
+                    print(equation)
+                    count += 1
         newtext = text
     if docpath:
         filename = os.path.join(docpath,os.path.basename(filename))
@@ -292,7 +298,7 @@ def main():
     # print("{} seconds".format(int(time.time()-start)))
     pool.close()
     pool.join()
-    
+'''
     #tsv created
     #enumerate_docs
     print("Loading from eqs.tsv to generate equation dictionary...")
@@ -351,6 +357,7 @@ def main():
         pool.map(substitute_eqid,filelist)
         pool.close()
         pool.join()
-
+'''
 if __name__ == '__main__':
     main()
+

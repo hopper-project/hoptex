@@ -178,7 +178,7 @@ def generate_mathml(work_dir,tsv_file,out_dir):
                     print("{}-{}: No math in table".format(filename, i))
                     xhtml_equations[i] = ""
                 else:
-                    xhtml_equations[i] =  tempvar
+                    xhtml_equations[i] = tempvar
                     eq_mml = x
                     mml_queue.put(eq_mml) ## EQ MathML
             split = grab_math(text,split=1)
@@ -242,7 +242,10 @@ def generate_mathml(work_dir,tsv_file,out_dir):
             if "IX" in eqid:
                 continue
             line_count += 1
-            mathmlrep = mml_dict[eqid]
+            try:
+                mathmlrep = mml_dict[eqid]
+            except KeyError:
+                continue
             ## creating mml files
             mathml_eq_file = open(os.path.join(out_dir,eqid.lower()+".mml"),'w')
             mathml_eq_file.write(mathmlrep) ##
@@ -265,6 +268,7 @@ def main():
     parser = argparse.ArgumentParser(description='Conversion of sanitized LaTeX documents to XHTML')
     parser.add_argument("tex_dir",help="Path to input directory of .tex files")
     parser.add_argument("xhtml_dir",help="Path to output directory for .xhtml files")
+    parser.add_argument("--tex_list",help="List of .tex files to process (txt)",default=None)
     parser.add_argument("--tsv_file",help="Input .tsv file for mml generation")
     parser.add_argument("--mml_dir",help="Path to output directory for .mml files")
     parser.add_argument("--json_dir",help="Path to output directory for .json files")
@@ -273,6 +277,7 @@ def main():
     origdir = os.getcwd()
     path = os.path.abspath(args.tex_dir)
     xhtml_path = os.path.abspath(args.xhtml_dir)
+    tex_list = args.tex_list
     tsv_path = os.path.abspath(args.tsv_file)
     mml_path = os.path.abspath(args.mml_dir)
     eqoutpath = os.path.abspath(args.json_dir)
@@ -293,7 +298,7 @@ def main():
 
     print("Beginning processing of {}".format(path))
     print("Generating list of files with math...")
-    filelist = getmathfiles(path) 
+    filelist = getmathfiles(path,tex_list)
     print("Generation complete.")
     pool = mp.Pool(processes=mp.cpu_count())
     print("Initialized {} threads".format(mp.cpu_count()))

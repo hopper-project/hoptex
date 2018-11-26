@@ -263,9 +263,16 @@ def hasmath(filename):
     finds = grab_math(text)
     return (filename, len(finds))
 
-def getmathfiles(path):
+def getmathfiles(path, proc_list=None):
     """Returns a list of files that have math in them"""
-    filelist = glob.glob(os.path.join(path,'*.tex'))
+    if proc_list:
+        with open(os.path.join(path, proc_list)) as fl:
+            proc_list_text = fl.read()
+        files_to_process = proc_list_text.split()
+        filelist = [os.path.join(path,file) for file in files_to_process]
+    else:
+        filelist = glob.glob(os.path.join(path,'*.tex'))
+
     outlist = []
     pool = mp.Pool(processes=mp.cpu_count())
     filelist = pool.map(hasmath,filelist)
