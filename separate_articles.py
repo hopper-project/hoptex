@@ -16,10 +16,13 @@ def separate_eqs(**kwargs):
     nonsing_file = open(os.path.join(PATH, 'nonsingular_articles.txt'), 'w+')
     # nonsing_writer = csv.writer(nonsing_file, delimiter='\t')
 
+    article_id_set = set()
     article_eq_dict = defaultdict(int)
 
     for eq in reader:
         article_ids = eq[3].split(',')
+        for article_id in article_ids:
+            article_id_set.add(article_id)
         eq_id = eq[0]
         eq_freq = int(eq[2])
 
@@ -27,8 +30,8 @@ def separate_eqs(**kwargs):
             for article_id in article_ids:
                 article_eq_dict[article_id] = 1 # Flag to indicate article is nonsingular
 
-    for aid in article_eq_dict.keys():
-        print(aid)
+    for aid in article_id_set:
+        # print(aid)
         if article_eq_dict[aid] == 0:
             sing_file.write(aid + '\n')
         else:
