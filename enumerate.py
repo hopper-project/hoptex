@@ -99,13 +99,13 @@ def main():
     parser = argparse.ArgumentParser(description='Usage for equation enumeration')
     parser.add_argument("directory",help="Path to directory of .tex files")
     parser.add_argument("outfile",help="Path to output file")
-    parser.add_argument("--xhtml", help="Path to directory of xhtml files")
+    #parser.add_argument("--xhtml", help="Path to directory of xhtml files")
     parser.add_argument("--tsv", help="Path to tsv to continue loading ")
     parser.add_argument("--parent", action="store_true", help="Set to true if this is a folder of folders of .tex files")
     parser.add_argument("--tex_eqs", help="tex to eqs tsv to continue loading")
     parser.add_argument("--eqs_tex", help="eqs to tex tsv to continue loading")
-    parser.add_argument("--docpath", help="output directory of enumerated documents with EQIDs")
-    parser.add_argument("--inline", action='store_true', help="Use flag if enumerating inline equations")
+    #parser.add_argument("--docpath", help="output directory of enumerated documents with EQIDs")
+    #parser.add_argument("--inline", action='store_true', help="Use flag if enumerating inline equations")
     args = parser.parse_args()
     directory = os.path.join(os.path.abspath(args.directory),'')
     outpath = os.path.abspath(args.outfile)
@@ -115,10 +115,10 @@ def main():
     tex_eqs = args.tex_eqs
     eqs_tex = args.eqs_tex
     tsv_write_mode = 'w'
-    docpath = os.path.join(os.path.abspath(args.docpath),'')
-    inline = args.inline
-    if(args.xhtml):
-        xhtml = os.path.abspath(args.xhtml)
+    #docpath = os.path.join(os.path.abspath(args.docpath),'')
+    #inline = args.inline
+    #if(args.xhtml):
+    #    xhtml = os.path.abspath(args.xhtml)
     matches = []
     unique_eqs = {}
     unique_meqs = {}
@@ -129,6 +129,7 @@ def main():
     # 'resuming' a tsv
     # allows enumeration to continue from a previously written tsv
     # still writes the new tsv to the output destination
+    '''
     if(tsv):
         print("Loading equations...")
         with open(tsv,mode='r',encoding='latin-1') as fh:
@@ -155,6 +156,7 @@ def main():
                 linesplit = line.split('\t')
                 eqid = linesplit[0]
                 eqs_to_tex_dict[eqid] = linesplit[1:]
+    '''
     print("Seeking .tex files...")
     # if this is a parent directory of several folders of .tex files
     if(parent):
@@ -166,6 +168,7 @@ def main():
     else:
         matches = gettexfiles(directory)
     print("{} files found".format(len(matches)))
+    '''
     # generate list of xhtml files, if we're given a folder to look in
     if(xhtml):
         xhtmlmatches = {}
@@ -184,6 +187,7 @@ def main():
                 mismatch.append(processedname)
             else:
                 match.append(processedname)
+    '''
     # print("{} seconds".format(int(time.time()-start)))
     pool = mp.Pool(processes=mp.cpu_count())
     print("Grabbing math from files...")
@@ -191,6 +195,7 @@ def main():
     meqcount = 0
     # code for creating the 3-column tsv with matching xhtml docs
     if(xhtml):
+        '''
         all_math = pool.imap(grab_eqs_and_filename,matches)
         for tup in all_math:
             xhtmlMath = False
@@ -219,6 +224,8 @@ def main():
         with open(outpath,mode='w') as fh:
             for x in unique_eqs:
                 fh.write(unique_eqs[x][0]+'\t'+repr(x)[1:-1].replace("\t","\\t")+'\t'+repr(unique_eqs[x][1])[1:-1].replace("\t","\\t")+'\t'+repr(unique_eqs[x][2])+'\n')
+        '''
+        pass
     else:
         all_math = pool.imap(grab_math_from_file,matches)
         # document_equations = (document name, list of eqs)
@@ -285,6 +292,7 @@ def main():
                 EQID, sub_ids, eqtext, freq = unique_meqs[x]
                 fh.write(EQID+'\t'+mask(eqtext)+'\t'+repr(freq)+'\t'+','.join(doc_list)+'\n')
                 #fh.write(EQID+'\t'+sub_ids+'\t'+mask(eqtext)+'\t'+repr(freq)+'\t'+','.join(doc_list)+'\n')
+        '''
         with open(tex_eqs,mode='w') as fh:
             for document_name in tex_to_eqs_dict:
                 eqs_list = tex_to_eqs_dict[document_name]
@@ -293,6 +301,7 @@ def main():
             for eqid in eqs_to_tex_dict:
                 tex_list = eqs_to_tex_dict[eqid]
                 fh.write(eqid+'\t'+'\t'.join(tex_list)+'\n')
+        '''
     print("{} single line equations".format(len(unique_eqs)))
     print("{} multiline equations".format(len(unique_meqs)))
     # print("{} seconds".format(int(time.time()-start)))
