@@ -3,6 +3,10 @@ import os
 import re
 import multiprocessing as mp
 import gc
+import pymysql.cursors
+from collections import defaultdict
+import subprocess
+import math
 
 global a
 global b
@@ -13,6 +17,7 @@ global f
 global g
 global i
 global j
+global k
 
 #regex patterns
 
@@ -26,6 +31,7 @@ g = r'(?s)(?<!\\)\\\[.*?\\\]'
 h = r'(?s)\$\$[^\^].*?\$\$'
 i = r'(?s)\\begin\{eqnarray\*?\}.*?\\end\{eqnarray\*?\}'
 j = r'(?s)\\\[.*?\\\]'
+k =  r'(?s)\\begin\{displaymath\*?\}.*?\\end\{displaymath\*?\}'
 
 # named capturing versions of the respective equations above
 ca = r'(?s)(?P<equation>\\begin\{equation\*?\}(?P<math>.*?)\\end\{equation\*?\})'
@@ -303,3 +309,206 @@ def mask(text):
 def unmask(text):
     """Converts the 'masked' equation back to its original form"""
     return text.encode().decode('unicode-escape')
+
+def populate_db(eqs, article):
+    """Populates the database with equation_id, tex, frequency, article_id
+    Fills equation_metadata table with equation_id, tex, frequency,
+    and fills article_equations with article_id, equation_id"""
+
+    print('Populating the database with {} equations'.format(len(eqs)))
+
+    db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
+    cursor = db.cursor()
+    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+
+    for e in eqs.keys():
+        eqid, tex, freq  = eqs[e]
+        if '_F' in eqid:
+            _eqid = eqid.strip('_F')
+
+            """Increment frequency count"""
+            sql_command = ("""UPDATE equation_metadata SET frequency=frequency+{} \
+                    WHERE BINARY equation_id='{}'""").format(freq,_eqid)
+            nr = cursor.execute(sql_command)
+            #if nr != 1:
+            #    print('UPDATE operation failed for {}'.format(eqid))
+        else:
+            sql_command = ("""INSERT INTO equation_metadata(equation_id,tex,frequency) \
+                    VALUES{}""").format((eqid,tex,repr(freq)))
+            nr = cursor.execute(sql_command)
+            #if nr != 1:
+            #    print('INSERT operation failed for {}'.format(eqid))
+
+        a_list = article[e]
+        for a in a_list:
+            if '_F' in eqid: eqid = eqid.strip('_F')
+            sql_command = ("""INSERT INTO article_equations(article_id,equation_id) \
+                    VALUES{}""").format((a,eqid))
+            nr = cursor.execute(sql_command)
+            #if nr != 1:
+            #    print('INSERT operation failed for {}'.format((a,eqid)))
+
+    print('populate_db complete')
+    db.commit()
+    db.close()
+
+def put_mathml(tex, mathml):
+    """Puts mathml into appropriate place in db"""
+
+    db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
+    cursor = db.cursor()
+    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+
+    sql_command = ("""UPDATE equation_metadata SET mathml='{}' \
+            WHERE BINARY tex='{}'""").format(mathml,tex)
+    nr = cursor.execute(sql_command)
+    #if nr != 1:
+    #    print('INSERT operation failed for {}'.format(eqid))
+
+    '''
+    sql_command = ("""SELECT equation_id FROM equation_metadata \
+            WHERE BINARY tex='{}'""").format(tex)
+    nr = cursor.execute(sql_command)
+    if nr != 1:
+        print('INSERT operation failed for {}'.format(eqid))
+    else:
+        eqid = cursor.fetchall()[0][0]
+        print('MathML inserted for {}'.format(eqid))
+    '''
+
+    db.commit()
+    db.close()
+
+def next_eqid():
+    """Gets next equation id available"""
+
+    db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
+    cursor = db.cursor()
+    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+
+    sql_command = ("""SELECT equation_id FROM equation_metadata \
+            WHERE equation_id LIKE '{}'""").format("EQDS%")
+
+    cursor.execute(sql_command)
+    eqid = cursor.fetchall()
+    eqds = 0
+    if len(eqid) != 0:
+        for i in eqid:
+            nxt = i[0].lstrip("EQDS")
+            nxt = nxt.rstrip("Q")
+            if int(nxt) >= eqds:
+                eqds = int(nxt)+1
+
+    sql_command = ("""SELECT equation_id FROM equation_metadata \
+            WHERE equation_id LIKE '{}'""").format("EQDM%")
+
+    cursor.execute(sql_command)
+    eqid = cursor.fetchall()
+    eqdm = 0
+    if len(eqid) != 0:
+        for i in eqid:
+            nxt = i[0].lstrip("EQDM")
+            nxt = nxt.rstrip("Q")
+            if int(nxt) >= eqdm:
+                eqdm = int(nxt)+1
+
+    db.commit()
+    db.close()
+
+    return eqds, eqdm
+
+def get_mathml(tex):
+    """Gets mathml of tex from the database if available.
+    If not found, returns an empty string"""
+
+    db = MySQLdb.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
+    cursor = db.cursor()
+    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+
+    sql_command = ("""SELECT mathml FROM equation_metadata \
+            WHERE BINARY tex='{}'""").format(tex)
+
+    cursor.execute(sql_command)
+    mathml = cursor.fetchall()
+    if mathml[0][0] == None:
+        db.commit()
+        db.close()
+        return ''
+
+    db.commit()
+    db.close()
+
+    return mathml[0][0]
+
+def get_eqid(tex):
+    """Gets equation_id of tex from the database if available.
+    If not found, returns an empty string"""
+
+    db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
+    cursor = db.cursor()
+    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+
+    sql_command = ("""SELECT equation_id FROM equation_metadata \
+            WHERE BINARY tex='{}'""".format(tex)
+    cursor.execute(sql_command)
+
+    eqid= cursor.fetchall()
+
+    db.commit()
+    db.close()
+
+    return '' if len(eqid) == 0 else eqid[0][0]+'_F'
+
+def separate_articles(eqs, article_list, output_dir, K):
+    """Separates articles into singular and nonsingular articles"""
+
+    PATH = os.path.join(os.getcwd(), output_dir) # Output path
+    if not os.path.exists(PATH): # If output_dir doesn't exist
+        os.mkdir(PATH)
+        subprocess(["chmod","770",PATH])
+
+    sing_file = open(os.path.join(PATH, 'singular_articles.txt'), 'w+')
+    nonsing_file = open(os.path.join(PATH, 'nonsingular_articles.txt'), 'w+')
+
+    article_to_eq = defaultdict(list)
+    eq_to_article = defaultdict(list)
+
+    article_id_set = set()
+
+    for e in eqs:
+        eq_id, _, eq_freq  = eqs[x]
+        eq_freq = int(eq_freq)
+        article_ids = article_list[x].split(',')
+
+        for article_id in article_ids:
+            article_id_set.add(article_id)
+            article_to_eq[article_id].append(eq_id)
+
+        eq_to_article[eq_id] += article_ids
+
+        # if eq_freq > 1:
+            # for article_id in article_ids:
+                # article_eq_dict[article_id] = 1 # Flag to indicate article is nonsingular
+
+    sing_count = 0
+    for aid in article_id_set:
+        nonsing_flag = 0
+        for eq_id in article_to_eq[aid]:
+            if len(eq_to_article[eq_id]) > 1:
+                nonsing_flag = 1
+
+        if nonsing_flag:
+            nonsing_file.write(aid + '.tex' + '\n')
+        else:
+            sing_count += 1
+            sing_file.write(aid + '.tex' + '\n')
+
+    sing_file.close()
+    nonsing_file.close()
+
+    l = int(math.ceil(float(sing_count) / K))
+
+    subprocess.call(["split","--numeric=1","-d","-a","4","-l",
+        str(l),"./sep/singular_articles.txt"])
+    subprocess.call(["rename","'s/^x0*//'","./sep/x*"])
+    subprocess.call(["chmod","770","./sep/*"])
