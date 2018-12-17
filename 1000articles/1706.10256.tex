@@ -1,0 +1,528 @@
+\begin{filecontents*}{example.eps}
+gsave
+newpath
+  20 20 moveto
+  20 220 lineto
+  220 220 lineto
+  220 20 lineto
+closepath
+2 setlinewidth
+gsave
+  .4 setgray fill
+grestore
+stroke
+grestore
+\end{filecontents*}
+
+\RequirePackage{fix-cm}
+
+\documentclass{svjour3}                     
+
+\smartqed  
+
+\usepackage{amsmath}
+\usepackage{inputenc, theorem,enumerate,fancyhdr,amssymb,amsfonts,rotating,multirow, url, float}
+
+\textwidth=15.5cm \textheight=21.0cm
+
+\begin{document}
+
+\title{A faster dual algorithm for the Euclidean minimum covering ball problem
+}
+
+\titlerunning{}        
+
+\author{Marta Cavaleiro        \and Farid Alizadeh}
+
+\authorrunning{M. Cavaleiro and F. Alizadeh} 
+
+\institute{Marta Cavaleiro\at
+              Rutgers University, MSIS Dept. \& RUTCOR \\
+              100 Rockafellar Rd, Piscataway, NJ 08854.
+              
+              
+              \email{marta.cavaleiro@rutgers.edu}           
+           \and
+           Farid Alizadeh \at
+              Rutgers University, MSIS Dept. \& RUTCOR \\
+              100 Rockafellar Rd, Piscataway, NJ 08854.
+              
+              
+              \email{farid.alizadeh@rutgers.edu} 
+}
+
+\date{\today}
+
+\maketitle
+
+\begin{abstract}
+Dearing and Zeck \cite{Dearing09} presented a dual algorithm for the problem of the minimum covering ball in $\mathbb{R}^n$. Each iteration of their algorithm has a computational complexity of at least $\mathcal O(n^3)$. In this paper we propose a modification to their algorithm that, together with an implementation that uses updates to the QR factorization of a suitable matrix, achieves a $\mathcal O(n^2)$ iteration. 
+
+\keywords{minimum covering ball \and smallest enclosing ball \and 1-center \and minmax location \and computational geometry}
+\end{abstract}
+
+\section{Introduction}
+Consider a given set of points ${\mathcal{P}}=\{p_1,\hdots,p_m\}$ in the Euclidean space ${\mathbb{R}}^n$. Let~$\|.\|$ denote the Euclidean norm. The problem of finding the hypersphere $$B(x, r)=\{y\in{\mathbb{R}}^n: \|y-x\|\leq r\}$$ with minimum radius that covers ${\mathcal{P}}$, which we will refer to as the minimum covering ball (MB) of ${\mathcal{P}}$, can be formulated as
+
+\begin{equation} MB({\mathcal{P}}) := \begin{array}{cl}\label{meb}
+\min &r^2 \\
+\text{s.t.} & \|p_i-x\|^2\leq r^2, \quad i=1,\hdots,m.
+\end{array}
+\end{equation}
+
+\noindent We will use the notation $MB({\mathcal{P}})$ both to refer to the problem of the minimum covering ball of a set ${\mathcal{P}}$ and, depending on the context, also to the corresponding optimal ball.
+
+\medskip
+
+The MB problem, reported to date back to the 19th century \cite{Sylvester}, is an important and active problem in computational geometry and optimization. Applications are wide and include facility location ($n=2$ and $n=3$), computer graphics (mostly $n=3$), machine learning (usually with $n$ very large).
+
+Problem (\ref{meb}) can easily be converted in a quadratic program (QP) and solved using off-the-shelf QP solvers. G{\"a}rtner and Sch{\"o}nherr \cite{Gartner00} developed a generalization of the simplex method for QP with the goal of targeting geometric QPs, with one of the main applications being the MB problem. The MB problem is also a second-order-cone program (SOCP) instance, so interior point methods may also be used. Some work has also been done using the SOCP formulation while exploiting the special features of the MB problem \cite{Kumar03,Zhou05}. 
+
+The algorithmic complexity of the MB problem was first given by Megiddo in 1983, when he gave the first deterministic algorithm that solves the MB problem in linear time on the number of points, when the dimension is fixed \cite{Megiddo83,Megiddo84}.
+
+The MB problem is an \emph{LP-type} problem \cite{Dyer04}, sharing common properties with linear programs, in particular its combinatorial nature: the optimal ball is determined by at most $n+1$ points of ${\mathcal{P}}$ that lie on its boundary. Such set of points is usually called a \emph{support set}. Many algorithms that search for such set have been developed. Welzl \cite{Welzl91} presented a randomized algorithm that searches for a support set, solving the problem in expected linear time for fixed dimension. This algorithm was improved by G\"artner \cite{Gartner99}, however only dimensions $n\leq 25$ could be handled in practice. Later Fischer and G{\"a}rtner \cite{Fischer04} proposed an algorithm with a pivoting scheme resembling the simplex method for LP based on previous ideas from \cite{Hopp96}, even adapting Bland's rule to avoid cycling. Their algorithm can handle problems in larger dimensions ($n\leq 10,000$). Using related ideas, Dearing and Zeck \cite{Dearing09} developed a dual algorithm for the MB problem. This algorithm is the subject of this paper, and as we will prove, it can also deal with larger dimensions.
+
+The concept of $\epsilon$-\emph{core sets}, proposed by B\^{a}doiu et al. \cite{Badoiu02}, introduced a new direction of research in approximate algorithms for the MB problem. A remarkable property is the existence of a $\epsilon$-core set of size at most $1/\epsilon$ and independent of $n$ \cite{Badoiu03,Kumar03}. Several algorithms focused on finding $\epsilon$-core sets have been proposed \cite{Badoiu02,Badoiu03,Kumar03,Yildirim08,Nielsen09,Larsson13}, being in general able to deal with large dimensions in useful time.
+
+Streaming algorithms, that only allow one pass over the input points, have also been studied. Zarrabi-Zadeh and Chan \cite{Zarrabi06} gave a $3/2$-approximation algorithm, and later an algorithm by Agarwal and Sharathkumar \cite{Agarwal15} was able to achieve a $1.22$-approximation factor \cite{Chan11}.
+
+\medskip
+
+In this paper we propose a modification to the algorithm proposed by Dearing and Zeck \cite{Dearing09} that makes it faster. Their algorithm looks for a support set, by solving a sequence of subproblems $MB({\mathcal{S}})$, with ${\mathcal{S}}\subseteq{\mathcal{P}}$ affinely independent, until all points of ${\mathcal{P}}$ are covered. At each iteration, set ${\mathcal{S}}$ is updated by either adding a point that is not yet covered, or by replacing an existing point in ${\mathcal{S}}$ by it. Problem $MB({\mathcal{S}})$ is solved using a directional search procedure, and during this step possibly more points are removed from ${\mathcal{S}}$. 
+
+It is possible to implement the algorithm as presented in \cite{Dearing09} taking advantage of the QR updates of a suitable matrix, which can be done in quadratic time on $n$. However, they would need to be done as many as ${\mathcal{O}}(n)$ times, resulting in an iteration having ${\mathcal{O}}(n^3)$ computational complexity. We modify the directional search procedure in such a way that, together with an implementation using QR updates, achieves a ${\mathcal{O}}(n^2)$ iteration.
+
+\smallskip
+
+The paper is organized as follows: In section~\ref{sec:DearingZeck} we review Dearing and Zeck's algorithm for the $MB$ problem. In section~\ref{sec:LineSearch} we present a modification of the algorithm that makes its directional-search step faster. In section~\ref{sec:Implementation} we show how the algorithm can be implemented using QR updates of a certain matrix, which together with the results from section~\ref{sec:LineSearch}, result in ${\mathcal{O}}(n^2)$ iteration. Finally, in section~\ref{sec:Results} we present some computational results that show the practical impact of our work.
+
+\smallskip
+
+One application of this algorithm that benefits from it having a faster iteration is a branch and bound approach to solve the problem of the minimum $k$-covering ball (that seeks the ball with smallest radius that contains at least $k$ of $m$ given points in ${\mathcal{P}}$). At each node of the search tree, Dearing and Zeck's algorithm can be employed to solve the corresponding subproblem. Since it starts with the solution of the parent node, it usually needs very few iterations to solve each subproblem. And since a very large number of subproblems need to be solved, having a fast iteration is essential. This application will be the subject of a future publication by the authors of this paper.
+
+\section{The dual algorithm by Dearing and Zeck}\label{sec:DearingZeck}
+
+The dual problem of (\ref{meb}) is
+\begin{equation} \begin{array}{cl}\label{dual}
+\displaystyle\max_{\pi\in {\mathbb{R}}^m} & \displaystyle\sum_{i=1}^{m} \pi_i\left\|p_i\right\|^2 - \left\|\sum_{i=1}^{m} \pi_i p_i\right\| ^2\\
+\text{s.t.} & \displaystyle\sum_{i=1}^{m} \pi_i =1\\
+& \pi\geq 0,\quad i=1,\dots, m,
+\end{array}\end{equation}
+\noindent and the optimal primal and dual solutions satisfy the following complementary slackness conditions
+\begin{equation} \begin{array}{rl}\label{c}
+\displaystyle \sum_{i=1}^{m}\pi_i \left(p_i -x\right)=0\quad \text{and}\quad \pi_i\left(r^2 - \|x-p_i\|^2\right) = 0,\quad i=1,\dots,m.
+\end{array}\end{equation}
+
+\noindent An important consequence of duality and the complementary slackness conditions, and a well known fact, is the following lemma
+
+\begin{lemma}\label{lem:convhull} 
+Consider a ball $B(x,r)$ that covers ${\mathcal{P}}$, and let ${\mathcal{S}}\subseteq{\mathcal{P}}$ be the set of points on the boundary of $B(x,r)$. Then $B(x,r)=MB({\mathcal{P}})$ if and only if $x\in{\operatorname{conv}}({\mathcal{S}})$.
+\end{lemma}
+
+\noindent As a consequence, the optimal ball is determined by at most $n+1$ affinely independent points of~${\mathcal{P}}$. Moreover, it is easily proved that the center is the intersection of the bisectors of the facets of ${\operatorname{conv}}({\mathcal{S}})$, the convex hull of ${\mathcal{S}}$.
+
+\medskip
+
+We now define \emph{support set} for the $MB({\mathcal{P}})$ problem, an analogous concept to the one of basis for linear programing. 
+
+\begin{definition}[Support set]
+	An affinely independent subset ${\mathcal{S}}\subseteq{\mathcal{P}}'\subseteq{\mathcal{P}}$ is a \emph{support set} of $MB({\mathcal{P}}')$ if $MB({\mathcal{S}}) = MB({\mathcal{P}}')$ and ${\mathcal{S}}$ is minimal, in the sense that it does not exist a ${\mathcal{S}}'\subset{\mathcal{S}}$ s.t. $MB({\mathcal{S}}')=MB({\mathcal{P}}')$.
+\end{definition}
+
+\noindent The following lemma is yet another consequence from duality and complementary slackness:
+
+\begin{lemma}\label{lem:suppset}
+${\mathcal{S}}$ is a support set of ${\mathcal{P}}'\subseteq{\mathcal{P}}$ if and only if $x$, the center of $MB({\mathcal{P}}')$, is in ${\operatorname{ri}}{\operatorname{conv}}({\mathcal{S}})$, the relative interior of ${\operatorname{conv}}({\mathcal{S}})$. 
+\end{lemma}
+
+The dual algorithm developed by Dearing and Zeck \cite{Dearing09} solves the problem $MB({\mathcal{P}})$ by finding a support set of $MB({\mathcal{P}})$ the following way: at the beginning of each iteration we have the solution of $MB({\mathcal{S}})$, where ${\mathcal{S}}$ is a support set of $MB({\mathcal{S}})$; a point $p\in{\mathcal{P}}$ that is not yet covered by $MB({\mathcal{S}}$) is then selected, and problem $MB({\mathcal{S}}\cup\{p\})$ is solved by iteratively removing points from the set ${\mathcal{S}}\cup\{p\}$ until a support of $MB({\mathcal{S}}\cup\{p\})$ is found. The radius of the covering ball strictly increases at each iteration and the algorithm stops when all points have been covered. As a consequence, the algorithm is finite \cite[Theo. 3.2]{Dearing09}.
+
+\medskip
+
+We now review the algorithm in more detail. We denote by $x$ and $r$ the center and radius of the ball at each iteration, and by ${\mathcal{S}}$ the corresponding support set. 
+
+As ${\mathcal{S}}$ and $x$ are updated throughout each iteration, the algorithm maintains the following invariants
+\begin{itemize} 
+	\item ${\mathcal{S}}$ is affinely independent, 
+	\item $x\in{\operatorname{conv}}({\mathcal{S}})$.
+\end{itemize}
+\noindent As a consequence, dual feasibility and complementary slackness conditions are both always satisfied.
+
+\subsection{Initialization}
+The routine starts with a support set ${\mathcal{S}}\subseteq{\mathcal{P}}$ of $MB({\mathcal{S}})$, and $x$ and $r$ the solution to $MB({\mathcal{S}})$. If such data is not available, the algorithm picks any two points $\{p_{i_1}, p_{i_2}\} \in {\mathcal{P}}$, and solves $MB({\mathcal{S}})$ with ${\mathcal{S}}=\{p_{i_1},p_{i_2}\}$:
+	$$x = \frac{p_{i_1}+p_{i_2}}2\quad\text{and}\quad r = \|x-p_{i_1}\|.$$
+	
+\subsection{Iteration}	
+	At the beginning of each iteration, we have the minimum covering ball of a support set ${\mathcal{S}}= \{p_{i_1}, . . . , p_{i_s}\}\subseteq {\mathcal{P}}$, whose center and radius are $x$ and $r$ respectively. Moreover $x\in{\operatorname{ri}} {\operatorname{conv}} ({\mathcal{S}})$.
+	
+	\medskip
+	
+\begin{description}
+	\item[1. \emph{Optimality check}:] If all points of ${\mathcal{P}}$ are covered by $MB({\mathcal{S}})$ then $MB({\mathcal{S}})=MB({\mathcal{P}})$. Otherwise, the algorithm picks a point ${{p}}\in{\mathcal{P}}$ that is not yet covered. 
+	\bigskip
+	
+	\item[2. \emph{Update ${\mathcal{S}}$}:] If ${\mathcal{S}}\cup\{{{p}}\}$ is affinely independent then ${\mathcal{S}}={\mathcal{S}}\cup\{{{p}}\}$, and the two invariants are maintained for the current ${\mathcal{S}}$ and $x$. 
+
+	If ${\mathcal{S}}\cup\{{{p}}\}$ is not affinely independent, a point $p_{i_k}\in{\mathcal{S}}$ is dropped from ${\mathcal{S}}$, in such way that ${\mathcal{S}}\setminus\{p_{i_k}\}\cup\{{{p}}\}$ is affinely independent and $x\in{\operatorname{conv}}({\mathcal{S}}\setminus\{p_{i_k}\}\cup\{{{p}}\})$. Consider $s$ the cardinality of ${\mathcal{S}}$. Point $p_{i_k}$ to leave ${\mathcal{S}}$ is calculated as follows:
+
+	\begin{itemize}
+		\item Let $\pi_1,...,\pi_s$ solve  $\displaystyle\sum^s_{j=1} \pi_j p_{i_j} = x\quad\text{and}\quad \sum^s_{j=1} \pi_j=1$\label{upS1};
+		\item Let $\omega_1,...,\omega_s$ solve  $\displaystyle\sum^s_{j=1} \omega_j p_{i_j} = -{{p}}\quad\text{and}\quad \sum^s_{j=1} \omega_j=-1$\label{upS2};		
+		\item $p_{i_k}$ is such that $\displaystyle\frac{\pi_k}{-\omega_k} = \min_{j=1,\dots,s} \left\{\frac{\pi_j}{-\omega_j}: \omega_j<0\right\}$\label{upS3}.
+	\end{itemize}
+	${\mathcal{S}}$ is now updated: ${\mathcal{S}}={\mathcal{S}}\setminus \{p_{i_k}\}\cup\{{{p}}\}$. 
+	
+	\bigskip
+	
+	\item[3. \emph{Solution of $MB({\mathcal{S}})$}:]  The optimal center of $MB({\mathcal{S}})$ can occur in two possible locations:
+	
+	(a) Either the center is in the interior of ${\operatorname{conv}}({\mathcal{S}})$, in which case it is the intersection of the bisectors of the facets of ${\operatorname{conv}}({\mathcal{S}})$ with ${\operatorname{aff}}({\mathcal{S}})$, the affine space generated by the points in ${\mathcal{S}}$. In this case ${\mathcal{S}}$ is the support set of $MB({\mathcal{S}})$.
+	
+	(b) Or the center is on one of the facets of ${\operatorname{conv}}({\mathcal{S}})$, implying that the support set of $MB({\mathcal{S}})$ is a proper subset of ${\mathcal{S}}$.
+	
+	\medskip
+	
+	To find the optimal center of $MB({\mathcal{S}})$, the algorithm uses a directional search procedure that starts at the current center $x$, and proceeds along a direction $d$. During this search the algorithm either immediately finds the optimal solution to $MB({\mathcal{S}})$, or identifies a point from ${\mathcal{S}}$ that is not part of the support set of $MB({\mathcal{S}})$, removing it from ${\mathcal{S}}$, and performing a new directional search next. The details of this directional search are described below:
+	
+	\smallskip
+	
+	\begin{description}
+		\item [i. \emph{The direction $d$}: ] $d$, the direction along which the line search is performed, satisfies the following:
+		
+		(a) It is on the $(s-1)$-dimensional subspace generated by the points in ${\mathcal{S}}$, ${\operatorname{Sub}}({\mathcal{S}})$, where~$s$ is the cardinality of ${\mathcal{S}}$, that is
+		$$u_j^Td = 0,\,\, j=1,...,n-s+1,$$
+		\noindent with $\{u_j\}_j$ a basis for ${\operatorname{Null}}({\mathcal{S}})$, the null space of ${\operatorname{Sub}}({\mathcal{S}})$;
+		
+		(b) It is parallel to the intersection of the bisectors of the facets of the polytope ${\operatorname{conv}}({\mathcal{S}}\setminus\{{{p}}\})$, or, equivalently, it is orthogonal to ${\operatorname{Sub}}({\mathcal{S}}\setminus\{{{p}}\})$, so
+		$$(p_{i_j}-p_{i_s})^Td=0,\quad p_{i_j}\in{\mathcal{S}}\setminus\{p_{i_s},{{p}}\};$$
+		
+		(c) It ``points towards''  $\,{{p}}$, in the sense that the distance to ${{p}}$ from any point on the ray $\ell^+ = \{x+\alpha d: \alpha \geq 0\}$ decreases as $\alpha$ increases:
+		$$(p-p_{i_s})^Td=1.$$
+		
+		\medskip
+		
+		\item [ii. \emph{Calculating the next iterate}: ] The ray $\ell^+$ intersects both the intersection of the bisectors of the facets of ${\operatorname{conv}} ({\mathcal{S}})$, let $\alpha_b$ correspond to that point, and one (or the intersection of several) of those facets, let $\alpha_f$ correspond to that point. Two cases are possible:
+		
+		\smallskip
+		Case 1: $\alpha_b<\alpha_f$, that is, the intersection with the bisectors occurs first. If this is the case, the solution to $MB({\mathcal{S}})$ is the point $x+\alpha_b d$. The algorithm goes back to Step 1 with $x=x+\alpha_b d$ and the support set ${\mathcal{S}}$.
+	
+		\smallskip
+		Case 2: $\alpha_b\geq\alpha_f$. In this case the opposite point $p_{i_l}\in {\mathcal{S}}$ to the (or one of the) intersected facet(s) is not part of the support set of $MB({\mathcal{S}})$, being therefore removed from ${\mathcal{S}}$: ${\mathcal{S}} = {\mathcal{S}}\setminus\{p_{i_l}\}$. Note that $p_{i_l}$ can never be $p$. The algorithm now returns to the beginning of Step 3 with the new ${\mathcal{S}}$ and $x=x + \alpha_f d$, for a new directional search to solve $MB({\mathcal{S}})$.
+	\end{description}
+\end{description}	
+
+\noindent For a full description of the algorithm and its correctness we refer the reader to \cite{Dearing09}.
+
+\section{Directional search via orthogonal projections}\label{sec:LineSearch}
+
+In \cite{Dearing09}, the authors find $\alpha_f$, the point where the ray $\ell^+$ intersects the boundary of ${\operatorname{conv}} ({\mathcal{S}})$, by calculating the intersection of the ray with each one of the facets (as many as $n+1$). This is the central reason why, even using efficient updates to the QR factorization of a matrix, their iteration could not have a better complexity than ${\mathcal{O}}(n^3)$, since such updates would need to be done ${\mathcal{O}}(n)$ times. 
+
+\smallskip
+
+We now show how one can find $\alpha_f$ without having to check each facet. The idea consists on projecting ${\operatorname{conv}}({\mathcal{S}})$ and the ray $\ell^+$ orthogonally onto ${\operatorname{aff}}({\mathcal{S}}\setminus\{{{p}}\})$. Recall that $\ell^+$ is perpendicular to ${\operatorname{aff}}({\mathcal{S}}\setminus\{{{p}}\})$, so its projection will be a single point, the projection of $x$. In order to find the intersected facet, we find in which two projected facets of ${\operatorname{conv}}({\mathcal{S}})$ the projection of $x$ fell into. We then calculate the intersection of the ray with the two facets, and the one with smallest $\alpha$ that is non-negative, corresponds to the facet of ${\operatorname{conv}}({\mathcal{S}})$ intersected by the ray.
+
+\medskip
+ 
+\noindent Before we proceed into the details, consider the following notation:
+\begin{itemize}
+	\item ${\mathcal{S}}=\{p_1, \dots, p_{s-1}, {{p}}\}$ and ${\mathcal{S}}'={\mathcal{S}}\setminus\{{{p}}\}$;
+	\item ${\mathcal{C}}$, the polytope ${\operatorname{conv}}({\mathcal{S}})$, and $\partial {\mathcal{C}}$ its boundary;
+	\item $F_j= {\operatorname{conv}}({\mathcal{S}}\setminus\{p_j\})$, the facet of ${\mathcal{C}}$ opposed to point $p_j\in{\mathcal{S}}$, $j=1,...,s-1$;
+	\item $F_0={\operatorname{conv}}({\mathcal{S}}\setminus\{{{p}}\})$, the facet of ${\mathcal{C}}$ opposed to~${{p}}$;
+	\item $\ell=\{x+\alpha d: \alpha\in{\mathbb{R}}\}$ and $\ell^+=\{x+\alpha d: \alpha\geq 0\}$;
+	\item $\alpha_j$, $j=0,\dots,m$, be the intersection of $\ell$ with facet $F_j$.
+\end{itemize}
+
+\medskip
+
+Recall that, at the beginning of Step 3ii, we have:
+\begin{itemize}
+	\item ${\mathcal{S}}$ is an affinely independent set, and therefore ${{p}}\not\in{\operatorname{aff}}({\mathcal{S}}')$;
+	\item $d$ is a direction in ${\operatorname{Sub}}({\mathcal{S}})$, orthogonal to ${\operatorname{aff}}({\mathcal{S}}')$, that points towards ${{p}}$ and passes through the intersection of the bisectors of the facets of ${\operatorname{conv}}({\mathcal{S}})$;
+	\item $x$, the current solution, is in ${\operatorname{conv}}({\mathcal{S}})$.
+\end{itemize} 
+
+\medskip
+
+Let $x'$ and $p'$ be the orthogonal projections of $x$ and ${{p}}$ onto ${\operatorname{aff}}({\mathcal{S}}')$, respectively, and let
+\begin{equation}\label{rep}
+x'=\sum_{j=1}^{s-1} \pi_j p_j\text{ s.t. } \sum_{j=1}^{s-1} \pi_j =1\quad\text{and}\quad p'=\sum_{j=1}^{s-1} \omega_j p_j\text{ s.t. } \sum_{j=1}^{s-1} \omega_j=1,
+\end{equation}
+
+\noindent be their unique representations as affine combinations of points of ${\mathcal{S}}'$. An important observation is that the projection of all points of $\ell$ onto ${\operatorname{aff}}({\mathcal{S}}')$ coincides with $x'$. The two Lemmas that follow will be useful later.
+
+\begin{lemma}\label{lem:1}
+ $x'\in{\operatorname{conv}}({\mathcal{S}}'\cup\{p'\})$.
+\end{lemma}
+
+\noindent Lemma \ref{lem:1} is a direct consequence of the linearity of the projection operator and the fact that $x\in{\operatorname{conv}}({\mathcal{S}})$. 
+
+\begin{lemma}\label{lem:2}
+	If $\pi_j<0$ then $\omega_j<0$.
+\end{lemma}
+\proof{
+From Lemma \ref{lem:1} we know that there exists $\beta\geq 0$ and  $\beta'\geq 0$ such that
+$$x'=\sum_{j=1}^{s-1}\beta_j p_j+\beta'p'\text{ and } \sum_{j=1}^{s-1}\beta_j+\beta'=1.$$
+
+\noindent Therefore,
+$$x' = \sum_{j=1}^{s-1}\beta_jp_j + \beta'\sum_{j=1}^{s-1}\omega_jp_j = \sum_{j=1}^{s-1}(\beta_j+\beta'\omega_j)p_j.$$
+
+\noindent Let $\delta_j = \beta_j+\beta'\omega_j$. Note that $\sum_{j=1}^{s-1} \delta_j= 1$.Since ${\mathcal{S}}$ is an affinely independent set, the representation of $x'$ as an affine combination of the points in ${\mathcal{S}}$ is unique, therefore we must have $\pi_j=\delta_j=\beta_j+\beta'\omega_j$ for all $j$. Thus, if $\pi_j<0$ then $\omega_j<0$. Note that $\pi_j=0$ does not imply $\omega_j\leq 0$.}
+
+\medskip
+
+Consider the general case where the intersection of line $\ell$ with $\partial {\mathcal{C}}$ is two points $z_1$ and $z_2$. Let $F_{k_1}$ be one of the facets containing $z_1$ and $F_{k_2}$ be one containing $z_2$. Point $z_1$ and/or $z_2$ may be on the intersection of several facets, but knowing one of them suffices. The projection of $z_1$ and $z_2$ onto ${\operatorname{aff}}({\mathcal{S}}')$ is $x'$, therefore $x'$ will be written as a unique convex combination of the projections of the points that form $F_{k_1}$ and also as a unique convex combination of the projections of the points that form $F_{k_2}$, and only of those and no other projected facets. In the particular cases when $\ell$ intersects $\partial{\mathcal{C}}$ on a single point or on an infinite number of points, $x'$ will still be written as a convex combination of the projected points of one of the intersected facets. Lemma \ref{lem:3} proves this fact. Note that the intersection always exists since $x\in\ell\cap{\mathcal{C}}$. Theorem \ref{theo:main} finds those at most two unique convex representations of $x'$, finding consequently the intersected facets of $\partial {\mathcal{C}}$ by $\ell$. 
+
+\begin{lemma}\label{lem:3}
+	Line $\ell$ intersects $F_k$, the facet of ${\mathcal{C}}$ opposed to $p_k\in{\mathcal{S}}'$, if and only if $x'\in {\operatorname{conv}}({\mathcal{S}}'\setminus\{p_k\}\cup\{p'\})$. 
+\end{lemma}
+\proof{
+	We only need to prove that if $x'\in {\operatorname{conv}}({\mathcal{S}}'\setminus\{p_k\}\cup\{p'\})$ then $\ell$ intersects $F_k$, since the opposite is trivial as a consequence of the linearity of the projection operator.
+	
+	Let $B=[p_2-p_1, \dots, p_{s-1}-p_{1}]$. Then $p'=B(B^TB)^{-1}B^T({{p}}-p_1)+p_1$. Firstly, we prove that there exists a $ \gamma >0$ s.t. $d = \gamma ({{p}}-p')$. Clearly, ${{p}}-p'\in{\operatorname{Sub}} ({\mathcal{S}})$, and ${{p}}-p'$ is orthogonal to ${\operatorname{Sub}} ({\mathcal{S}}')$ since
+	
+	$$B^T({{p}}-p') = B^T({{p}}-p_1) - B^T({{p}}-p_1)=0.$$	
+	\noindent Moreover, $d$ and ${{p}}-p'$ have the same direction since (recall that $({{p}}-p_{s-1})^Td>0$)
+	
+	$$({{p}}-p_{s-1})^T ({{p}}-p')= {\left\|{{{{p}}-p'}}\right\|}^2 + (p'-p_{s-1})^T({{p}}-p') = {\left\|{{{{p}}-p'}}\right\|}^2 >0.$$
+	\noindent Thus we conclude that there exists a $\gamma>0$ such that $d=\gamma ({{p}}-p')$.	
+ 
+	 Now, suppose  $x'\in {\operatorname{conv}}({\mathcal{S}}'\setminus\{p_k\}\cup\{p'\})$, that is, 
+	$$x'=\sum_{j\neq k} \beta_jp_j + \beta'p'\,\,\text{with}\,\,\sum_{j\neq k}\beta_j+\beta'=1\,\,\text{and}\,\, \beta'\geq 0,\,\beta_j\geq 0,\, j=1,...,s-1.$$
+	
+	\noindent Observe that for any $\alpha$ we have
+	\begin{equation*}
+		x'+\alpha d = \sum_{j\neq k} \beta_jp_j + \beta'p' + \alpha\gamma(p-p')=\sum_{j\neq k} \beta_jp_j + (\beta'-\alpha\gamma)p' + \alpha\gamma {{p}}.
+	\end{equation*}
+		
+	\noindent Let $\alpha' = \frac{\beta'}{\gamma}$. We have that $x'+\alpha' d\in{\operatorname{conv}}({\mathcal{S}}'\setminus\{p_k\}\cup\{{{p}}\})$ since $\sum_{j\neq k}\beta_j+\alpha'\gamma=1$.
+	This implies that there exists an $\alpha$ such that $x+\alpha d\in F_k$, that is, $\ell$ intersects $F_k$.
+}	
+
+\bigskip
+
+Now we show in Theorem \ref{theo:main} how to calculate the intersection of $\ell^+$ and $\partial{\mathcal{C}}$, that is $\alpha_f$. Recall that
+$$\alpha_f = \min_{j=1,\hdots,s-1} \{\alpha_j:\, \alpha_j\geq 0\},$$
+
+\noindent and $\alpha_j$, the intersection of $\ell$ with any $F_j$, can be calculated by finding a basis $\{w_1,\dots,w_{n-(s-1)+1}\}$ for the null space of ${\operatorname{Sub}}({\mathcal{S}}'\setminus\{p_k\}\cup\{{{p}}\})$, and
+\begin{equation}\label{alpha}
+\alpha_j = \frac{({{p}}-x)^Tw_i}{d^Tw_i},\text{ for any }\, i=1,...,n-s+2, \text{ s.t. } d^Tw_i\neq 0.
+\end{equation}
+	
+\smallskip 
+
+\begin{theorem}\label{theo:main}
+	
+	Consider the representations (\ref{rep}) of $x'$ and $p'$. Let $F_k$, the facet opposed to $p_k\in{\mathcal{S}}'$, be the one first intersected by~$\ell^+$, and let $\alpha_k$ be the value of $\alpha$ at which the intersection occurs. To find $p_k$ and $\alpha_k$, there are two possible cases:
+	\begin{itemize}
+		\item {Case 1.} If there is a $k=1,...,m$ such that $\pi_k=\omega_k=0$, then $p_k$ is the point opposed to the facet intersected first, and $\alpha_f=\alpha_k=0$.
+		\smallskip
+		\item{Case 2.} Suppose case 1 does not hold. First, find ${k_1}$ such that
+		\begin{equation}\label{pk1}
+		\frac{\pi_{k_1}}{\omega_{k_1}} = \min_{j=1,...,s-1} \left\{\frac{\pi_j}{\omega_j}: \pi_j\geq 0, \omega_j>0\right\},
+		\end{equation}
+		
+		\noindent then, find $\alpha_{k_1}$ as in (\ref{alpha}). Let ${\mathcal{J}}:=\{j: \pi_j\leq 0, \omega_j<0\}$. If ${\mathcal{J}}\neq\emptyset$,  find ${k_2}$ such that
+		\begin{equation}\label{pk2}
+		\frac{\pi_{k_2}}{\omega_{k_2}} = 
+		\max_{j=1,...,s-1} \left\{\frac{\pi_j}{\omega_j}: \pi_j\leq 0, \omega_j<0\right\} ,
+		\end{equation}
+		\noindent and find $\alpha_{k_2}$ as in (\ref{alpha}). If ${\mathcal{J}}=\emptyset$ simply consider $\alpha_{k_2}=-\infty$.
+		
+		\noindent The facet first intersected by $\ell^+$, $F_k$, is such that
+		$$k=\arg\min_{j=k_1, k_2}\{\alpha_j:\,\alpha_j\geq 0\},$$
+		\noindent  and $\alpha_f=\alpha_k$.
+	\end{itemize}
+\end{theorem}
+	
+	
+\proof{
+{\emph{Case 1.}} Suppose there is a $k\in\{1,\dots,m\}$ such that $\omega_k=\pi_k=0$. Then, since $x=x'+\delta d$, for some $\delta\geq 0$, and the fact that there is a $\gamma>0$ such that $d=\gamma (p-p')$ (see the proof of Lemma \ref{lem:3}) we have:
+\begin{eqnarray*}\label{xx}
+	x &=&  x'+\delta\gamma (p-p')=\sum_{\substack{j=1\\ j\neq k}}^{s-1} \pi_jp_j + \delta \gamma \left(p- \sum_{\substack{j=1\\ j\neq k}}^{s-1}  \omega_jp_j \right)=\sum_{\substack{j=1\\ j\neq k}}^{s-1} \left(\pi_j-\delta\gamma\omega_j\right)p_j +\delta \gamma p,
+\end{eqnarray*}
+			
+\noindent and this representation of $x$ as a convex combination of ${\mathcal{S}}$ is unique, since ${\mathcal{S}}$ is affinely independent. Consequently, $\pi_j-\delta\gamma\omega_j\geq 0$ and $\delta\gamma\geq 0$, concluding that $x\in{\operatorname{conv}}({\mathcal{S}}'\setminus\{p_k\}\cup\{p\})\equiv F_k$. Therefore $\ell^+$ intersects $F_k$ at $\alpha_f=\alpha_k=0$.
+		
+\smallskip 
+
+\noindent \emph{Remark: The case $\pi_k=\omega_k=0$ needed to be treated separately, since in such case~$F_k$ is perpendicular to $F_0$, and so formula (\ref{alpha}) could not be applied (we would have~$0/0$). }
+		
+\smallskip
+		
+{\emph{Case 2.}} Since $x'\in{\operatorname{conv}}({\mathcal{S}}'\cup\{p'\})$, from the proof of Lemma~\ref{lem:2}, there exists $\beta'\geq 0$ such that
+
+\begin{equation}\label{convxp}
+	x'=\sum_{j=1}^{s-1}\beta_j p_j+\beta' p'= \sum_{j=1}^{s-1}(\pi_j-\beta'\omega_j)p_j+\beta' p'.
+\end{equation}
+
+\noindent Formula (\ref{convxp}) gives all possible ways to represent $x'$ as a convex combination of ${\mathcal{S}}'\cup\{p'\}$ as a function of $\beta'$. We are now interested in knowing the minimum and maximum values of $\beta'$, $\beta'_{min}$ and $\beta'_{max}$ respectively.
+
+Suppose $\pi_j\geq 0$ for all $j=1,...,s-1$. We have that $x'\in{\operatorname{conv}}({\mathcal{S}}'\cup\{p'\})$ and so $\beta_{min} = 0$. It is easy to see that $\beta_{max}=\frac{\pi_{k_1}}{\omega_{k_1}}$ as in (\ref{pk1}), and that any $\beta\in[0, \beta_{max}]$ yields $\pi_j-\beta\omega_j\geq 0$. We then conclude that, when all $\pi_j\geq 0$ we have~$x'\in {\operatorname{conv}}({\mathcal{S}}'\setminus\{p_{k_1}\}\cup\{p'\})$, and so from Lemma \ref{lem:3} we have that $\ell$ intersects~$F_{k_1}$. Note that $\beta_{max}$ may be $0$. When $\beta_{max}>0$, observe that there is no other $\beta\in]0, \beta_{max}[$ such that $\pi_j-\beta \omega_j= 0$, so there is no other way to write $x'$ as a convex combination of $p'$ and $s-2$ points of ${\mathcal{S}}'$.
+
+\smallskip
+
+Now consider that there exists $\pi_j<0$. Then $x'\not\in {\operatorname{conv}}({\mathcal{S}}')$ and therefore $\beta_{min}>0$. Since $\beta'$ must be positive, in order to have a convex combination in (\ref{convxp}), $\beta'$ must satisfy the following conditions:
+\begin{equation}\label{neg}
+\beta'\geq\frac{\pi_j}{\omega_j},\quad\forall j: \, \omega_j<0,\, \pi_j\leq 0\,\Rightarrow\,\beta'\geq\frac{\pi_{k_2}}{\omega_{k_2}},
+\end{equation}
+\begin{equation}\label{pos}
+\beta'\leq\frac{\pi_j}{\omega_j},\quad\forall j: \, \omega_j>0,\, \pi_j\geq 0\,\Rightarrow\,\beta'\leq\frac{\pi_{k_1}}{\omega_{k_1}}.
+\end{equation}
+
+\noindent For $k_1$ and $k_2$ as in (\ref{pk1}) and (\ref{pk2}) respectively. The conditions above are feasible since there must be such a $\beta'$, and because of Lemma \ref{lem:2}. This allow us to conclude that $\frac{\pi_{k_2}}{\omega_{k_2}}\leq\frac{\pi_{k_1}}{\omega_{k_1}}$ and $\beta_{min} = \frac{\pi_{k_2}}{\omega_{k_2}}$ and $\beta_{max} = \frac{\pi_{k_1}}{\omega_{k_1}}$. Finally we conclude that $x'\in {\operatorname{conv}}({\mathcal{S}}'\setminus\{p_{k_1}\}\cup\{p'\})$ and $x'\in {\operatorname{conv}}({\mathcal{S}}'\setminus\{p_{k_2}\}\cup\{p'\})$, with $k_1\neq k_2$. So $\ell$ intersects both facets $F_{k_1}$ and $F_{k_2}$.
+}
+	
+
+\section{The Implementation}\label{sec:Implementation}
+
+Recall the QR factorization of some matrix $A$ of size $n\times m$ into the product of matrices $Q$ and $R$, where $Q_{n\times n}$ is an orthogonal matrix and $R_{n\times m}$ is upper triangular. For our purposes we will consider $n\geq m$. If $A$ has full column rank, then the diagonal of $R$ is non-zero, and $Q$ can be partitioned in $[V_{n\times m}\, \,U_{n\times (n-m)}]$ such that the columns of $V$ form a basis of ${\operatorname{Span}}(A)$, the column range of $A$, and the columns of $U$ form a basis to ${\operatorname{Null}}(A)$, the null space of $A$. Different algorithms are available to find a QR factorization of a matrix, but in terms of computational work, and for a general matrix $n\times n$, they all need ${\mathcal{O}}(n^3)$ steps \cite[\S 5.2]{Golub96}. However, the QR factorization of $A$ can be ``recycled'' and used to calculate the QR factorization of a matrix obtained from $A$ by either rank-one changes, appending a row or column to $A$, or deleting a row or column from $A$ \cite[\S 12.5]{Golub96}. This is accomplished by using \emph{Givens rotations}, and, in the case when $m=n$, such procedure needs ${\mathcal{O}}(n^2)$ steps.
+
+\medskip
+
+We now describe in detail how one can implement the algorithm taking advantage of  the QR factorization updates. At the beginning of each iteration, we have the QR factorization of the $n\times s$ matrix $S$, whose columns are the points in ${\mathcal{S}}$, the support set found in the previous iteration:
+$$S =\left[\begin{array}{cccc} p_{i_1} &p_{i_2}&\dots&  p_{i_s}\end{array}\right].$$
+Let $Q_S$ and $R_S$ be the matrices of the QR factorization of $S$, which were inherited from the previous iteration. The first iteration is the only time a QR factorization from scratch is performed. 
+
+\subsection{Update ${\mathcal{S}}$ procedure}\label{subsec:app1}
+
+The first step of this phase is to check whether ${\mathcal{S}}\cup \{{{p}}\}$ is affinely independent. If it is not, the next step is to find $p_{i_k}\in {\mathcal{S}}$, such that ${\mathcal{S}}\setminus\{p_{i_k}\} \cup \{{{p}}\}$ is affinely independent.
+
+\smallskip
+
+Consider matrices $B$ and $\bar{B}$ as follows:
+\begin{equation}\label{mat:B}
+B = \left[\begin{array}{ccc}
+p_{i_1}& \dots & p_{i_s}\\
+1 & \dots &1
+\end{array}\right], \quad\quad \bar{B} = \left[\begin{array}{cccc}
+p_{i_1}& \dots & p_{i_s} & {{p}}\\
+1 & \dots &1 & 1
+\end{array}\right].
+\end{equation}
+
+\noindent $B$  is full column rank since ${\mathcal{S}}$ is affinely independent. When ${\mathcal{S}}$ has $n+1$ points we automatically know that ${\mathcal{S}}\cup \{{{p}}\}$ is affinely dependent. Consider then $s\leq n$, which implies that $\bar{B}$ has at least as many columns as rows. ${\mathcal{S}}\cup \{{{p}}\}$ is affinely independent if and only if $\bar{B}$ is full column rank. This can be checked by looking at the element in position $(s+1, s+1)$ of $R_{\bar{B}}$, from the QR factorization of $\bar{B}=Q_{\bar{B}}R_{\bar{B}}$: if it is zero or close to zero (to account for precision errors) then ${\mathcal{S}}\cup \{{{p}}\}$ is affinely dependent, otherwise it is affinely independent.
+
+Matrix $B$ can be obtained by inserting a row of ones in $S$, and $\bar{B}$ by then inserting the column $\binom{{p}}{1}$ in $B$, thus the corresponding QR factorizations can be efficiently computed from the QR factorization of $S$ and of $B$ respectively.
+
+\smallskip
+
+If ${\mathcal{S}}\cup \{{{p}}\}$ is affinely independent, we leave $S$ as is. Otherwise, the linear systems are solved
+\begin{equation}\label{ls:B}
+B\pi = \binom{x}{1},\quad\text{and}\quad B\omega = \binom{-{{p}}}{-1},
+\end{equation}
+\noindent by reducing them to linear systems with upper triangular matrices, using the QR factorization of $B$:
+\begin{equation}\label{ls:RB}
+R_B\pi = Q_B^T\binom{x}{1},\quad\quad\quad R_B\omega = Q_B^T\binom{-{{p}}}{-1},
+\end{equation}
+\noindent which can be solved using \emph{Back Substitution} and performed in ${\mathcal{O}}(n^2)$ \cite[\S 3.1]{Golub96}. Now ${\mathcal{S}}$ is updated, ${\mathcal{S}}={\mathcal{S}} \setminus \{p_{i_k}\}\cup\{{{p}}\}$, for some $p_{i_k}$, and at this point we get the new $Q_S$ and $R_S$, the QR factorization of the new matrix $S$, obtained from the previous one by removing the $k$-th column. We do not add ${{p}}$ yet to $S$, we leave that to the very end of the iteration, when ${{p}}$ is finally covered.
+
+\smallskip
+
+Linear systems (\ref{ls:RB}) are guaranteed to be determined since ${\mathcal{S}}$ is affinely independent and both $x$ and ${{p}}$ are in ${\operatorname{aff}}({\mathcal{S}})$. However, we may encounter degeneracies if some diagonal elements of $R_B$ are close to zero. In order to avoid that, we adopt the same strategy as \cite{Fischer03}, and so, at the beginning of the iteration, we select a ${{p}}$ that is not too close to the affine space of ${\mathcal{S}}$.
+
+\subsection{Solving MB(${\mathcal{S}}$): calculating $d$}\label{subsec:app2}
+
+Consider that at the beginning of this phase $S= \left[p_{i_1}\, \dots \, p_{i_{s}}\right]$ and let $C$ be the following matrix:		
+\begin{equation}	\label{mat:C}C = \left[\begin{array}{cccc}
+p_{i_1}-p_{i_s}& \dots & p_{i_{s-1}}-p_{i_s} & {{p}} - p_{i_s}
+\end{array}\right].
+\end{equation}
+
+\noindent Let $C = Q_{C}R_{{C}}$ be the QR factorization of ${C}$, obtained by updating the QR factorization of $S=Q_SR_S$ twice, since $C$ can be obtained from $S$ by adding two rank one matrices
+$${C} = S + ({{p}}-p_{i_s})e_n^T - p_{i_s}1_n^T.$$
+\noindent with $e_j\in{\mathbb{R}}^n$ is the vector with $1$ in the $j$-th entry and all the other zero. ${C}$ is full column rank since ${\mathcal{S}}\cup\{{{p}}\}$ is affinely independent, so we can partition $Q_{C}=[V\,\,  U]$, where $V$ is a $n\times s$ matrix whose columns are a basis to ${\operatorname{Span}}(C)$, and $U$ is a $n\times(n-s)$ matrix whose columns are a basis to ${\operatorname{Null}}(C)$. Finally, to find $d$ we need to solve the linear system
+
+\begin{equation*}\label{ls:C}
+\left[\begin{array}{c}
+C^T\\
+U^T
+\end{array}\right] d=e_{s}\quad\Longleftrightarrow\quad
+\left[\begin{array}{ccc}
+& R_C^T&\\
+\hline
+0_{(n-s)\times s} & \vline &I_{n-s}
+\end{array}\right]Q_C^T d = e_s,\end{equation*}
+
+\noindent where the latter is a lower triangular system.
+	
+		
+\subsection{Solving MB(${\mathcal{S}}$): calculating the next iterate}\label{subsec:app3}
+		
+The first step now is to calculate $x'$ and~${{p}}'$, the orthogonal projection of $x$ and ${{p}}$ respectively onto~${\operatorname{aff}}({\mathcal{S}}')$, where ${\mathcal{S}}'={\mathcal{S}}\setminus\{{{p}}\}$. Let $D$ be the following matrix:
+	
+\begin{equation*}\label{mat:D}
+D = \left[\begin{array}{ccc}
+p_{i_1}-p_{i_s}& \dots & p_{i_{s-1}}-p_{i_s}
+\end{array}\right].
+\end{equation*}
+
+\noindent And let $Q_D$ and $R_D$ be the matrices of the QR factorization of $D$, which can be obtained easily from the QR factorization of matrix $C$ (\ref{mat:C}), since $D$ is obtained from $C$ by removing the last column. Let $V$ be the matrix with the first $s-1$ columns of $Q_D$, which form an orthogonal basis to ${\operatorname{Sub}}({\mathcal{S}}')$. Consider ${\operatorname{aff}}({\mathcal{S}}')=p_{i_1}+{\operatorname{Sub}}({\mathcal{S}}')$. The projections $x'$ and~${{p}}'$ can be calculated the following way:
+
+$$x' = VV^T(x-p_{i_1})+p_{i_1},\quad \quad {{p}}' = VV^T({{p}}-p_{i_1})+p_{i_1}.$$
+
+\noindent Now, two linear systems need to be solved
+\begin{equation}\label{ls:B2}
+B\pi = \binom{x'}{1}\quad\text{and}\quad B\omega = \binom{{{p}}'}{1},
+\end{equation}
+
+\noindent where $B$ is the same matrix as in (\ref{mat:B}) but with the points of ${\mathcal{S}}'$, so (\ref{ls:B2}) are solved following the same steps used to solve (\ref{ls:B}).
+
+After finding $k_1$ and $k_2$, as in (\ref{pk1}) and (\ref{pk2}) respectively, we need to calculate $\alpha_{k_1}$ and $\alpha_{k_2}$. To calculate~$\alpha_{k_1}$, we need a basis for the null space of ${\operatorname{Sub}}({\mathcal{S}}'\setminus\{p_{k_1}\}\cup \{{{p}}\})$, in order to apply formula (\ref{alpha}). If $k_1<s$, ${\operatorname{Sub}}({\mathcal{S}}'\setminus\{p_{i_k}\}\cup \{{{p}}\})\equiv {\operatorname{Span}}(F)$ with
+$$F=\left[\begin{array}{ccccccc}\label{mat:F}
+p_{i_1}-p_{i_s}& \dots &p_{i_{k_1-1}}-p_{i_s}&p_{i_{k_1+1}}-p_{i_s}&\dots& p_{i_{s-1}}-p_{i_s} & {{p}} - p_{i_s}
+\end{array}\right].$$
+
+\noindent Matrix $F$ can be obtained from $C$ (\ref{mat:C}) by deleting its $k_1$-th column. On the other hand, if $k_1=s$ then	${\operatorname{Sub}}({\mathcal{S}}'\setminus\{p_{i_k}\}\cup \{{{p}}\})\equiv {\operatorname{Span}}(F)$ with
+$$F=\left[\begin{array}{ccc}\label{mat:F2}
+p_{i_1}-{{p}}& \dots & p_{i_{s-1}}-{{p}}
+\end{array}\right],$$
+\noindent and $F$ can be obtained from $C$ by deleting the last column and then adding the rank one matrix $(p_{i_{s}}-{{p}})1_n^T$. Therefore, in both cases, the QR factorization of $F$ can be obtained by updating the QR factorization of~$C$. A basis for the null space of ${\operatorname{Sub}}({\mathcal{S}}'\setminus\{p_{k_1}\}\cup \{{{p}}\})$ is then formed by the  last $n-s+1$ columns of~$Q_F$. The value $\alpha_{k_2}$ is calculated in an analogous way.
+
+\medskip
+
+The only time a $QR$ factorization of a matrix is calculated from scratch is at the beginning of the algorithm. Then, at each iteration, a constant number of ``QR updates'' are performed to matrices with $n$ rows and at most $n$ columns, so such updates take ${\mathcal{O}}(n^2)$ steps. This results in an iteration that is done in quadratic time.
+
+\section{Computational results}\label{sec:Results}
+
+In order to understand in practice the effect of the new directional procedure together with implementation described in Section \ref{sec:Implementation}, we implemented the algorithm in MATLAB. In order to compare it to the original version from Dearing and Zeck \cite{Dearing09}, we re-wrote their algorithm also using QR updates and implemented it too. Our experiments were conducted using MATLAB R2014a (version 8.3) on a PC with an Intel Core i5 2.30 GHz processor, with 4 GB RAM. Tables \ref{tab:1} and \ref{tab:2} show the average running times of the two versions of the algorithm on instances with $1000$ and $10000$ points, respectively, drawn uniformly at random from the unit cube. 
+\begin{table}
+\caption{Average time in seconds for datasets with $m=1000$ points in variable dimension $n$ uniformly sampled in an unit cube.}
+\begin{center}\begin{tabular}{rrrrr}
+\hline\noalign{\smallskip}
+\multicolumn{2}{c}{Problem} & &\multicolumn{2}{c}{Time in seconds}\\
+\noalign{\smallskip}\cline{1-2}\cline{4-5}\noalign{\smallskip}
+$n$ &  $m$ && D\&Z original & D\&Z new\\
+\noalign{\smallskip}\hline\noalign{\smallskip}
+50 & 1000 && 0.15 &	0.32		 \\
+100 & 1000 && 0.42 & 0.96 \\
+500 & 1000 && 32.52 &	20.13 \\	
+1000 & 1000 && 140.45 & 57.50	\\
+5000 & 1000 && 8852.20 & 887.15 \\
+\noalign{\smallskip}\hline
+\end{tabular}\end{center}\label{tab:1}  
+\end{table}
+
+\begin{table} 
+\caption{Average time in seconds for datasets with $m=10000$ points in variable dimension $n$ uniformly sampled in an unit cube.}
+\begin{center}\begin{tabular}{rrrrr}
+		\hline\noalign{\smallskip}
+		\multicolumn{2}{c}{Problem} & &\multicolumn{2}{c}{Time in seconds}\\
+		\noalign{\smallskip}\cline{1-2}\cline{4-5}\noalign{\smallskip}
+		$n$ &  $m$ && D\&Z original & D\&Z new\\
+		\noalign{\smallskip}\hline\noalign{\smallskip}
+		50 & 10000 && 2.48 &	2.95		 \\
+		100 & 10000 && 5.03 & 5.97 \\
+		500 & 10000 && 70.04 &	42.55 \\	
+		1000 & 10000 && 267.68 & 114.88	\\
+		5000 & 10000 && 17044.10 & 1463.20 \\
+		\noalign{\smallskip}\hline
+	\end{tabular}\end{center}\label{tab:2} 
+\end{table}
+	
+We observed that for smaller dimensions the original algorithm is slightly faster, which is expected. It is with larger dimensions that we observe that the new version of the algorithm with the changes we proposed in Section \ref{sec:LineSearch} is considerably faster. This change naturally does not affect the number of iterations, but only the computational work of each iteration.
+
+\bibliographystyle{abbrv}
+\bibliography{referencesDualAlg}
+
+\end{document}

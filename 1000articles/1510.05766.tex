@@ -1,0 +1,526 @@
+\documentclass[11pt]{article}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{verbatim}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows,calc}
+\tikzset{
+>=stealth',
+help lines/.style={dashed, thick},
+axis/.style={<->},
+important line/.style={thick},
+connection/.style={thick, dotted},
+}
+
+\newtheorem{defn}{Definition}
+\newtheorem{lem}{Lemma}
+\newtheorem{cor}{Corollary}
+\newtheorem{thm}{Theorem}
+\newtheorem{prop}{Proposition}
+
+\title{Non-linear PDE Approach to Time-Inconsistent Optimal Stopping}
+\author{Christopher W. Miller\footnotemark[1]}
+\providecommand{\keywords}[1]{\textbf{Key words.} #1}
+
+\begin{document}
+
+\maketitle
+
+\footnotetext[1]{Department of Mathematics, University of California, Berkeley. Supported in part by NSF GRFP under grant number DGE 1106400.}
+
+\begin{abstract}
+We present a PDE-based approach to a class of time-inconsistent optimal stopping problems featuring a non-linearity involving the expectation of the stopping time. In particular, we illustrate a fairly general technique to convert this into optimization over the value function of a standard stochastic control problem. This approach is similar in spirit to those emphasized recently in \cite{PedersenPeskir2013,Karnam2015}, but ours results in a standard stochastic optimal control problem which can be characterized as the unique viscosity solution of an elliptic HJB with only a single extra variable. Furthermore, our approach immediately allows construction of the optimal stopping time under standard regularity constraints of the PDE. We believe this class of non-linear optimal stopping problems exemplifies a fruitful emerging approach to general time-inconsistent dynamic optimization problems in a setting which minimizes technical complications.
+\end{abstract}
+
+\begin{keywords}Non-linear optimal stopping, time-inconsistency, Hamilton-Jacobi-Bellman equation, sequential optimization, stochastic optimal control.\end{keywords}
+
+\section{Introduction}\label{Section:Introduction}
+
+We present a PDE-based approach to solving a class of time-inconsistent optimal stopping problems. In particular, we consider a non-linearity in the objective function which involves the expected value of a stopping time. Using ideas developed in \cite{PedersenPeskir2013}, we condition on the time-inconsistent feature in the objective function to obtain a constrained optimal stopping problem. In contrast to the previous literature, however, we embed the constrained optimal stopping problem into a time-consistent control problem with one extra state variable. We characterize this auxiliary value function as the viscosity solution of a degenerate-elliptic Hamilton-Jacobi-Bellman (HJB) equation subject to certain growth constraints. We also show how to construct an optimal stopping time for the original problem by solving a sequential concave optimization problem involving the HJB.
+
+Time-inconsistent optimal stopping and optimal stochastic control problems are characterized by the failure of standard dynamic programming arguments to apply. There are many qualitative features that lead to time-inconsistency, including dependence on the starting value in the terminal payout and non-linearities involving expected values of stopped (or controlled) processes. In each case, a control which is optimal at time $t_0$ may not look optimal when considered at time $t>t_0$. Problems of this variety appear frequently in finance and economics, such as in optimal control under mean-variance or Conditional Value-at-Risk (CVaR)-based payoffs (see \cite{Bjork2014,PedersenPeskir2013,Yong2012,Rudloff2013}).
+
+We believe that the ideas developed in this paper can be extended to deal with other types of time-inconsistent features in optimal stopping and optimal stochastic control problems. In particular, we emphasize the following strategy to dealing with time-inconsistency: (1) Condition on the time-inconsistent feature to obtain a constrained problem, (2) embed the constrained problem in time-consistent problem in a higher-dimensional state-space, and finally, (3) construct an optimal control of the original problem by starting an optimal choice of the new state variables. We make this claim more clear in Section \ref{Subsection:GeneralInconsistentcies} by considering a generalization to other types of time-inconsistent features.
+
+The main idea of our approach is inspired by the approach reported in \cite{PedersenPeskir2013}. In that paper, the authors solve a mean-variance stopping problem with a similar non-linearity by conditioning on the time-inconsistent feature and solving the constrained stopping problem with free-boundary techniques and verification arguments along the lines of \cite{PeskirShiryaev2006}. In contrast, we identify the auxiliary value function as the viscosity solution of degenerate-elliptic HJB with one extra state variable. Our technique depends neither on the specific dynamics of the underlying state process nor on the availability of analytic solutions, and furthermore, remains computationally tractable in more general situations.
+
+The approach used in this paper is similar in spirit to that considered in \cite{Karnam2015}, where the authors develop a PDE-based framework for non-linear control of Backward Stochastic Differential Equation (BSDE) systems. In our paper, however, we consider neither issues of controllability nor the geometric dynamic programming principle. We show how to cast a class of non-linear optimal stopping problems as a sequential optimization involving a standard stochastic optimal control problem.
+
+Other notable works in the literature on time-inconsistent problems include \cite{Bjork2014,Hu2012,Yong2012,Ekeland2010}. Several of these papers focus on various notions of equilibrium strategies, which view time-inconsistent problems as a sequential game against ones' future self. In this case, the optimal equilibrium strategy can be characterized as the solution to an ``extended HJB'' system. This is along the lines of our approach in that it focuses on PDE, but our approach obtains an optimal static stopping time. Our approach has the advantage that the PDE obtained is more standard and more can be said from a theoretical perspective. However, in contrast to equilibrium strategies, if one wants to follow an optimal path starting from a different point in time, the whole PDE must be solved again.
+
+This paper proceeds as follows: In Section \ref{Section:Formulation}, we formulate a time-inconsistent optimal stopping problem featuring a non-linearity in the expectation of the stopping time. In Section \ref{Section:EquivalentProblem}, we show how this is equivalent to a sequential optimization problem which is time-consistent at each step. We characterize the value function of the time-consistent subproblem as the viscosity solution of a HJB equation. In Section \ref{Section:Properties}, we prove various bounds and concavity properties of the auxiliary value function and characterize it as the unique viscosity solution of an HJB subject to certain growth constraints. We also show that the sequential optimization problem is a concave. From a practical perspective, this means that the auxiliary value function can be computed using monotone schemes, then the value function can be computed by concave optimization techniques. Finally, in Section \ref{Section:Generalization}, we provide remarks on connections and generalizations of this approach. In particular, we show how to generalize the underlying dynamics and handle more general non-linearities. We also highlight a connection between our HJB and the Monge-Ampere equation.
+
+\section{Problem Formulation}\label{Section:Formulation}
+
+Let $X$ be a standard Brownian motion on a probability space $(\Omega,\mathcal{F},\mathbb{P})$ with filtration $\mathbb{F}$ satisfying the usual properties. Let $\mathbb{P}^x$ denote the measure corresponding to $X$ starting from a given point $x$. Denote by $\mathcal{T}$ the collection of all $\mathbb{F}$-stopping times such that $\mathbb{E}^x\left[\tau^2\right]<\infty$.
+
+Let $f:\mathbb{R}^d\to\mathbb{R}$ be continuous and bounded from above. Let $g:\mathbb{R}^+\to\mathbb{R}$ be continuous. Under these conditions, we define a criterion as:
+\begin{equation}
+J\left[x,\tau\right] := \mathbb{E}^x\left[ f(X(\tau))\right] + g\left(\mathbb{E}^x\left[\tau\right]\right).
+\end{equation}
+
+\begin{defn}\label{Defn:MainProblem}The time-inconsistent optimal stopping problem is defined by:
+\begin{equation}v(x) := \sup\limits_{\tau\in\mathcal{T}} J\left[x,\tau\right]\hspace{0.5cm}\text{for all }x\in\mathbb{R}.\end{equation}\end{defn}
+
+The main result of this paper is that we can re-cast this time-inconsistent stopping problem as a sequential optimization problem involving a time-consistent stopping problem. In particular, let $\mathcal{A}$ represent the collection of all square-integrable, progressively-measurable processes and consider a stochastic control problem:
+\begin{defn}\label{Defn:AuxProblem}We define the auxiliary time-consistent control problem as:
+\begin{equation}w(x,y):=\left\{\begin{array}{rl}
+\sup\limits_{\alpha\in\mathcal{A}}&\mathbb{E}^{x,y}\left[f(X(\tau^\alpha))\right]\\
+& dX = dW\\
+& dY^\alpha = -dt + \alpha dW\\
+& \tau^\alpha = \inf\left\{t\geq 0\mid Y^\alpha(t)=0\right\}
+\end{array}\right.\end{equation}
+for all $(x,y)\in\mathbb{R}\times [0,\infty)$.\end{defn}
+
+The focus of this paper is on the following equivalence between $v$ and optimization over $w$:
+\begin{equation}\label{Eqn:SeqOptimization}
+v(x) = \sup\limits_{y\geq 0}\left[w(x,y) + g(y)\right].
+\end{equation}
+Under certain growth assumptions on the functions $f$ and $g$, we show the following results:
+\begin{enumerate}
+\item The auxiliary value function $w$ is the unique viscosity solution of an HJB with certain growth restrictions (Theorem \ref{Thm:UniqueHJB}),
+\item The sequential optimization problem (\ref{Eqn:SeqOptimization}) is concave in $y$ (Theorem \ref{Thm:MaximalElement}), and
+\item We can construct an optimal stopping time $\tau$ for the original problem from an optimal control in the auxiliary control problem (Theorem \ref{Thm:StoppingTimeConstruction}).
+\end{enumerate}
+We also note that the three-step procedure we follow in this problem suggests a more general approach to other kinds of non-linearities in time-inconsistent optimal stopping and optimal stochastic control problems. We formally highlight this procedure in more generality in Section \ref{Subsection:GeneralInconsistentcies}.
+
+\section{Equivalent Sequential Time-Consistent Problem}\label{Section:EquivalentProblem}
+
+Our goal is to convert this time-inconsistent optimal stopping problem into a sequential optimization problem involving a time-consistent control problem. Our general approach to time-inconsistency is the following:
+\begin{itemize}
+\item Step 1: Condition on any time-inconsistent features in the problem to generate a family of optimal-stopping problems with constraints,
+\item Step 2: Enlarge the state-space to embed the constrained problems in a time-consistent problem, and
+\item Step 3: Construct an optimal stopping time for the time-inconsistent problem by picking an optimal value of the time-inconsistent feature and generating an optimal solution to the time-consistent problem starting from that choice.
+\end{itemize} 
+In our particular problem, this will involve adding a new state variable to track the expectation of the optimal stopping time. As the system evolves, we expect this variable to be a super-martingale as the expected time until stopping drifts downward. However, it's possible to allow this expected stopping time to increase along certain paths so-long as it is compensated by a decrease along other paths.
+
+\subsection{Conditioning on Time-Inconsistent Features}
+
+For any $(x,y)\in\mathbb{R}\times[0,\infty)$, consider the following subset of stopping times:
+\begin{equation}
+\mathcal{T}_{x,y} := \left\{\tau\in\mathcal{T}\mid\mathbb{E}^x\left[\tau\right]=y\right\}.
+\end{equation}
+
+Furthermore, consider the following family of constrained optimal stopping problems.
+
+\begin{defn}\label{Defn:ConstrainedFunctions}Define a family of constrained optimal stopping problems by:
+\[\tilde{w}(x,y) := \sup\limits_{\tau\in\mathcal{T}_{x,y}} \mathbb{E}^x\left[f(X(\tau))\right]\hspace{0.5cm}\text{for all }(x,y)\in\mathbb{R}\times [0,\infty).\]\end{defn}
+
+We first claim that we can reformulate the time-inconsistent optimal stopping problem (\ref{Defn:MainProblem}) as a sequential optimization problem involving these constrained optimal stopping problems.
+
+\begin{thm}[\cite{PedersenPeskir2013}]
+\label{Thm:AuxEquivalence}We can reformulate $v$ in terms of $\tilde{w}$ as:
+\[v(x) = \sup\limits_{y\geq 0} \left[\tilde{w}(x,y) + g(y)\right]\hspace{0.5cm}\text{for all }(x,y)\in\mathbb{R}\times [0,\infty).\]\end{thm}
+\begin{proof}
+The key is to note that for each $x\in\mathbb{R}$,
+\[\mathcal{T} = \bigcup_{y\geq 0}\mathcal{T}_{x,y}.\]
+Then we check that:
+\begin{eqnarray}
+v(x) & = & \sup\limits_{\tau\in\mathcal{T}} J\left[x,\tau\right]\nonumber\\
+& = & \sup\limits_{y\geq 0}\sup\limits_{\tau\in\mathcal{T}_{x,y}} \left[\mathbb{E}^x\left[f(X(\tau ))\right]+ g\left(\mathbb{E}^x\left[\tau\right]\right)\right]\nonumber\\
+& = & \sup\limits_{y\geq 0}\sup\limits_{\tau\in\mathcal{T}_{x,y}}\left[\mathbb{E}\left[f(X(\tau ))\right]+ g(y)\right]\nonumber\\
+& = & \sup\limits_{y\geq 0}\left[\tilde{w}(x,y)+g(y)\right].\nonumber
+\end{eqnarray}
+\end{proof}
+
+\subsection{Equivalence to Time-Consistent Optimal Control}
+
+Next, we reformulate the constrained optimal stopping problem as a time-consistent stochastic control problem. Let $\mathcal{A}$ be the set of all real-valued, progressively-measurable, and square-integrable processes. We begin this section by identifying $\tau\in\mathcal{T}_{x,y}$ with a control in $\mathcal{A}$.
+
+\begin{lem}\label{Lem:MRT}Let $\tau\in\mathcal{T}_{x,y}$. Then there exists a progressively-measurable, square-integrable process $\alpha$ such that:
+\[\tau = \inf\left\{t\geq 0\mid y-t+\int_0^t\alpha(s)dW(s)=0\right\}\hspace{0.5cm}\mathbb{P}^x\text{-a.s.}\]\end{lem}
+\begin{proof}
+Because $\tau\in\mathcal{T}_{x,y}$ is a square-integrable random variable with expectation $y$, there exists a progressively-measurable, square-integrable process $\alpha$ such that:
+\[\tau = y + \int_0^\infty\alpha(s)dW(s)\hspace{0.5cm}\mathbb{P}^x\text{-a.s.}\]
+by the martingale representation theorem. Taking conditional expectation with respect to $\tau$, we see:
+\[\tau = y + \int_0^\tau\alpha(s)dW(s)\hspace{0.5cm}\mathbb{P}^x\text{-a.s.}\]
+
+Define a stopping time:
+\[\sigma:=\inf\left\{t\geq 0\mid y-t+\int_0^t\alpha(s)dW(s)=0\right\}.\]
+Then it is clear that $\sigma\leq\tau$ ($\mathbb{P}^x$-a.s.). Suppose that $\mathbb{P}^x\left[\sigma <\tau\right]>0$. Taking expectations conditional on $\sigma$ of the martingale representation result, we see:
+\[\mathbb{E}^x_\sigma\left[\tau\right] = y + \int_0^\sigma\alpha(s)dW(s).\]
+But by the definition of $\sigma$, this implies:
+\[\mathbb{E}^x_\sigma\left[\tau-\sigma\right] = y - \sigma + \int_0^\sigma\alpha(s)dW(s) = 0.\]
+Taking expectation, we see $\mathbb{E}^x\left[\tau\right]=\mathbb{E}^x\left[\sigma\right],$ which contradicts the assumption that $\mathbb{P}^x\left[\sigma<\tau\right]>0$. Then $\sigma=\tau$ $\mathbb{P}^x$-almost surely.
+\end{proof}
+
+The key to the main result is to convert between stopping times in $\mathcal{T}_{x,y}$ and controls in $\mathcal{A}$ via Lemma \ref{Lem:MRT} and instead view $w$ as the value function of a stochastic optimal control problem.
+
+\begin{thm}Recall the stochastic control problem (\ref{Defn:AuxProblem}). We have the equivalence:
+\[w(x,y) = \tilde{w}(x,y).\]\end{thm}
+\begin{proof}
+Fix any $(x,y)\in\mathbb{R}\times [0,\infty)$.
+\begin{enumerate}
+\item Let $\alpha\in\mathcal{A}$ be an arbitrary control and consider the stopping time:
+\[\tau^\alpha := \inf\left\{t\geq 0\mid Y^\alpha(t)=0\right\}.\]
+We claim that $\tau^\alpha\in\mathcal{T}_{x,y}$. Note that:
+\[0=Y^\alpha(\tau^\alpha)=y-\tau^\alpha+\int_0^{\tau^\alpha}\alpha(s)dW(s)\hspace*{0.5cm}\mathbb{P}^x\text{-a.s.},\]
+and $\alpha$ is square-integrable, so:
+\[0 = y - \mathbb{E}^x\left[\tau^\alpha\right].\]
+Then we have:
+\[\tilde{w}(x,y)\leq\inf\limits_{\alpha\in\mathcal{A}}\mathbb{E}^{x,y}\left[f(X(\tau^\alpha))\right] = w(x,y),\]
+because $\alpha$ was arbitrary.
+
+\item Let $\tau\in\mathcal{T}_{x,y}$ be an arbitrary stopping time. By Lemma \ref{Lem:MRT} there exists a control $\alpha\in\mathcal{A}$ such that:
+\[\tau = \inf\left\{t\geq 0\mid y-t+\int_0^t\alpha(s)dW(s)=0\right\}\hspace*{0.5cm}\mathbb{P}^x\text{-a.s.}\]
+But $\tau=\tau^\alpha$ almost surely if we let $Y^\alpha$ evolve via the control $\alpha$. Then:
+\[\tilde{w}(x,y)=\inf\limits_{\tau\in\mathcal{T}_{x,y}}\mathbb{E}^x\left[f(X(\tau))\right]\geq w(x,y),\]
+because $\tau$ was arbitrary.
+\end{enumerate}
+\end{proof}
+
+Now we can immediately apply dynamic programming principal to $w$ and show that it is a viscosity solution to an HJB equation.
+
+\begin{cor}\label{Cor:ViscositySolution}
+Assume $w$ is locally bounded. Then it is a viscosity solution to the HJB:
+\begin{equation}\label{Eqn:AuxiliaryHJB}
+\left\{\begin{array}{rl}
+u_y - \sup\limits_{\alpha\in\mathbb{R}}\left[\frac{1}{2}u_{xx}+\alpha u_{xy}+\frac{1}{2}\alpha^2 u_{yy}\right] = 0 & \text{in }\mathbb{R}\times(0,\infty)\\
+u = f & \text{on }\mathbb{R}\times\{y=0\}.
+\end{array}\right.\end{equation}\end{cor}
+
+\subsection{Construction of Optimal Stopping Times}\label{Subsection:Construction}
+
+We have shown that we can recover the value function of the time-inconsistent optimal stopping problem by performing sequential optimization over choice of $y\geq 0$ and control $\alpha\in\mathcal{A}$. However, it remains to be shown that we can construct an optimal stopping time for the time-inconsistent problem.
+
+\begin{thm}\label{Thm:StoppingTimeConstruction}
+Fix $x\in\mathbb{R}$ and $\epsilon > 0$. Let $y\geq 0$ be $\epsilon$-suboptimal for the optimization problem (\ref{Eqn:SeqOptimization}) and $\alpha\in\mathcal{A}$ be $\epsilon$-suboptimal for $w(x,y)$. Consider the stopping time:
+\[\tau^\alpha := \inf\left\{t\geq 0\mid y-t+\int_0^t\alpha(s)dW(s) = 0\right\}.\]
+Then $\tau^\alpha\in\mathcal{T}$ is $(2\epsilon)$-suboptimal for the time-inconsistent problem (\ref{Defn:MainProblem}).\end{thm}
+\begin{proof}
+Fix $\epsilon >0$ and let $y\geq 0$ be $\epsilon$-suboptimal for problem (\ref{Eqn:SeqOptimization}). That is:
+\[v(x)\leq w(x,y)+g(y)+\epsilon.\]
+Furthermore, let $\alpha\in\mathcal{A}$ be $\epsilon$-suboptimal for $w(x,y)$. That is:
+\[w(x,y)\leq\mathbb{E}^{x,y}\left[f(X(\tau^\alpha))\right]+\epsilon.\]
+Let $\tau^\alpha$ be a stopping time defined as above, and recall that:
+\[y - \tau^\alpha +\int_0^{\tau^\alpha}\alpha(s)dW(s) = 0\hspace*{0.5cm}\mathbb{P}^x\text{-a.s.}\]
+Then we can compute $\mathbb{E}^x\left[\tau^\alpha\right] = y$ and futhermore:
+\[\mathbb{E}^x\left[(\tau^\alpha)^2\right] = y^2 + \mathbb{E}^x\left[\int_0^{\tau^\alpha}\alpha(s)^2 ds\right]\leq y^2+\mathbb{E}^x\left[\int_0^\infty\alpha(s)^2 ds\right] < +\infty,\]
+where the last inequality follows from $\alpha\in\mathcal{A}$. Then $\tau^\alpha\in\mathcal{T}$ is an admissible stopping time.
+
+Finally, putting the two inequalities above together, we find:
+\begin{eqnarray}
+v(x)& \leq & \mathbb{E}^x\left[f(X(\tau^\alpha))\right]+g(y)+2\epsilon \nonumber\\
+& =&  \mathbb{E}^x\left[f(X(\tau^\alpha))\right]+g(\mathbb{E}^x\left[\tau^\alpha\right]) + 2\epsilon\nonumber\\
+& = & J\left[x,\tau^\alpha\right] + 2\epsilon.\nonumber
+\end{eqnarray}
+Then $\tau^\alpha$ is $\left(2\epsilon\right)$-suboptimal for the time-inconsistent problem.
+\end{proof}
+
+This result shows that if the sequential problem has a maximizing element, then it corresponds to a maximizing element of the time-inconsistent problem. Furthermore, it shows how we can build approximate maximizers of the time-inconsistent problem in practice by first finding an approximate maximizer $y$ of problem (\ref{Eqn:SeqOptimization}), then finding an approximate maximizer $\alpha$ of $w(x,y)$.
+
+\section{Viscosity Characterization and Concavity Properties}\label{Section:Properties}
+
+In this section we prove various properties of the auxiliary value function $w$. In particular, we characterize it as the unique viscosity solution of (\ref{Eqn:AuxiliaryHJB}) with certain growth conditions. Furthermore, we highlight conditions under which there is concavity in the time-direction for each fixed value of $x\in\mathbb{R}$. Finally, we use this to show that the sequential optimization problem is a concave optimization problem.
+
+\subsection{Viscosity Solution Characterization}\label{Subsection:Viscosity}
+
+Our goal in this section is to characterize the auxiliary value function $w$ as the unique viscosity solution of (\ref{Eqn:AuxiliaryHJB}) with a particular type of growth at infinity. We proceed by first obtaining growth bounds on the auxiliary value function.
+
+\begin{lem}\label{Lem:AuxiliaryValueBounds}
+Suppose that there exist $\alpha,\beta\geq 0$ such that:
+\[|f(x)+\beta x^2|\leq\alpha(1+|x|)\hspace{0.5cm}\text{for all }x\in\mathbb{R}.\]
+Then there exists $C\geq 0$ such that:
+\[|w(x,y)-f(x)|\leq C(1+|x|+|y|)\hspace{0.5cm}\text{for all }(x,y)\in\mathbb{R}\times[0,\infty).\]\end{lem}
+\begin{proof}
+Fix $(x,y)\in\mathbb{R}\times[0,\infty)$ and let $\tau\in\mathcal{T}_y$ be an arbitrary stopping time. Then:
+\begin{eqnarray}
+\mathbb{E}^x\left[f(X(\tau))\right] & \leq & \alpha+\alpha\mathbb{E}^x\left[|X(\tau)|\right]-\beta\mathbb{E}^x\left[X(\tau)^2\right]\nonumber\\
+& \leq & \alpha+\alpha|x|-\beta x^2+(\alpha-\beta)\mathbb{E}^x\left[\tau\right]\nonumber\\
+& = & \alpha(1+|x|)-\beta x^2 +(\alpha-\beta)y.\nonumber
+\end{eqnarray}
+Note, we used Tanaka's formula (see \cite{KaratzasShreve1991}) to bound the term $\mathbb{E}^x\left[|X(\tau)|\right]$. Because $\tau$ was arbitrary:
+\[w(x,y)\leq\alpha(1+|x|)-\beta x^2+(\alpha-\beta)y\leq f(x)+2\alpha(1+|x|)+(\alpha-\beta) y.\]
+On the other hand, if we choose $\tau\equiv y$, then we compute:
+\begin{eqnarray}
+w(x,y) & \geq & \mathbb{E}^x\left[f(X(y))\right]\nonumber\\
+& \geq & -\alpha-\alpha\mathbb{E}^x\left[|X(y)|\right]-\beta\mathbb{E}^x\left[X(y)^2\right]\nonumber\\
+& \geq & -\alpha-\alpha|x|-\beta x^2-\beta y\nonumber\\
+& \geq & f(x)-2\alpha(1+|x|)-\beta y.\nonumber
+\end{eqnarray}
+Then we conclude:
+\[|w(x,y)-f(x)|\leq 2\alpha(1+|x|)+(\alpha+\beta)y\]
+for all $(x,y)\in\mathbb{R}\times[0,\infty)$. Taking $C:=2\alpha+\beta$, the result follows.
+\end{proof}
+
+The growth bounds above immediately show that the auxiliary value function $w$ is locally bounded. Then it is a standard procedure to check that $w$ is a viscosity solution of (\ref{Eqn:AuxiliaryHJB}), see \cite{Touzi2013}.
+
+The question of uniqueness is a bit more subtle because this is a degenerate elliptic equation with no upper bound on the diffusion coefficient. Furthermore, we expect $w$ to have quadratic growth. Proving a standard comparison principle with quadratic growth and unbounded diffusion coefficient can be very technical (see \cite{DaLioLey2010}). Instead, we focus on the fact that we know that $w-f$ has linear growth.
+
+\begin{lem}[Comparison Principle]\label{Lem:ComparisonPrinciple}
+Let $u$ be an upper semi-continuous viscosity sub-solution and $v$ be a lower semi-continuous viscosity super-solution of (\ref{Eqn:AuxiliaryHJB}) respectively. Suppose that their difference has linear growth. That is, there exists $C\geq 0$ such that:
+\[|u(x,y)-v(x,y)|\leq C(1+|x|+|y|).\]
+Then if $u\leq v$ on $\mathbb{R}\times\{y=0\}$, then $u\leq v$ on $\mathbb{R}\times [0,\infty)$.\end{lem}
+
+This result is fairly standard, but is complicated by the unbounded diffusion coefficient. We provide a complete proof of Lemma \ref{Lem:ComparisonPrinciple} in the Appendix.
+
+\begin{thm}\label{Thm:UniqueHJB}
+Suppose that there exists $\alpha,\beta\geq 0$ such that:
+\[|f(x)+\beta x^2|\leq\alpha(1+|x|)\hspace{0.5cm}\text{for all }x\in\mathbb{R}.\]
+Then the auxiliary value function $w$ is the unique viscosity solution of (\ref{Eqn:AuxiliaryHJB}) such that $w(x,y)-f(x)$ has linear growth.\end{thm}
+\begin{proof}
+We showed in Lemma \ref{Lem:AuxiliaryValueBounds} that $w$ is a viscosity solution satisfying the growth condition above. Suppose that $v$ is another viscosity solution such that $v-f$ has linear growth. Then there exists $C\geq 0$ such that:
+\[|w(x,y)-v(x,y)|\leq |w(x,y)-f(x)|+|v(x,y)-f(x)|\leq C(1+|x|+|y|).\]
+Furthermore, $v=w$ on $\mathbb{R}\times\{y=0\}$, so it follows from Lemma \ref{Lem:ComparisonPrinciple} that $v=w$ on $\mathbb{R}\times[0,\infty)$.
+\end{proof}
+
+\subsection{Concavity Properties}
+
+We propose conditions under which the auxiliary value function $w$ is concave in $y$ for each $x$. Note that because $w(x,0)=f(x)$, there is no hope of joint concavity of $w$ when $f$ is not concave. We also proceed to show conditions under which the sequential optimization problem for $v$ is concave.
+
+\begin{prop}\label{Prop:ConcaveValueFunction}
+Suppose that there exist $\alpha,\beta\geq 0$ such that:
+\[|f(x)+\beta x^2|\leq\alpha(1+|x|)\hspace{0.5cm}\text{for all }x\in\mathbb{R}.\] 
+Then for each $x\in\mathbb{R}$, the map $y\mapsto w(x,y)$ is concave.\end{prop}
+\begin{proof}
+By the results of Section \ref{Subsection:Viscosity}, we know $w$ is a viscosity solution of (\ref{Eqn:AuxiliaryHJB}). In particular, we claim it is a viscosity supersolution of:
+\[-w_{yy}\geq 0\hspace{0.5cm}\text{on }\mathbb{R}\times(0,\infty).\]
+This is because for any smooth function $\phi$ touching $w$ from below at $(x_0,y_0)\in\mathbb{R}\times(0,\infty)$, we have:
+\[\phi_y(x_0,y_0)\geq\sup\limits_{\alpha\in\mathbb{R}}\left[\frac{1}{2}\phi_{xx}(x_0,y_0)+\alpha\phi_{xy}(x_0,y_0)+\frac{1}{2}\alpha^2\phi_{yy}(x_0,y_0)\right]\]
+by the viscosity solution property. However, this implies $-\phi_{yy}(x_0,y_0)\geq 0$ because, otherwise, the right-hand-side would be arbitrarily large for large $\alpha$.
+
+We conclude that for each fixed $x_0\in\mathbb{R}$, the function $y\mapsto w(x_0,y)$ is a viscosity supersolution:
+\[-w_{yy}\geq 0\hspace{0.5cm}\text{on }(0,\infty).\]
+This, in turn implies that $y\mapsto w(x_0,y)$ is concave on $(0,\infty)$ for each fixed $x_0\in\mathbb{R}$. See, for example, Propositions 6.9 and Lemma 6.23 in \cite{Touzi2013}.
+
+Finally, by the growth bounds in Lemma \ref{Lem:AuxiliaryValueBounds}, it is clear that $w$ is continuous at $(x_0,0)$, so we can conclude that for each $x_0\in\mathbb{R}$, the map $y\mapsto w(x_0,y)$ is concave on $[0,\infty)$.
+\end{proof}
+
+We can immediately apply this result to find conditions under which the the sequential time-consistent optimization problem (\ref{Eqn:SeqOptimization}) is concave.
+
+\begin{cor}\label{Cor:Concavity}Suppose that there exist $\alpha,\beta\geq 0$ such that:
+\[|f(x)+\beta x^2|\leq\alpha(1+|x|)\hspace{0.5cm}\text{for all }x\in\mathbb{R}.\]
+Let $g:\mathbb{R}^+\to\mathbb{R}$ be concave. Then the map:
+\[y\mapsto w(x,y)+g(y)\]
+is concave for each $x\in\mathbb{R}$.\end{cor}
+\begin{proof}This follows immediately from Proposition \ref{Prop:ConcaveValueFunction} and the concavity of $g$, see \cite{Boyd2004}.\end{proof}
+
+In order to construct an optimal stopping time as outlined in Section \ref{Subsection:Construction}, we first need to find a maximizing element $y\in[0,\infty)$ of the sequential time-inconsistent optimization problem (\ref{Eqn:SeqOptimization}). We next show a coercivity condition on $g$ which will provide existence of a minimizing element.
+
+\begin{thm}\label{Thm:MaximalElement}
+Suppose that there exist $\alpha,\beta\geq 0$ such that:
+\[|f(x)+\beta x^2|\leq\alpha(1+|x|)\hspace{0.5cm}\text{for all }x\in\mathbb{R}.\]
+Suppose also that $g$ is concave and there exists $\gamma <\beta-\alpha$ such that:
+\[g(y)\leq\gamma y.\]
+Then for each $x\in\mathbb{R}$, the map:
+\[y\mapsto w(x,y)+g(y)\]
+is concave and has a maximizing element $y\in[0,\infty)$.\end{thm}
+\begin{proof}
+Fix $x\in\mathbb{R}$. From Corollary \ref{Cor:Concavity}, we know the map $y\mapsto w(x,y)+g(y)$ is concave. We claim that this map is also bounded from above by a strictly decreasing linear function. Therefore, there exists a maximizing element $y^*\in[0,\infty)$.
+
+Let $y\in[0,\infty)$ and $\tau\in\mathcal{T}_y$ be arbitrary. Similar to Lemma \ref{Lem:AuxiliaryValueBounds}, we compute:
+\begin{eqnarray}
+\mathbb{E}^x\left[f(X(\tau))\right] & \leq & \alpha + \alpha\mathbb{E}^x\left[|X(\tau)|\right]-\beta\mathbb{E}^x\left[X(\tau)^2\right]\nonumber\\
+& \leq & \alpha(1+|x|)-\beta x^2+(\alpha-\beta)\mathbb{E}^x\left[\tau\right]\nonumber\\
+& = & \alpha(1+|x|)-\beta x^2+(\alpha-\beta)y.
+\end{eqnarray}
+Because $\tau$ we arbitrary, we conclude:
+\[w(x,y)\leq\alpha(1+|x|)-\beta x^2+(\alpha-\beta)y.\]
+Together with the growth assumption of $g$:
+\[w(x,y)+g(y)\leq\alpha(1+|x|)-\beta x^2+(\gamma+\alpha-\beta)y.\]
+Because $x$ is fixed and $\gamma<\beta-\alpha$, the map $y\mapsto w(x,y)+g(y)$ is bounded from above by a strictly decreasing linear function in $y$. Then the result follows.
+\end{proof}
+
+\section{Generalizations and Concluding Remarks}\label{Section:Generalization}
+
+The goal of this section is to highlight various generalizations and connections. In particular, we extend the results of Section \ref{Section:EquivalentProblem} to general diffusion processes and also other types of non-linearities in the time-inconsistent stopping problem. We also highlight a connection between our PDE and the Monge-Ampere equation. This section is very formal and meant as a launching point for future research. As such, we do not reproduce analogues of the results in Section \ref{Section:Properties}, though we expect that with appropriate conditions on $f$ and $g$ analogous results to all major properties will hold.
+
+\subsection{Extension to Diffusion Processes}\label{Subsection:Extension}
+
+Consider a probability space $(\Omega,\mathcal{F},\mathbb{P})$, which admits a Brownian motion $W$ valued in $\mathbb{R}^d$. Let $\mathbb{F}$ be the $\mathbb{P}$-augmentation of the canonical filtration of $W$. Let $\mu:\mathbb{R}^n\to\mathbb{R}^n$ and $\sigma:\mathbb{R}^n\to\mathcal{M}(n,d)$ be Lipschitz continuous with linear growth bounds. Then for each $x\in\mathbb{R}^n$, there is a unique strong solution to the SDE:
+\begin{equation}
+X(t) = x + \int_0^t \mu(X(s))ds + \int_0^t \sigma(X(s))dW(s).
+\end{equation}
+Let $\mathbb{P}^x$ denote the probability measure on $X$ corresponding to starting at $x\in\mathbb{R}$.
+
+Denote the infinitesimal generator of the diffusion process $X$ by:
+\begin{equation}
+\mathcal{L}_x\phi := \mu\cdot D\phi + \frac{1}{2}\text{Tr}\left[\sigma\sigma^\top D^2\phi\right].
+\end{equation}
+
+The main result of this section is then:
+\begin{prop}
+Consider the time-inconsistent optimal stopping problem given by:
+\begin{equation}
+v(x) := \sup\limits_{\tau\in\mathcal{T}}\mathbb{E}^x\left[f(X(\tau))\right]+ g(\mathbb{E}^x\left[\tau\right]).
+\end{equation}
+Furthermore, consider an auxillary time-consistent control problem defined by:
+\begin{equation}\label{Eqn:GeneralAuxFunction}
+w(x,y):=\left\{\begin{array}{rl}
+\sup\limits_{\alpha\in\mathcal{A}}&\mathbb{E}^{x,y}\left[f(X(\tau^\alpha))\right]\\
+& dX = \mu(X)dt + \sigma(X)dW\\
+& dY^\alpha = -dt + \alpha dW\\
+& \tau^\alpha = \inf\left\{t\geq 0\mid Y^\alpha(t)=0\right\}.
+\end{array}\right.
+\end{equation}
+Then we have the identity:
+\begin{equation}
+v(x) = \sup\limits_{y\geq 0}\left[w(x,y)+g(y)\right].
+\end{equation}
+\end{prop}
+\begin{proof}The proof is as before, except now a higher-dimensional version of martingale representation theorem must be used, see \cite{Touzi2013}. In particular, this makes the control be valued in $\mathbb{R}^d$ rather than one-dimensional.
+\end{proof}
+
+Then if $w$ is locally bounded, then as before we can identify it as a viscosity solution of an HJB.
+\begin{cor}
+Assume the axillary value function $w$ defined in (\ref{Eqn:GeneralAuxFunction}) is locally bounded. Then it is a viscosity solution to the HJB:
+\begin{equation}\label{Eqn:GeneralAuxHJB}
+\left\{\begin{array}{rl}
+u_y - \sup\limits_{\alpha\in\mathbb{R}^d}\left[\mathcal{L}_x u+\alpha^\top\sigma D_x u_y+\frac{1}{2}|\alpha|^2 u_{yy}\right] = 0 & \text{in }\mathbb{R}^n\times(0,\infty)\\
+u = f & \text{on }\mathbb{R}^n\times\{y=0\}.
+\end{array}\right.\end{equation}
+\end{cor}
+
+\subsection{Connection to Monge-Ampere Equation}
+
+Consider the one-dimensional problem from Section \ref{Section:Formulation}. We showed in Section \ref{Section:Properties} that the auxiliary value function $w$ is viscosity solution of the HJB equation (\ref{Eqn:AuxiliaryHJB}) which is concave in $y$ for each $x$. We claim that if $w$ is smooth, then it is a solution to a Monge-Ampere-like equation.
+
+\begin{prop}
+Let $w$ be the auxiliary value function which is a viscosity solution of \ref{Eqn:AuxiliaryHJB}. If $w$ is smooth, then $w$ a solution of:
+\begin{equation}\label{Eqn:MongeAmpere}
+\left\{\begin{array}{rl}
+2u_yu_{yy} - \det D^2 u = 0 & \text{in }\mathbb{R}\times(0,\infty)\\
+u = f & \text{on }\mathbb{R}\times\{y=0\}.
+\end{array}\right.\end{equation}
+\end{prop}
+
+Note, the equation above is not elliptic, so the viscosity solution theory of \cite{CrandallIshiiLions1992} does not immediately apply. However, there are many classical results on viscosity solution interpretations of the standard Monge-Ampere equation (see \cite{IshiiLions1990}). However, we focus on classical solution theory at the moment.
+
+\begin{proof}
+Because $w$ is a smooth viscosity solution of \ref{Eqn:AuxiliaryHJB}, it is a classical solution. Fix $(x_0,y_0)\in\mathbb{R}\times(0,\infty)$. Then:
+\[u_y(x_0,y_0) = \sup\limits_{\alpha\in\mathbb{R}}\left[\frac{1}{2}w_{xx}(x_0,y_0)+\alpha w_{xy}(x_0,y_0)+\frac{1}{2}\alpha^2 w_{yy}(x_0,y_0)\right].\]
+\begin{enumerate}
+\item Suppose that $w_{yy}(x_0,y_0)<0$. Then the supremum is achieved at:
+\[\alpha^* := -\frac{w_{xy}(x_0,y_0)}{w_{yy}(x_0,y_0)}.\]
+We can compute:
+\[u_y(x_0,y_0) = \frac{1}{2}w_{xx}(x_0,y_0)-\frac{w_{xy}(x_0,y_0)^2}{2w_{yy}(x_0,y_0)}=\frac{w_{xx}(x_0,y_0)w_{yy}(x_0,y_0)-w_{xy}(x_0,y_0)^2}{2w_{yy}(x_0,y_0)},\]
+and consequently:
+\[2w_y(x_0,y_0)w_{yy}(x_0,y_0) = \det D^2w(x_0,y_0).\]
+
+\item Suppose that $w_{yy}(x_0,y_0)=0$. Then for the PDE to hold, we must have $w_{xy}(x_0,y_0)=0$. Then we can compute:
+\[2w_y(x_0,y_0)w_{yy}(x_0,y_0)-\det D^2w(x_0,y_0) = (2w_y(x_0,y_0)-w_{xx}(x_0,y_0))w_{yy}(x_0,y_0)+w_{xy}(x_0,y_0)^2 = 0,\]
+because $w_{xy}(x_0,y_0)=w_{yy}(x_0,y_0)=0$.
+
+\item Finally, suppose that $w_{yy}(x_0,y_0)>0$. Then taking $\alpha$ large, we can make the supremum arbitrarily large and contradict the fact that $w$ is a smooth solution at of the PDE at $(x_0,y_0)$. Then this case never occurs.
+\end{enumerate}
+\end{proof}
+
+We remark that this is a degenerate form of the two-dimensional Monge-Ampere equations studied in \cite{Schulz1990}. More generally, the PDE in Section \ref{Subsection:Extension} can be written in a Monge-Ampere-like form. We believe there may be room for further analysis of regularity of these PDEs. Furthermore, this form may be amenable to numerics, as there is a whole literature on wide-stencil monotone schemes for numerical solutions of the Monge-Ampere equation (see \cite{Oberman2008}).
+
+\subsection{Extension to Other Non-linearities}\label{Subsection:GeneralInconsistentcies}
+
+In Section \ref{Section:EquivalentProblem}, we alluded to the claim that the approach used in this paper can be extended to other non-linearities leading to time-inconsistent stochastic optimization problems. The same type of argument holds in more general cases, but the resulting control problem, analogous to (\ref{Defn:AuxProblem}), has a terminal constraint which is non-standard from the perspective of viscosity solutions.
+
+To illustrate this point, consider the one-dimensional setting of Section \ref{Section:Formulation}, but a more general time-inconsistent problem depending non-linearly on the higher moments of $(\tau,X(\tau))$.
+
+\begin{prop}
+Let $h:\mathbb{R}^+\times\mathbb{R}\to\mathbb{R}^m$ be a smooth, bounded function. Consider the time-inconsistent optimal stopping problem given by:
+\begin{equation}\label{Eqn:GeneralTimeInconsistent}
+v(x) := \sup\limits_{\tau\in\mathcal{T}}\mathbb{E}^x\left[f(X(\tau))\right]+ g(\mathbb{E}^x\left[h(\tau,X(\tau))\right]).
+\end{equation}
+Let $\mathcal{A}$ and $\mathcal{B}$ be the collections of one- and $m$-dimensional square-integrable, progressively-measurable processes respectively. Consider an auxillary time-consistent control problem defined by:
+\begin{equation}\label{Eqn:GeneralAuxFunction2}
+w(x,y,z):=\left\{\begin{array}{rl}
+\sup\limits_{(\alpha,\beta)\in\mathcal{A}\times\mathcal{B}}&\mathbb{E}^{x,y,z}\left[f(X(\tau^\alpha))\right]\\
+& dX = dW\\
+& dY^\alpha = -dt + \alpha dW\\
+& dZ^\beta = \beta dW\\
+& \tau^\alpha = \inf\left\{t\geq 0\mid Y^\alpha(t)=0\right\}\\
+& Z^\beta(\tau^\alpha) = h(\tau^\alpha,X(\tau^\alpha)).
+\end{array}\right.
+\end{equation}
+Then we have the identity:
+\begin{equation}
+v(x) = \sup\limits_{(y,z)\in[0,\infty)\times\mathbb{R}^m}\left[w(x,y,z)+g(z)\right].
+\end{equation}
+\end{prop}
+\begin{proof}
+We provide a sketch of a proof following the same three-step procedure from Section \ref{Section:EquivalentProblem}.
+
+\begin{enumerate}
+\item For any $(x,y,z)\in\mathbb{R}\times[0,\infty)\times\mathbb{R}^m$, consider the collection of stopping time / control pairs defined as:
+\[\mathcal{T}_{x,y,z} := \left\{\tau\in\mathcal{T}\mid \mathbb{E}^x\left[\tau\right] = y,\,\mathbb{E}^x\left[h(\tau,X(\tau))\right]=z\right\}.\]
+Then we define an auxiliary constrained stopping problem as:
+\[\tilde{w}(x,y,z) := \sup\limits_{\tau\in\mathcal{T}_{x,y,z}} \mathbb{E}^x\left[f(X(\tau))\right]\hspace{0.5cm}\text{for all }(x,y,z)\in\mathbb{R}\times [0,\infty)\times\mathbb{R}^m.\]
+Note, we take $\tilde{w}(x,y,z)=-\infty$ if $\mathcal{T}_{x,y,z}=\emptyset$.
+Then by the same argument as in Theorem \ref{Thm:AuxEquivalence}, we have:
+\[v(x) = \sup\limits_{(y,z)\in[0,\infty)\times\mathbb{R}^m}\left[\tilde{w}(x,y,z)+g(z)\right].\]
+
+\item We next claim that $w=\tilde{w}$. This follows by applying the martingale representation theorem on $\tau$ to obtain $\alpha\in\mathcal{A}$ and on the vector $h(\tau,X(\tau))$ to obtain $\beta\in\mathcal{B}$.
+
+\item Finally, given a maximizing $(y^*,z^*)\in[0,\infty)\times\mathbb{R}^m$, we can construct an $\epsilon$-suboptimal control to the generalized time-inconsistent problem (\ref{Eqn:GeneralTimeInconsistent}) starting from $x\in\mathbb{R}$ by constructing a suboptimal control of (\ref{Eqn:GeneralAuxFunction2}) starting from $(x,y^*,z^*)$.
+\end{enumerate}
+
+\end{proof}
+
+For many $(x,y,z)\in\mathbb{R}\times[0,\infty)\times\mathbb{R}^m$, there may be no feasible controls. At these points, the auxiliary value function is formally taken to have the value $-\infty$. It is fairly straightforward to formally show that $w$ is a viscosity solution to a certain HJB at any point where it is finite, but dealing with the equality constraints is non-standard. We leave a PDE-based analysis of this problem to further work.
+
+\section*{Appendix I: Proof of Lemma \ref{Lem:ComparisonPrinciple}}
+
+The proof of the comparison principle in Lemma \ref{Lem:ComparisonPrinciple} follows the typical doubling of variables argument. However, because the diffusion coefficient is unbounded from above, we must be careful about the application of the Crandall-Ishii lemma, as in \cite{DaLioLey2010}.
+
+\begin{proof}[Proof of Lemma \ref{Lem:ComparisonPrinciple}]
+Assume to the contrary that:
+\[\sigma := \sup\limits_{\mathbb{R}\times[0,\infty)}\left(u-v\right) > 0.\]
+\begin{enumerate}
+\item For any fixed $\epsilon,\lambda >0$, define:
+\[\Phi(x,y,t,s) := u(x,t)-v(y,s)-\frac{1}{2\epsilon^2}\left((x-y)^2+(t-s)^2\right)-\frac{\epsilon}{2}(x^2+y^2)-\lambda(t+s).\]
+Because both $u$ and $v$ have the same asymptotic quadratic growth in $x$, their difference has linear growth in both $x$ and $y$. If we take $\lambda>0$ large enough, then there exists a point $(x_0,y_0,t_0,s_0)\in\mathbb{R}^2\times[0,T]^2$ such that:
+\[\Phi(x_0,y_0,t_0,s_0) = \max\limits_{\mathbb{R}^2\times[0,\infty)^2}\Phi(x,y,t,s).\]
+We can find a sequence $\epsilon_n\to 0$ such that the corresponding maximizers $(x_n,y_n,t_n,s_n)$ satisfy:
+\[(x_n,y_n,t_n,s_n)\to(\hat{x},\hat{y},\hat{t},\hat{s})\in\mathbb{R}^2\times[0,T]^2.\]
+For sufficiently small $\epsilon_n$, we have that:
+\[\Phi(x_n,y_n,t_n,s_n)\geq\sup\limits_{\mathbb{R}\times[0,\infty)}\Phi(x,x,t,t)\geq\frac{\sigma}{2}.\]
+But then:
+\begin{eqnarray}
+\limsup\limits_{n\to\infty}\left[\frac{1}{2\epsilon_n^2}\left((x_n-y_n)^2+(t_n-s_n)^2\right)\right]&\leq &\limsup\limits_{n\to\infty}\left[u(x_n,t_n)-v(y_n,s_n)-\frac{\epsilon_n}{2}(x_n^2+y_n^2)\right.\nonumber\\
+& & \left.\hspace{1cm}-\lambda(t_n+s_n)-\frac{\sigma}{2}\right]\nonumber\\
+& = & u^*(\hat{x},\hat{t})-v_*(\hat{y},\hat{s})-\lambda(\hat{t}+\hat{s})-\frac{\sigma}{2}.\nonumber
+\end{eqnarray}
+So we see $\hat{x}=\hat{y}$ and $\hat{t}=\hat{s}$. Finally, we have:
+\[u^*(\hat{x},\hat{t})-v_*(\hat{x},\hat{t})\geq\frac{\sigma}{2}-2\lambda\hat{t},\]
+which contradicts $u\leq v$ on $t=0$ if $\hat{t}=0$. Therefore, for sufficiently small $\epsilon_n$, we have:
+\[\Phi(x,y,t,s)\text{ attains a maximum at }(x_n,y_n,t_n,s_n)\in\mathbb{R}^2\times(0,\infty)^2.\]
+
+\item By the Crandall-Ishii lemma (see \cite{CrandallIshiiLions1992,Touzi2013}), for any $\rho >0$, there exists $A,B\in\mathcal{S}_2$ such that:
+\[\epsilon_n^{-2}(t_n-s_n)+\lambda\leq\sup\limits_{\alpha\in\mathbb{R}}\left[\frac{1}{2}a_{11}+\alpha a_{12}+\frac{1}{2}\alpha^2 a_{22}\right],\]
+\[\epsilon_n^{-2}(t_n-s_n)-\lambda\geq\sup\limits_{\alpha\in\mathbb{R}}\left[\frac{1}{2}b_{11}+\alpha b_{12}+\frac{1}{2}\alpha^2 b_{22}\right],\]
+and
+\[-\left(\rho^{-1}+|M|\right)I\leq\left[\begin{array}{cc}A&0\\0&-B\end{array}\right]\leq M+\rho M^2,\]
+where:
+\[M := \epsilon_n^{-2}\left[\begin{array}{cc}
+I & -I \\
+-I & I
+\end{array}\right]
++\epsilon_n\left[\begin{array}{cccc}
+1 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 1 & 0 \\
+0 & 0 & 0 & 0 
+\end{array}\right].\]
+Subtracting the first two inequalities above, we obtain:
+\[2\lambda\leq \sup\limits_{\alpha\in\mathbb{R}}\left[\frac{1}{2}a_{11}+\alpha a_{12}+\frac{1}{2}\alpha^2 a_{22}\right]-\sup\limits_{\beta\in\mathbb{R}}\left[\frac{1}{2}b_{11}+\beta b_{12}+\frac{1}{2}\beta^2 b_{22}\right].\]
+That is, for any $\eta >0$, there exists $\alpha\in\mathbb{R}$ such that for all $\beta\in\mathbb{R}$, we have:
+\[2\lambda-\eta\leq \frac{1}{2}a_{11}+\alpha a_{12}+\frac{1}{2}\alpha^2 a_{22}-\frac{1}{2}b_{11}-\beta b_{12}-\frac{1}{2}\beta^2 b_{22}.\]
+Applying the matrix inequality above with $\rho:=\epsilon_n^2$ to the vector $(1,\alpha,1,\beta)$, we obtain:
+\[a_{11}+2\alpha a_{12}+\alpha^2 a_{22}-b_{11}-2\beta b_{12}-\beta^2 b_{22} \leq
+3\epsilon_n^{-2}(\alpha-\beta)^2 + 6\epsilon_n+2\epsilon_n^4.\]
+Taking $\eta := \lambda$ and $\beta :=\alpha$, we obtain:
+\[\lambda \leq 6\epsilon_n+2\epsilon_n^4,\]
+which is a contradiction for $\epsilon_n$ sufficiently small.
+\end{enumerate}
+\end{proof}
+
+\bibliographystyle{siam}
+
+\bibliography{TimeInconsistentStopping}
+
+\end{document}

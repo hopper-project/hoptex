@@ -1,0 +1,826 @@
+
+\documentclass[10pt]{paper}
+
+\usepackage{amsmath,amsfonts,amsthm,mathtools}
+\usepackage{algorithm2e}
+
+\bibliographystyle{wileyj}
+
+\usepackage{pgfplotstable}
+
+\usepackage{microtype}
+\usepackage{hyperref}
+
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\DeclarePairedDelimiter{\avs}{\lvert}{\rvert}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{remark}[theorem]{Remark}
+
+\usepackage{booktabs,colortbl}
+\pgfplotstableset{
+every even row/.style={
+before row={\rowcolor[gray]{0.9}}},
+every head row/.style={
+before row=\toprule,after row=\midrule},
+every last row/.style={
+after row=\bottomrule},
+}
+
+\begin{document}
+
+\title{Perron--based algorithms for the multilinear pagerank}
+
+\author{Beatrice Meini\footnote{Dipartimento di Matematica, Universit\`a di Pisa, Italy.} and Federico Poloni\footnote{Dipartimento di Informatica, UniversitÃ  di Pisa, Italy. \texttt{federico.poloni@unipi.it}.}}
+\maketitle
+
+\begin{abstract}
+We consider the multilinear pagerank problem studied in [Gleich, Lim and Yu, \emph{Multilinear Pagerank}, 2015], which is a system of quadratic equations with stochasticity and nonnegativity constraints. We use the theory of quadratic vector equations to prove several properties of its solutions and suggest new numerical algorithms. In particular, we prove the existence of a certain minimal solution, which does not always coincide with the stochastic one that is required by the problem.
+We use an interpretation of the solution as a Perron eigenvector to devise new fixed-point algorithms for its computation, and pair them with a homotopy continuation strategy. The resulting numerical method is more reliable than the existing alternatives, being able to solve a larger number of problems.
+\end{abstract}
+
+\keywords{Multilinear pagerank; Perron vector; fixed point iteration; Newton's method}
+
+\maketitle
+
+\section{Introduction}
+
+Gleich, Lim and Yu~\cite{GleLY15} consider the following problem, arising as an approximate computation of the stationary measure of an order-2 Markov chain: given ${\mathbf{v}} \in \mathbb{R}^n, R \in \mathbb{R}^{n\times n^2}$, $\alpha\in \mathbb{R}$ with ${\mathbf{v}}\geq 0, R\geq 0, \alpha \in (0,1)$ and 
+\begin{equation} \label{stochastic}
+	{\mathbf{1}}_n^\top {\mathbf{v}} = 1, \quad {\mathbf{1}}_n^\top R = {\mathbf{1}}_{n^2}^\top,
+\end{equation}
+compute a stochastic solution ${\mathbf{s}}$ to
+\begin{equation}  \label{mlpr}
+	{\mathbf{x}} = \alpha R({\mathbf{x}} \otimes {\mathbf{x}}) + (1-\alpha) {\mathbf{v}}.
+\end{equation}
+Here, stochastic means that ${\mathbf{s}}\ge 0$  and ${\mathbf{1}}_n^\top {\mathbf{s}} = 1$, where ${\mathbf{1}}$ denotes a column vector of all ones (with an optional subscript to specify its length), and inequalities between vectors and matrices are intended in the componentwise sense.
+In the paper~\cite{GleLY15}, they prove some theoretical properties, consider several solution algorithms, and evaluate their performance.
+
+This problem originally appeared in~\cite{LiN14}, and is a variation of problems related to tensor eigenvalue problems and Perron-Frobenius theory for tensors; see e.g.~\cite{Lim05,Cha08,Fri13}. However, it also fits in the framework of quadratic vector equations derived from Markovian binary tree models introduced in~\cite{HauLR08} and later considered in~\cite{BinMP11,MeiP11,Pol13}.
+Indeed, the paper~\cite{Pol13} considers a more general problem, which is essentially~\eqref{mlpr} without the hypotheses~\eqref{stochastic}. Hence, all of its results apply here, and they can be used in the context of multilinear pagerank. In particular, \cite{Pol13} considers the minimal nonnegative solution of~\eqref{mlpr} (in the componentwise sense), which is not necessarily stochastic as the one sought in~\cite{GleLY15}. 
+
+In this paper, we use the theory of quadratic vector equations in~\cite{BinMP11,MeiP11,Pol13} to better understand the behavior of the solutions of \eqref{mlpr}
+and suggest new algorithms for computing the stochastic solution.
+More specifically, we show that if one considers the minimal nonnegative solution of \eqref{mlpr} as well, the theoretical properties of~\eqref{mlpr} become clearer, even if one is only interested in stochastic solutions.
+Indeed we prove that there always exists a minimal nonnegative solution, which is the unique stochastic solution  when $\alpha\le 1/2$. 	When $\alpha > \frac12$,  the minimal nonnegative solution ${\mathbf{m}}$ is not stochastic  and there is at least one stochastic solution ${\mathbf{s}} \geq {\mathbf{m}}$. 
+Note that~\cite[Theorem~4.3]{GleLY15} already proves that when $\alpha \leq \frac12$ the  stochastic solution is unique; our results give a broader characterization.
+All this is in Section~\ref{sec:properties}.
+
+When $\alpha\le 1/2$, as already pointed out in \cite{GleLY15}, computing the stochastic solution of \eqref{mlpr} is easy. Indeed, this is also due to the fact that the stochastic solution is the minimal solution, and for instance the numerical methods proposed in \cite{HauLR08,BinMP11,MeiP11} perform very well.
+The most difficult case is when $\alpha>1/2$, in particular when $\alpha\approx 1$. Since the minimal solution ${\mathbf{m}}$ of~\eqref{mlpr}  can be easily computed, the idea is to compute and deflate it, with a similar strategy to the one developed in~\cite{BinMP11,MeiP11},   hence allowing us to compute stochastic solutions even when they are not minimal. 
+The main tool in this approach is rearranging~\eqref{mlpr} to show that (after a change of variables) a solution ${\mathbf{x}}$ corresponds to the Perron eigenvector of a certain matrix that depends on ${\mathbf{x}}$ itself. This interpretation in terms of Perron vector allows to devise new algorithms based on fixed point iteration and on Newton's method.
+Sections~\ref{sec:deflating} and~\ref{sec:perron} describe this deflation technique and the algorithms based on the Perron vector computation.
+
+Finally, we propose in Section~\ref{sec:homotopy} a homotopy continuation strategy that allows one to solve the problem for values $\hat{\alpha} < \alpha$ in order to obtain better starting values for the more challenging cases when $\alpha \approx 1$.
+
+We report several numerical experiments in Section~\ref{sec:experiments}, to show the effectiveness of these new techniques for the set of small-scale benchmark problems introduced in~\cite{GleLY15}, and draw some conclusions in Section~\ref{sec:conclusions}.
+
+\section{Properties of the nonnegative solutions} \label{sec:properties}
+
+In this section, we show properties of the nonnegative solutions of the equation \eqref{mlpr}. In particular, we prove that there always exists a minimal nonnegative solution, which is stochastic when $\alpha\le 1/2$.
+These properties can be derived by specializing the results of \cite{Pol13}, which apply to more general vector equations defined by bilinear forms.
+
+We introduce the map 
+\[
+G({\mathbf{x}}) : = \alpha R({\mathbf{x}} \otimes {\mathbf{x}}) + (1-\alpha) {\mathbf{v}},
+\]
+and its Fr\'echet derivative 
+\[
+G'_{\mathbf{x}} := \alpha R({\mathbf{x}} \otimes I_n) + \alpha R(I_n \otimes {\mathbf{x}}).
+\]
+
+We have the following result.
+\begin{lemma}
+	Consider the fixed-point iteration
+	\begin{equation} \label{fp}
+		{\mathbf{x}}_{k+1} = G({\mathbf{x}}_k), \quad k=0,1,\dots,
+	\end{equation}
+	started from ${\mathbf{x}}_0=0$. Then the sequence of vectors 
+	$\{{\mathbf{x}}_k\}$ is such that $0\le {\mathbf{x}}_k\le {\mathbf{x}}_{k+1}\le {\mathbf{1}}$, there exists $\lim_{k\to\infty}{\mathbf{x}}_k={\mathbf{m}}$ and 
+${\mathbf{m}}$ is the minimal nonnegative solution of \eqref{mlpr}, i.e., equation \eqref{mlpr} has a (unique) solution ${\mathbf{m}}\geq 0$ such that ${\mathbf{m}} \leq {\mathbf{x}}$ for any other possible solution ${\mathbf{x}}\geq 0$. 
+\end{lemma}
+
+\begin{proof}
+The map $G({\mathbf{x}})$ is weakly positive, i.e., $G({\mathbf{x}})\ge 0$, $G({\mathbf{x}})\ne 0$ whenever ${\mathbf{x}}\ge0$,   ${\mathbf{x}}\ne0$. Moreover, if $0\le {\mathbf{x}}\le{\mathbf{1}}$ then $0\le G({\mathbf{x}})\le{\mathbf{1}}$. Therefore Condition A1 of \cite{Pol13} is satisfied which, according to Theorem 4 of \cite{Pol13},  implies that the sequence of vectors 
+	$\{{\mathbf{x}}_k\}$ is bounded and converges monotonically to a vector ${\mathbf{m}}$, which is the minimal nonnegative solution of \eqref{mlpr}.
+\end{proof}
+
+\subsection{Sum of entries and criticality}
+Moreover, in this specific problem, the hypotheses~\eqref{stochastic} enforce a stronger structure on the iterates of~\eqref{fp}: the sum of the entries of $G({\mathbf{x}})$ is a function of the sum of the entries of ${\mathbf{x}}$ only.
+
+\begin{lemma}
+Let $g(u):=\alpha u^2 + (1-\alpha)$. Then,  ${\mathbf{1}}^\top G({\mathbf{x}}) = g({\mathbf{1}}^\top {\mathbf{x}})$ for any ${\mathbf{x}}\in\mathbb R^n$.\label{lem:gu}
+\end{lemma}
+\begin{proof}
+\begin{align*}
+{\mathbf{1}}^\top G({\mathbf{x}}) &= {\mathbf{1}}^\top (\alpha R({\mathbf{x}} \otimes {\mathbf{x}}) + (1-\alpha) {\mathbf{v}}) = \alpha {\mathbf{1}}^\top R({\mathbf{x}} \otimes {\mathbf{x}}) + (1-\alpha) {\mathbf{1}}^\top {\mathbf{v}} 
+\\&= \alpha {\mathbf{1}}^\top({\mathbf{x}} \otimes {\mathbf{x}}) + (1-\alpha) = \alpha ({\mathbf{1}}^\top {\mathbf{x}})^2 + (1-\alpha). \qedhere
+\end{align*}
+\end{proof}
+This fact has important consequences for the sum of the entries of the solutions of~\eqref{mlpr}.
+\begin{corollary}
+For \label{solvalues} each solution ${\mathbf{x}}$ of~\eqref{mlpr}, ${\mathbf{1}}^\top {\mathbf{x}}$ is one of the two solutions of the quadratic $u = g(u)$, i.e., $u=1$ or $u=\frac{1-\alpha}{\alpha}$.
+\end{corollary}
+
+Let $u$ be one of the solutions of $u = g(u)$ and define the level set 
+$\ell_u = \{{\mathbf{x}}: {\mathbf{1}}^\top{\mathbf{x}}=u, {\mathbf{x}}\geq 0\}$. Since $\ell_u$ is convex and compact, and since $G({\mathbf{x}})$ maps $\ell_u$ to itself by Lemma~\ref{lem:gu}, then  the Brouwer fixed-point theorem implies the following result.
+
+\begin{corollary}
+There exists at least a  solution ${\mathbf{x}}\ge 0$ to~\eqref{mlpr} with ${\mathbf{1}}^\top{\mathbf{x}} = 1$ and a solution ${\mathbf{x}}\ge0$ with ${\mathbf{1}}^\top{\mathbf{x}} = \frac{1-\alpha}{\alpha}$. 
+\end{corollary}
+
+Hence we can have two different settings, for which we borrow the terminology from~\cite{Pol13}.
+\begin{description}
+	\item[Subcritical case] $\alpha \leq \frac12$, hence the minimal nonnegative solution ${\mathbf{m}} = {\mathbf{s}}$ is the unique stochastic solution.
+	\item[Supercritical case] $\alpha > \frac12$, hence the minimal nonnegative solution ${\mathbf{m}}$ satisfies ${\mathbf{1}}^\top{\mathbf{m}} = \frac{1-\alpha}{\alpha} < 1$ and there is at least one stochastic solution ${\mathbf{s}} \geq {\mathbf{m}}$. 
+\end{description}
+Note that~\cite[Theorem~4.3]{GleLY15} already proves that when $\alpha \leq \frac12$ the  stochastic solution is unique; these results give a broader characterization.
+
+The tools that we have introduced can already be used to determine the behavior of simple iterations such as~\eqref{fp}.
+
+\begin{theorem}
+	Consider the fixed-point iteration~\eqref{fp}, with a certain initial value ${\mathbf{x}}_0\ge 0$, for the problem~\eqref{mlpr} with $\alpha > \frac12$. Then,
+\begin{itemize}
+ 	\item If ${\mathbf{1}}^\top {\mathbf{x}}_0 \in (0, \frac{1-\alpha}{\alpha}]$, then $\lim_{k\to\infty} z_k = \frac{1-\alpha}{\alpha}$, and the iteration~\eqref{fp} can converge only to the minimal solution ${\mathbf{m}}$ (if it converges).
+ 	\item If ${\mathbf{1}}^\top {\mathbf{x}}_0 \in (\frac{1-\alpha}{\alpha}, 1]$ or $z_0 = 1$, then $\lim_{k\to\infty} z_k = 1$, hence the iteration~\eqref{fp} can converge only to a stochastic solution (if it converges).
+ 	\item If ${\mathbf{1}}^\top {\mathbf{x}}_0 \in (1, +\infty)$, then $\lim_{k\to\infty} z_k = +\infty$, hence the iteration diverges.
+ \end{itemize} 
+\end{theorem}
+\begin{proof}
+Thanks to Lemma~\ref{lem:gu}, the quantity $z_k := {\mathbf{1}}^\top {\mathbf{x}}_k$ evolves according to $z_{k+1} = g(z_k)$. So the result follows by the theory of scalar fixed-point iterations, since this iteration converges to $\frac{1-\alpha}{\alpha}$ for $z_0 \in (0, \frac{1-\alpha}{\alpha}]$, to $1$ for $z_0 \in (\frac{1-\alpha}{\alpha}, 1]$, and diverges for $z_0 \in (1, +\infty)$.
+\end{proof}
+An analogous result holds for the subcritical case.
+
+The papers~\cite{BinMP11,MeiP11,Pol13} describe several methods to compute the minimal solution ${\mathbf{m}}$. In particular, all the ones described in~\cite{Pol13} exhibit monotonic convergence, that is, $0 = {\mathbf{x}}_0 \leq {\mathbf{x}}_1 \leq {\mathbf{x}}_2 \leq \cdots \leq {\mathbf{x}}_k \leq \cdots \leq {\mathbf{m}}$. Due to the uniqueness and the monotonic convergence properties, computing the minimal solution ${\mathbf{m}}$ is typically simple, fast, and free of numerical issues. Hence in the subcritical case the multilinear pagerank problem is easy to solve. The supercritical case is more problematic.
+
+Among all available algorithms to compute the minimal solution ${\mathbf{m}}$, we recall Newton's method, which is one of the most efficient ones. The Newton--Raphson method applied to the function $F({\mathbf{x}}) = {\mathbf{x}} - G({\mathbf{x}})$ generates the sequence
+	\begin{equation}\label{eq:newton}
+		(I-G'_{{\mathbf{x}}_k}){\mathbf{x}}_{k+1} = (1-\alpha) {\mathbf{v}} - \alpha R({\mathbf{x}}_k \otimes {\mathbf{x}}_k), \quad k=0,1,\dots.
+	\end{equation}
+The following result holds~\cite[Theorem~13]{Pol13}.
+\begin{lemma}
+	Suppose that ${\mathbf{m}} > 0$, and that $G'_{\mathbf{m}}$ is irreducible. Then, Newton's method~\eqref{eq:newton} starting from ${\mathbf{x}}_0=0$ is well defined and converges monotonically to ${\mathbf{m}}$ (i.e., $0 = {\mathbf{x}}_0 \leq {\mathbf{x}}_1 \leq {\mathbf{x}}_2 \leq \cdots \leq {\mathbf{x}}_k \leq \cdots \leq {\mathbf{m}}$).
+\end{lemma}
+Algorithm~\eqref{algo:newton} shows a straightforward implementation of Newton's method as described above.
+\begin{algorithm}
+\KwIn{$R$, $\alpha$, ${\mathbf{v}}$ as above, a tolerance $\varepsilon$}
+\KwOut{An approximation to the minimal solution ${\mathbf{m}}$ of~\eqref{mlpr}.}
+${\mathbf{x}} \leftarrow 0$\;
+\While{$\norm{G({\mathbf{x}}) - {\mathbf{x}}}_1 > \varepsilon$ }{
+	$G'_{\mathbf{x}} \leftarrow  \alpha R({\mathbf{x}} \otimes I_n) + \alpha R(I_n \otimes {\mathbf{x}})$\;
+	${\mathbf{x}} \leftarrow (I_n - G'_{\mathbf{x}})^{-1}((1-\alpha) {\mathbf{v}} - \alpha R({\mathbf{x}} \otimes {\mathbf{x}})) $
+}
+${\mathbf{m}} = {\mathbf{x}}$\;
+\caption{Newton's method for the computation of the minimal solution ${\mathbf{m}}$ to~\eqref{mlpr}.} \label{algo:newton}
+\end{algorithm}
+
+Note that the theory in~\cite[Section~9]{Pol13} shows how one can predict where zeros appear in ${\mathbf{m}}$ and eliminate them reducing the problem to a smaller one. Indeed, in view of the probabilistic interpretation of multilinear pagerank, zero entries in ${\mathbf{m}}$ can appear only when the second-order Markov chain associated to $R$ is not irreducible. So we can assume in the following that ${\mathbf{m}} > 0$, and that the nonnegative matrix $G'_{\mathbf{m}}$ is irreducible. In particular, in this case $G'_{\mathbf{m}}$ also substochastic (as proved in~\cite[Theorem~6]{Pol13}).
+
+\section{Deflating the minimal solution} \label{sec:deflating}
+From now on, we assume to be in the supercritical case, i.e. $\alpha>1/2$, and that ${\mathbf{m}}$ has been already computed and is explicitly available. 
+
+We wish adapt to this setting the deflation strategy introduced in~\cite{MeiP11}. Since all solutions ${\mathbf{s}}$ to~\eqref{mlpr} satisfy ${\mathbf{s}} \geq {\mathbf{m}}$, it makes sense to change variable to obtain an equation in ${\mathbf{y}} := {\mathbf{s}} - {\mathbf{m}} \geq 0$. After a few manipulations, using bilinearity of $({\mathbf{m}}+{\mathbf{y}})\otimes ({\mathbf{m}}+{\mathbf{y}})$ and the fact that ${\mathbf{m}} = \alpha R({\mathbf{m}} \otimes {\mathbf{m}}) + (1-\alpha){\mathbf{v}}$, one gets
+\begin{equation} \label{optimistic}
+	{\mathbf{y}} = \alpha R({\mathbf{y}} \otimes {\mathbf{y}}) + \alpha R({\mathbf{y}} \otimes {\mathbf{m}}) + \alpha R({\mathbf{m}} \otimes {\mathbf{y}}) = \alpha R({\mathbf{y}} \otimes {\mathbf{y}}) + G'_{\mathbf{m}}{\mathbf{y}} = (\alpha R({\mathbf{y}} \otimes I_n) + G'_{\mathbf{m}}){\mathbf{y}}.
+\end{equation}
+Moreover,
+\begin{equation} \label{normy}
+	{\mathbf{1}}^\top {\mathbf{y}} = {\mathbf{1}}^\top ({\mathbf{s}}-{\mathbf{m}}) = 1-\frac{1-\alpha}{\alpha} = \frac{2\alpha-1}{\alpha}.	
+\end{equation}
+
+We set $P_{\mathbf{y}} := \alpha R({\mathbf{y}} \otimes I_n) + G'_{\mathbf{m}}$. Note that $P_{\mathbf{y}} \geq G'_{\mathbf{m}}$ for each ${\mathbf{y}}\geq 0$, hence it is irreducible. In addition, if ${\mathbf{y}}$ is chosen such that ${\mathbf{1}}^\top {\mathbf{y}} = \frac{2\alpha-1}{\alpha}$ as in~\eqref{normy}, then
+\begin{equation} \label{conti}
+	\begin{aligned}
+		{\mathbf{1}}^\top P_{\mathbf{y}} &= \alpha {\mathbf{1}}^\top R({\mathbf{y}} \otimes I) + \alpha {\mathbf{1}}^\top R(I \otimes {\mathbf{m}}) + \alpha {\mathbf{1}}^\top R({\mathbf{m}} \otimes I)
+		\\&= \alpha {\mathbf{1}}^\top ({\mathbf{y}} \otimes I) + \alpha {\mathbf{1}}^\top (I \otimes {\mathbf{m}}) + \alpha {\mathbf{1}}^\top ({\mathbf{m}} \otimes I)
+		\\&= \alpha \frac{2\alpha-1}{\alpha} {\mathbf{1}}^\top + \alpha\frac{1-\alpha}{\alpha} {\mathbf{1}}^\top + \alpha\frac{1-\alpha}{\alpha} {\mathbf{1}}^\top = {\mathbf{1}}^\top,
+	\end{aligned}	
+\end{equation}
+so $P_{\mathbf{y}}$ is a stochastic matrix.
+
+Let us introduce the map $\mathcal{PV}(A)$ that gives the Perron vector ${\mathbf{w}}$ of an irreducible matrix $A \geq 0$, normalized such that ${\mathbf{1}}^\top {\mathbf{w}} = 1$. 
+Then, since $P_{\mathbf{y}}$ is irreducible and stochastic, \eqref{optimistic} and~\eqref{normy} show that
+\begin{equation} \label{optimisticperron}
+	{\mathbf{y}} = \frac{2\alpha-1}{\alpha} \mathcal{PV}(P_{\mathbf{y}}),
+\end{equation}
+i.e., the sought vector ${\mathbf{y}}$ is the Perron vector of the matrix $P_{\mathbf{y}}$, multiplied by the constant $ \frac{2\alpha-1}{\alpha}$.
+
+\section{Perron-based algorithms} \label{sec:perron}
+
+Equation \eqref{optimisticperron} suggests a new fixed-point iteration for computing ${\mathbf{y}}$, 
+which is analogous to the one appearing in~\cite{MeiP11},
+\begin{equation}
+	{\mathbf{y}}_{k+1} = \frac{2\alpha-1}{\alpha} \mathcal{PV}(P_{{\mathbf{y}}_k}),
+\end{equation}
+starting from a given nonnegative vector ${\mathbf{y}}_0$ such that ${\mathbf{1}}^\top {\mathbf{y}}_0 = \frac{2\alpha-1}{\alpha}$. This iteration is implemented in Algorithm~\ref{algo:perron}
+
+\begin{algorithm}
+\KwIn{$R$, $\alpha$, ${\mathbf{v}}$ as above, with $\alpha > \frac12$, a tolerance $\varepsilon$, an initial value ${\mathbf{x}}_0$.}
+\KwOut{An approximation to a stochastic solution ${\mathbf{s}}$ of~\eqref{mlpr}.}
+Compute ${\mathbf{m}}$ with Algorithm~\ref{algo:newton}\;
+Normalize ${\mathbf{x}}_0$ (if needed): ${\mathbf{x}}_0 \leftarrow \max({\mathbf{x}}_0,\mathbf{0})$, ${\mathbf{x}}_0 \leftarrow \frac{{\mathbf{x}}_0}{{\mathbf{1}}^\top {\mathbf{x}}_0}$\;
+${\mathbf{y}} \leftarrow {\mathbf{x}}_0 - {\mathbf{m}}$\;
+Normalize ${\mathbf{y}}$ (if needed): ${\mathbf{y}} \leftarrow \max({\mathbf{y}},\mathbf{0})$, ${\mathbf{y}} \leftarrow \frac{2\alpha-1}{\alpha} \frac{\mathbf{y}}{{\mathbf{1}}^\top {\mathbf{y}}}$\;
+$G'_{\mathbf{m}} \leftarrow  \alpha R({\mathbf{m}} \otimes I_n) + \alpha R(I_n \otimes {\mathbf{m}})$\;
+\While{$\norm{G({\mathbf{x}}) - {\mathbf{x}}}_1 > \varepsilon$ }{
+	$P_{\mathbf{y}} \leftarrow \alpha R({\mathbf{y}} \otimes I_n) + G'_{\mathbf{m}}$\;
+	${\mathbf{y}} \leftarrow \frac{2\alpha-1}{\alpha} \mathcal{PV}(P_{\mathbf{y}})$\;
+	${\mathbf{x}} \leftarrow {\mathbf{m}} + {\mathbf{y}}$
+}
+${\mathbf{s}} = {\mathbf{x}}$\;
+\caption{The Perron-based iteration for the computation of a stochastic solution ${\mathbf{s}}$ to~\eqref{mlpr}.} \label{algo:perron}
+\end{algorithm}
+
+We may also apply Newton's method to find a solution to~\eqref{optimisticperron}, following~\cite{BinMP11}. 
+To this end, we first compute the Jacobian of the function ${\mathbf{w}}({\mathbf{y}}):=\mathcal{PV}(P_{\mathbf{y}})$.
+
+\begin{lemma}
+Let ${\mathbf{w}}({\mathbf{y}}):= \mathcal{PV}(P_{\mathbf{y}})$, with ${\mathbf{y}}\ge0$ such that ${\mathbf{1}}^\top {\mathbf{y}} = \frac{2\alpha-1}{\alpha}$. Then, its Jacobian is given by
+\begin{equation} \label{Jac}
+	{\mathbf{w}}'({\mathbf{y}}) = \alpha \left( {\mathbf{w}}({\mathbf{y}}) {\mathbf{1}}^\top - (I-P_{\mathbf{y}} + {\mathbf{w}}({\mathbf{y}}){\mathbf{1}}^\top)^{-1}R(I\otimes {\mathbf{w}}({\mathbf{y}}))\right).
+\end{equation}
+\end{lemma}
+\begin{proof}
+Let us compute its directional derivative along the direction ${\mathbf{z}}$. We set ${\mathbf{y}}(h) = {\mathbf{y}}+h{\mathbf{z}}$; hence, $P'_{{\mathbf{y}}(h)} = \alpha R ({\mathbf{z}} \otimes I)$. Since $P_{\mathbf{y}}$ is irreducible, its Perron eigenvalue is a simple eigenvalue, and hence we can define locally smooth functions $\lambda(h)$ as the Perron eigenvalue of $P_{{\mathbf{y}}(h)}$ and ${\mathbf{v}}(h)=\mathcal{PV}(P_{{\mathbf{y}}(h)})$.
+A computation analogous to~\eqref{conti} shows that ${\mathbf{1}}^\top P_{{\mathbf{y}}(h)} = (1+ h \alpha {\mathbf{1}}^\top{\mathbf{z}}){\mathbf{1}}^\top$, hence $\lambda(h) = 1+ h \alpha {\mathbf{1}}^\top{\mathbf{z}}$ and $\lambda'(h) = \alpha ({\mathbf{1}}^\top {\mathbf{z}})$.
+
+By differentiating $P_{{\mathbf{y}}(h)}{\mathbf{v}}(h) = \lambda(h){\mathbf{v}}(h)$ and evaluating at $h=0$, we get
+ \[
+\alpha R ({\mathbf{z}} \otimes I){\mathbf{v}}(0) + P_{\mathbf{y}} {\mathbf{v}}'(0) = \alpha ({\mathbf{1}}^\top {\mathbf{z}}) {\mathbf{v}}(0) + {\mathbf{v}}'(0),
+ \]
+or, rearranging terms,
+\[
+(I-P_{\mathbf{y}}){\mathbf{v}}'(0) = \alpha ({\mathbf{v}}(0) {\mathbf{1}}^\top - R(I\otimes {\mathbf{v}}(0))){\mathbf{z}},
+\]
+where ${\mathbf{v}}(0)={\mathbf{w}}({\mathbf{y}})$.
+Since we defined ${\mathbf{v}}(h)$ so that ${\mathbf{1}}^\top {\mathbf{v}}(h)=1$, we have ${\mathbf{1}}^\top {\mathbf{v}}'(0)=0$, and hence also
+\[
+(I-P_{\mathbf{y}} + {\mathbf{v}}(0){\mathbf{1}}^\top){\mathbf{v}}'(0) = \alpha \left({\mathbf{v}}(0) {\mathbf{1}}^\top - R(I\otimes {\mathbf{v}}(0))\right){\mathbf{z}}.
+\]
+The matrix in the left-hand side is nonsingular, since it can be obtained by replacing the eigenvalue $0$ with $1$ in the eigendecomposition of the singular irreducible M-matrix $I-P_{\mathbf{y}}$. Thus we can write 
+\[
+{\mathbf{v}}'(0) = \alpha(I-P_{\mathbf{y}} + {\mathbf{v}}(0){\mathbf{1}}^\top)^{-1}\left( ({\mathbf{v}}(0) {\mathbf{1}}^\top - R(I\otimes {\mathbf{v}}(0)))\right){\mathbf{z}}.
+\]
+ Since $(I-P_{\mathbf{y}} + {\mathbf{v}}(0){\mathbf{1}}^\top) {\mathbf{v}}(0) = {\mathbf{v}}(0)$, we can simplify this expression further to
+\[
+{\mathbf{v}}'(0) = \alpha\left(  {\mathbf{v}}(0) {\mathbf{1}}^\top - (I-P_{\mathbf{y}} + {\mathbf{v}}(0){\mathbf{1}}^\top)^{-1}R(I\otimes {\mathbf{v}}(0)) \right){\mathbf{z}},
+\]
+from which we  get~\eqref{Jac}.
+\end{proof}
+
+From the above result, the Jacobian of the function
+$H({\mathbf{y}})={\mathbf{y}} - \frac{2\alpha-1}{\alpha} \mathcal{PV}(P_{\mathbf{y}})$ is given by
+\begin{equation} \label{Jacnewt}
+	H'_{\mathbf{y}} = I_n -  (2\alpha-1) {\mathbf{w}}({\mathbf{y}}) {\mathbf{1}}^\top + (2\alpha-1)(I-P_{\mathbf{y}} + {\mathbf{w}}({\mathbf{y}}){\mathbf{1}}^\top)^{-1}R(I\otimes {\mathbf{w}}({\mathbf{y}}))
+\end{equation}
+and Newton's method consists in generating the sequence of vectors
+\[
+{\mathbf{y}}_{k+1}={\mathbf{y}}_k-(H'_{{\mathbf{y}}_k})^{-1} H({\mathbf{y}}_k)
+\]
+The Perron-Newton method is described in Algorithm~\ref{algo:perronnewton}.
+\begin{algorithm}
+\KwIn{$R$, $\alpha$, ${\mathbf{v}}$ as above, with $\alpha > \frac12$, a tolerance $\varepsilon$, an initial value ${\mathbf{x}}_0$.}
+\KwOut{An approximation to a stochastic solution ${\mathbf{s}}$ of~\eqref{mlpr}.}
+Compute ${\mathbf{m}}$ with Algorithm~\ref{algo:newton}\;
+Normalize ${\mathbf{x}}_0$ (if needed): ${\mathbf{x}}_0 \leftarrow \max({\mathbf{x}}_0,\mathbf{0})$, ${\mathbf{x}}_0 \leftarrow \frac{{\mathbf{x}}_0}{{\mathbf{1}}^\top {\mathbf{x}}_0}$\;
+${\mathbf{y}} \leftarrow {\mathbf{x}}_0 - {\mathbf{m}}$\;
+Normalize ${\mathbf{y}}$ (if needed): ${\mathbf{y}} \leftarrow \max({\mathbf{y}},\mathbf{0})$, ${\mathbf{y}} \leftarrow \frac{2\alpha-1}{\alpha} \frac{\mathbf{y}}{{\mathbf{1}}^\top {\mathbf{y}}}$\;
+$G'_{\mathbf{m}} \leftarrow  \alpha R({\mathbf{m}} \otimes I_n) + \alpha R(I_n \otimes {\mathbf{m}})$\;
+\While{$\norm{G({\mathbf{x}}) - {\mathbf{x}}}_1 > \varepsilon$ }{
+	$P_{\mathbf{y}} \leftarrow \alpha R({\mathbf{y}} \otimes I_n) + G'_{\mathbf{m}}$\;
+	${\mathbf{w}} \leftarrow \mathcal{PV}(P_{\mathbf{y}})$\;
+	$H'_{\mathbf{y}} \leftarrow I_n -  (2\alpha-1) {\mathbf{w}} {\mathbf{1}}^\top + (2\alpha-1)(I-P_{\mathbf{y}} + {\mathbf{w}}{\mathbf{1}}^\top)^{-1}R(I\otimes {\mathbf{w}})$\;
+	${\mathbf{y}} \leftarrow {\mathbf{y}} - {H'_{\mathbf{y}}}^{-1} ({\mathbf{y}} - \frac{2\alpha-1}{\alpha}{\mathbf{w}})$\;
+
+	Normalize ${\mathbf{y}}$ (if needed): ${\mathbf{y}} \leftarrow \frac{2\alpha-1}{\alpha} \frac{\mathbf{y}}{{\mathbf{1}}^\top {\mathbf{y}}}$\;
+	${\mathbf{x}} \leftarrow {\mathbf{m}} + {\mathbf{y}}$
+}
+${\mathbf{s}} = {\mathbf{x}}$\;
+\caption{The Perron-Newton method for the computation of a stochastic solution ${\mathbf{s}}$ to~\eqref{mlpr}.} \label{algo:perronnewton}
+\end{algorithm}
+
+The standard theorems~\cite{OrtegaBook} on local convergence of Newton's method imply the following result.
+\begin{theorem}
+	Suppose that the matrix $H'_{{\mathbf{s}} - {\mathbf{m}}}$ is nonsingular. Then the Perron-Newton method is locally convergent to a stochastic solution ${\mathbf{s}}$ of~\eqref{mlpr}. 
+\end{theorem}
+\begin{remark}
+Since ${\mathbf{1}}^\top \left(
+{\mathbf{w}}({\mathbf{y}}) {\mathbf{1}}^\top + (I-P_{\mathbf{y}} + {\mathbf{w}}({\mathbf{y}}){\mathbf{1}}^\top)^{-1}R(I\otimes {\mathbf{w}}({\mathbf{y}}))
+\right)=0$,
+the matrix $H'_{\mathbf{y}}$ has an eigenvalue 1 with left eigenvector ${\mathbf{1}}^\top$, for each value of ${\mathbf{y}}$.
+\end{remark}
+
+\section{Continuation techniques} \label{sec:homotopy}
+The above algorithms, as well as those in~\cite{GleLY15}, are sufficient to solve most of the test problems that are explored in~\cite{GleLY15}. However, especially when $\alpha\approx 1$, the algorithms may converge very slowly or stagnate far away from the minimal solution. For this reason, we explore an additional technique, based loosely on the ideas of homotopy continuation~\cite{Li97}, which is a well-known strategy to derive approximate solutions for a parameter-dependent equation.
+
+The main result is the following.
+\begin{lemma}
+Let ${\mathbf{s}}$ be a stochastic solution of problem~\eqref{mlpr} (for a certain $\alpha>\frac12$), and suppose that $I - G'_{\mathbf{s}}$ is nonsingular. Then, there is a stochastic solution ${\mathbf{s}}_{\hat{\alpha}}$ to~\eqref{mlpr} with the parameter $\alpha$ replaced by $\hat{\alpha}$ such that
+\begin{equation} \label{homotopy}
+	{\mathbf{s}}_{\hat{\alpha}} = {\mathbf{s}} + (I - G'_{\mathbf{s}})^{-1}({\mathbf{v}} - R({\mathbf{s}} \otimes {\mathbf{s}}))(\hat{\alpha}-\alpha) + O((\hat{\alpha} - \alpha)^2).	
+\end{equation}
+\end{lemma}
+\begin{proof}
+	Let us make the dependence of the various quantities on the parameter $\alpha$ explicit, i.e., we write ${\mathbf{s}}_\alpha$ to denote a stochastic solution of~\eqref{mlpr} for a certain value of the parameter $\alpha$, and similarly $G_\alpha, G'_{\alpha,{\mathbf{x}}}$ and $F_\alpha$.
+
+	We apply the implicit function theorem~\cite[Theorem~9.28]{BabyRudin} to
+	\[
+		0 = F_\alpha({\mathbf{s}}_\alpha) = {\mathbf{s}}_\alpha - \alpha R({\mathbf{s}}_\alpha \otimes {\mathbf{s}}_\alpha ) - (1-\alpha) {\mathbf{v}},
+	\]
+	obtaining
+	\begin{align*}
+	\frac{\partial F_\alpha}{\partial {\mathbf{s}}_\alpha} & = I - \alpha R(s_\alpha \otimes I) - \alpha R(I \otimes s_\alpha) = I - G'_{\alpha,{\mathbf{s}}_\alpha},\\
+	\frac{\partial F_\alpha}{\partial \alpha} &= {\mathbf{v}} - R({\mathbf{s}}_\alpha \otimes {\mathbf{s}}_\alpha),
+	\\
+	\frac{d}{d\alpha} {\mathbf{s}}_{\alpha} &= \left(\frac{\partial F_\alpha}{\partial {\mathbf{s}}_\alpha}\right)^{-1} \frac{\partial F_\alpha}{\partial \alpha} = (I - G'_{\alpha,{\mathbf{s}}_\alpha})^{-1}({\mathbf{v}} - R({\mathbf{s}}_\alpha \otimes {\mathbf{s}}_\alpha)).
+	\end{align*}
+	Note that the function ${\mathbf{s}}_{\hat{\alpha}}$ obtained by the theorem must satisfy ${\mathbf{1}}^\top {\mathbf{s}}_{\hat{\alpha}} = 1$ for each $\hat{\alpha} > \frac12$: indeed, by Corollary~\ref{solvalues} for a solution ${\mathbf{s}}_{\hat{\alpha}}$ of the equation ${\mathbf{x}} = G_{\hat{\alpha}}({\mathbf{x}})$ it must hold either ${\mathbf{1}}^\top {\mathbf{s}}_{\hat{\alpha}} = 1$ or ${\mathbf{1}}^\top {\mathbf{s}}_{\hat{\alpha}} = \frac{1-\hat{\alpha}}{\hat{\alpha}} < 1$, and the continuous function ${\mathbf{1}}^\top {\mathbf{s}}_{\hat{\alpha}}$ cannot jump from $1$ to $\frac{1-\hat{\alpha}}{\hat{\alpha}}$ without taking any intermediate value.
+
+	The formula~\eqref{homotopy} now follows by Taylor expansion.
+\end{proof}
+This result suggests a further solution strategy: we start solving the problem with a small value of $\alpha= \alpha_0$, e.g. $0.6$, then we solve it repeatedly for increasing values $\alpha_0 < \alpha_1 < \alpha_2 < \dots < \alpha_k = \alpha$; at each step $h$ we use~\eqref{homotopy} to obtain from ${\mathbf{s}}_{\alpha_{h-1}}$ a first-order approximation of ${\mathbf{s}}_{\alpha_h}$ to use as initial value.
+
+The only missing part is designing an effective strategy to choose the intermediate values $\alpha_h$. We adopt the following one. Once ${\mathbf{s}}_{\alpha_h}$ is computed, from the relation
+\[
+	{\mathbf{s}}_{\alpha_h} \approx {\mathbf{s}}_{\alpha_{h-1}} + \frac{d {\mathbf{s}}_{\alpha}}{d\alpha}|_{\alpha_{h-1}} ({\mathbf{s}}_{\alpha_h}-{\mathbf{s}}_{\alpha_{h-1}}) + \frac12 \frac{d^2 {\mathbf{s}}_{\alpha}}{d\alpha^2}|_{\alpha_{h-1}} ({\mathbf{s}}_{\alpha_h}-{\mathbf{s}}_{\alpha_{h-1}})^2  
+\]
+one can derive an estimate of the second derivative $\frac{d^2 {\mathbf{s}}_{\alpha}}{d\alpha^2}|_{\alpha_{h-1}}$. With this estimate at hand, one can choose $\alpha_{h+1}$ such that the second-order term that has been neglected in the approximation~\eqref{homotopy}
+\[
+	\frac12 \frac{d^2 {\mathbf{s}}_{\alpha}}{d\alpha^2}|_{\alpha_{h}} ({\mathbf{s}}_{\alpha_{h+1}}-{\mathbf{s}}_{\alpha_h})^2 \approx \frac12 \frac{d^2 {\mathbf{s}}_{\alpha}}{d\alpha^2}|_{\alpha_{h-1}} ({\mathbf{s}}_{\alpha_{h+1}}-{\mathbf{s}}_{\alpha_h})^2
+\]
+is below a absolute threshold, e.g., 0.01.
+
+The resulting homotopy continuation algorithm is described in Algorithm~\ref{algo:homotopy}. Note that we start from $\alpha_0 = 0.6$, to steer clear of the double solution for $\alpha=0.5$. Convergence for such a value of $\alpha_0$ is typically not problematic.
+\begin{algorithm}
+\KwIn{$R$, $\alpha$, ${\mathbf{v}}$ as above, with $\alpha > 0.6$, a tolerance $\varepsilon$, a threshold $\tau$ for the second derivative.}
+\KwOut{An approximation to a stochastic solution ${\mathbf{s}}$ of~\eqref{mlpr}.}
+$\alpha_0 \leftarrow 0.6$\;
+$h = 0$\;
+${\mathbf{x}} \leftarrow \text{a stochastic solution to~\eqref{mlpr} with parameters $R$, $\alpha_0$, ${\mathbf{v}}$}$\;
+\While{$\alpha_h < \alpha$}{
+	\uIf{at the first step}{$\mathrm{SecondDerivativeEstimate} = 0.01$\;}
+	\Else{
+		$\mathrm{SecondDerivativeEstimate} = 2\norm{{\mathbf{x}} - {\mathbf{x}}_{old}}_1 / (\alpha_{h} - \alpha_{h-1})^2 $\;
+	}
+	$\mathrm{StepSize} = \sqrt{2\tau/ \mathrm{SecondDerivativeEstimate}}$\;
+	$\alpha_{h+1} = \alpha_h + \mathrm{StepSize}$\;
+	\If{$\alpha_{h+1} > \alpha$}{
+		$\alpha_{h+1} \leftarrow \alpha$\;
+	}
+	${\mathbf{x}}_{old} \leftarrow{\mathbf{x}}$\;
+	${\mathbf{x}}_0 \leftarrow {\mathbf{x}} + (I - G'_{\mathbf{x}})^{-1}({\mathbf{v}} - R({\mathbf{x}} \otimes {\mathbf{x}}))(\alpha_{h+1}-\alpha_h)$\;
+	${\mathbf{x}} \leftarrow \text{a stochastic solution to~\eqref{mlpr} with parameters $R$, $\alpha_{h+1}$, ${\mathbf{v}}$ and initial approximation ${\mathbf{x}}_0$}$\;
+	$h \leftarrow h+1$\;
+}
+${\mathbf{s}} \leftarrow {\mathbf{x}}$\;
+
+\caption{The homotopy continuation method for the computation of a stochastic solution ${\mathbf{s}}$ to~\eqref{mlpr}.} \label{algo:homotopy}
+\end{algorithm}
+
+\section{Numerical experiments} \label{sec:experiments}
+We have implemented the described methods using Matlab, and compared them to some of the algorithms in~\cite{mlpr_github} on the same benchmark set of small-size models ($n \in \{3,4,6\}$) used in~\cite{GleLY15}. We have used tolerance $\varepsilon=\sqrt{\mathbf{u}}$, where $\mathbf{u}$ is the machine precision, ${\mathbf{x}}_0={\mathbf{v}}$ as an initial value unless differently specified, and  $\tau = 0.01$ for Algorithm~\ref{algo:homotopy}. To compute Perron vectors, we have used the output of Matlab's \texttt{eig}. For problems with larger $n$, different methods (\texttt{eigs}, inverse iteration, Gaussian elimination for kernel computation \dots) can be considered~\cite{StewartBook}.
+
+The results, for various values of $\alpha$, are reported in Tables~\ref{firsttable} to~\ref{lasttable}. Each of the 29 rows represents a different experiment in the benchmark set, and the columns stand for the different algorithms, according to the following legend.
+\begin{description}
+	\item[F] The fixed-point iteration~\eqref{fp}, from an initial value such that ${\mathbf{1}}^\top {\mathbf{x}}_0 = 1$ (and with renormalization to ${\mathbf{1}}^\top {\mathbf{x}}_k = 1$ at each step).
+	\item[IO] The inner-outer iteration method, as described in~\cite{GleLY15}.
+	\item[N] Newton's method with normalization to ${\mathbf{1}}^\top {\mathbf{x}}_k = 1$ at each step, as described in~\cite{GleLY15}. Note that this is \emph{not} Algorithm~\ref{algo:newton}, which would converge instead to the minimal solution ${\mathbf{m}}$.
+	\item[P] The Perron method (Algorithm~\ref{algo:perron}).
+	\item[PN] The Perron-Newton method (Algorithm~\ref{algo:perronnewton}).
+	\item[CPN] The homotopy continuation method (Algorithm~\ref{algo:homotopy}), where the inner problems are solved with method PN.
+	\item[CN] The homotopy continuation method (Algorithm~\ref{algo:homotopy}), where the inner problems are solved with method N.
+\end{description}
+For each experiment, we report on the left the number of iterations required, and on the right the CPU times in seconds (obtained on Matlab R2017a on a computer equipped with a 64-bit Intel core i5-6200U processor). 
+The value NaN inside a table represents failure to converge after 10,000 iterations.
+For P and PN, the number of iterations is defined as the sum of the number of Newton iterations required to compute ${\mathbf{m}}$ with Algorithm~\ref{algo:newton} and the number of iterations in the main algorithm.
+For CPN and CN, we report the number of inner iterations, that is, the total number of iterations performed by PN or N (respectively), summing along all calls to the subroutine.
+
+Note that neither the number of iterations nor the CPU time are particularly indicative of the true performance of the algorithms: indeed, the iterations in the different methods amount to different quantity of work, since some require merely linear system solutions and some require eigenvalue computations. Moreover, Matlab introduces overheads which are difficult to predict for several instructions (such as variable access and function calls). In order to make the time comparisons more fair, for methods IO and N we did not use the code in~\cite{mlpr_github}, but rather rewrote it without making use of Matlab's object-oriented features, which made the original functions significantly slower. The only change introduced with respect to their implementations is that we changed the stopping criterion to $\norm{G({\mathbf{x}})-{\mathbf{x}}}_1 \leq \sqrt{\mathbf{u}}$, so that the stopping criterion is the same one for all tested methods.
+
+In any case, the performance comparison between the various methods should be taken with a pinch of salt. For this reason, we prefer to report the raw timings instead of graphs or plots that would convey the wrong message.
+
+\begin{table}
+\footnotesize
+	\pgfplotstabletypeset[]{
+	F IO N P PN CPN CN
+    39    54     4    16     9    24     6
+    12    49     5    16     9    26     7
+    12    49     5    13     9    26     7
+    32    38     4    15     9    24     5
+    64   143     5    29     9    26     6
+    42   105     5    25     9    26     7
+    57   101     4    23     9    26     6
+    37    88     4    21     9    26     6
+    59    94     4    20     9    26     6
+    39    87     5    21     9    26     6
+    48    92     4    21     9    26     6
+    39    83     4    19     9    26     6
+    51    88     5    22     9    26     7
+    40    92     5    19     9    26     7
+    68    89     4    20     9    25     6
+    39    87     4    24     9    24     5
+    29    74     5    17     9    26     7
+    44    98     5    22     9    26     7
+    42    89     5    21     9    26     7
+    52    95     4    22     9    25     5
+    42    94     4    23     9    26     6
+    40    86     5    24     9    26     7
+    39    92     5    22     9    26     7
+    36    82     4    21     9    26     6
+    30    77     5    18     9    26     7
+    37    79     4    20     9    26     6
+    26    69     4    19     9    26     6
+    30    83     5    23     9    25     7
+    22    66     5    18     9    25     7
+    }
+	\pgfplotstabletypeset[precision=1, sci, sci zerofill, sci e]{
+	F IO N P PN CPN CN
+   1.6800e-03   2.1896e-02   2.7800e-04   1.1060e-03   7.3300e-04   1.6810e-03   5.0600e-04
+   3.2900e-04   2.4028e-02   3.2400e-04   1.3110e-03   8.7300e-04   1.9910e-03   5.5200e-04
+   2.9800e-04   1.8246e-02   3.3000e-04   1.0120e-03   1.0450e-03   2.4340e-03   5.7800e-04
+   7.0400e-04   1.4695e-02   2.8200e-04   1.0250e-03   1.1710e-03   2.5750e-03   6.4900e-04
+   1.3240e-03   6.9755e-02   3.7800e-04   2.8260e-03   8.3300e-04   1.9180e-03   5.1100e-04
+   9.4300e-04   4.4422e-02   3.3600e-04   2.0710e-03   8.7300e-04   1.9930e-03   5.4800e-04
+   1.2410e-03   4.1436e-02   2.9400e-04   1.8030e-03   7.6200e-04   1.9810e-03   5.9000e-04
+   8.2100e-04   3.4371e-02   2.8700e-04   1.6320e-03   8.4700e-04   2.2360e-03   5.1300e-04
+   1.6620e-03   3.6877e-02   2.6900e-04   1.5080e-03   8.5600e-04   2.2510e-03   5.4000e-04
+   9.1800e-04   3.7447e-02   3.1400e-04   1.5880e-03   7.6900e-04   3.3630e-03   5.5800e-04
+   1.1570e-03   3.8574e-02   2.7300e-04   1.6110e-03   7.6100e-04   2.5450e-03   5.9700e-04
+   9.1100e-04   3.4253e-02   5.7900e-04   1.4890e-03   7.4400e-04   1.9750e-03   5.2400e-04
+   1.1090e-03   3.7125e-02   3.4100e-04   2.2210e-03   8.0500e-04   1.9400e-03   5.5700e-04
+   9.1700e-04   3.8821e-02   4.9000e-04   1.5240e-03   7.7200e-04   2.0100e-03   5.6400e-04
+   1.5830e-03   3.4687e-02   2.9000e-04   1.5040e-03   8.3800e-04   2.4430e-03   5.4100e-04
+   8.4800e-04   3.1478e-02   2.7300e-04   1.8760e-03   1.0370e-03   2.0100e-03   4.9000e-04
+   6.8000e-04   3.0593e-02   3.6100e-04   1.3230e-03   9.5300e-04   2.3250e-03   5.5800e-04
+   9.0300e-04   4.1532e-02   3.3000e-04   1.7680e-03   7.5100e-04   1.9450e-03   5.5300e-04
+   9.8200e-04   3.6006e-02   3.9700e-04   1.8870e-03   8.0100e-04   2.5300e-03   6.2300e-04
+   1.3440e-03   4.1740e-02   3.2400e-04   1.7560e-03   1.3780e-03   2.3710e-03   5.2400e-04
+   1.0590e-03   4.2038e-02   2.8000e-04   1.7770e-03   1.7000e-03   2.7320e-03   5.5000e-04
+   8.9600e-04   3.3277e-02   3.2800e-04   1.6590e-03   9.8600e-04   1.9950e-03   5.4400e-04
+   1.4990e-03   3.9293e-02   3.1200e-04   1.6770e-03   8.9900e-04   1.9120e-03   8.4200e-04
+   7.9000e-04   3.4124e-02   3.4600e-04   1.6020e-03   8.2500e-04   1.9720e-03   5.0300e-04
+   8.1900e-04   3.2090e-02   4.1500e-04   1.6120e-03   1.4970e-03   2.7640e-03   6.4500e-04
+   8.3000e-04   3.4717e-02   3.5200e-04   1.9110e-03   1.2720e-03   3.1950e-03   5.6800e-04
+   6.1700e-04   2.7721e-02   3.1600e-04   1.7580e-03   8.7900e-04   2.1310e-03   5.4600e-04
+   9.5400e-04   3.6942e-02   3.5100e-04   2.0550e-03   8.9000e-04   2.0120e-03   6.0000e-04
+   7.1800e-04   2.5102e-02   3.4800e-04   1.4950e-03   8.2300e-04   1.9710e-03   6.3900e-04    
+   }
+	\caption{Iteration counts and times for the 29 benchmark tensors and $\alpha = 0.7$} \label{firsttable}
+\end{table}
+
+\begin{table}
+\footnotesize
+	\pgfplotstabletypeset[]{
+	F IO N P PN CPN CN
+    97    47     4    19     8    24     6
+    16    41     5    20     8    32     9
+    16    41     5    14     8    32     9
+    54    30     4    17     8    24     5
+    80   127     6    39    10    27     8
+   101   127     6    38     9    26     8
+   196   123     5    45     9    25     6
+    75   115     5    42     8    25     7
+   203   130     5    41     9    26     7
+   122   125     6    50     9    26     7
+   168   119     5    51     9    25     6
+    92   112     5    34     9    25     7
+   227   106     6    47     9    31     8
+   109   114     6    38     9    32    10
+   278   115     5    43     9    25     6
+    94   131     5    56     8    24     6
+    66   108     6    29     9    26     7
+   115   137     6    44     9    25     7
+   100   104     6    37     9    32     9
+   178   120     5    41     9    25     6
+   113   131     5    50     8    26     7
+   158   130     6    56     8    26     8
+   106   162     6    54     9    26     8
+    90    98     5    38     8    25     6
+    78   123     6    27     9    33    10
+    75   102     5    37     9    26     7
+    49    82     5    29     8    25     6
+    64    98     6    39     8    25     8
+    46    85     5    29     8    24     8
+    }
+	\pgfplotstabletypeset[precision=1, sci, sci zerofill, sci e]{
+	F IO N P PN CPN CN
+   6.4280e-03   4.5506e-02   2.9800e-04   1.6750e-03   2.0280e-03   3.5190e-03   9.1300e-04
+   6.8800e-04   3.3036e-02   5.8000e-04   2.8090e-03   1.3470e-03   2.9810e-03   7.9100e-04
+   4.4100e-04   1.7138e-02   3.3000e-04   1.2360e-03   7.3800e-04   2.5870e-03   7.6800e-04
+   1.1180e-03   1.0874e-02   5.0800e-04   1.6740e-03   1.1370e-03   3.0400e-03   7.8700e-04
+   2.7780e-03   7.3228e-02   3.5800e-04   2.7790e-03   8.9900e-04   2.0390e-03   6.9000e-04
+   2.1050e-03   6.7121e-02   3.8700e-04   3.0670e-03   8.4400e-04   2.0570e-03   6.0200e-04
+   4.2360e-03   6.4040e-02   3.4900e-04   3.7440e-03   9.6800e-04   2.1640e-03   5.1300e-04
+   1.6370e-03   5.9148e-02   3.0900e-04   3.3460e-03   8.4900e-04   2.1190e-03   7.2300e-04
+   4.4140e-03   6.9248e-02   4.3400e-04   3.8730e-03   1.0170e-03   3.1350e-03   5.5000e-04
+   2.4540e-03   6.9255e-02   3.5900e-04   5.1610e-03   9.2600e-04   2.4310e-03   5.6900e-04
+   3.4210e-03   6.2130e-02   4.7500e-04   4.1630e-03   8.8200e-04   2.2930e-03   5.4800e-04
+   1.9750e-03   5.6292e-02   3.0900e-04   3.0510e-03   9.2600e-04   2.1780e-03   6.0300e-04
+   4.8140e-03   5.6591e-02   3.7700e-04   3.8070e-03   9.5300e-04   2.6990e-03   7.1900e-04
+   2.2840e-03   5.7285e-02   3.8400e-04   3.0770e-03   9.0300e-04   2.9480e-03   1.0540e-03
+   6.1680e-03   5.8390e-02   7.0700e-04   4.4590e-03   8.3500e-04   1.9730e-03   5.6500e-04
+   1.9520e-03   6.2178e-02   3.5100e-04   4.5780e-03   7.4300e-04   3.2330e-03   5.9200e-04
+   1.5360e-03   5.6687e-02   6.2200e-04   3.0440e-03   8.8300e-04   2.0290e-03   5.3800e-04
+   2.4180e-03   7.9389e-02   4.1200e-04   3.8860e-03   9.8500e-04   3.4610e-03   5.7400e-04
+   2.3330e-03   5.8630e-02   3.9600e-04   2.9810e-03   9.9100e-04   2.6040e-03   1.0460e-03
+   5.0800e-03   6.3392e-02   5.3200e-04   4.0060e-03   8.7700e-04   1.9530e-03   4.9600e-04
+   2.6580e-03   7.9407e-02   6.4700e-04   7.7870e-03   8.2600e-04   2.4080e-03   6.9300e-04
+   6.3990e-03   6.9354e-02   3.7300e-04   4.2310e-03   8.0400e-04   2.2540e-03   6.6200e-04
+   2.0930e-03   8.3220e-02   3.6600e-04   4.0450e-03   1.1280e-03   2.3960e-03   6.4500e-04
+   1.8890e-03   5.1886e-02   3.4000e-04   3.5560e-03   1.3530e-03   3.1910e-03   5.4700e-04
+   1.7380e-03   6.6047e-02   3.9400e-04   2.3650e-03   1.0250e-03   4.4650e-03   1.7680e-03
+   1.8830e-03   5.8253e-02   3.7800e-04   3.6080e-03   1.0310e-03   2.3270e-03   6.7200e-04
+   2.3680e-03   4.0826e-02   3.3900e-04   2.3100e-03   8.0000e-04   2.5060e-03   1.1540e-03
+   1.4180e-03   5.3809e-02   5.4300e-04   4.1370e-03   2.2690e-03   2.6900e-03   7.5700e-04
+   1.1330e-03   4.4361e-02   3.7700e-04   2.4970e-03   8.7700e-04   2.1650e-03   7.5700e-04
+   }	
+	\caption{Iteration counts and times for the 29 benchmark tensors and $\alpha = 0.85$}
+\end{table}
+
+\begin{table}
+\footnotesize
+	\pgfplotstabletypeset[]{
+	F IO N P PN CPN CN
+         184          45           4          19           7          23           6
+          18          40           5          22           9          32           9
+          18          40           5          14           8          32           9
+          67          28           4          17           7          23           6
+          54          83           6          29          10          30          13
+         227         169           7          59           9          32          10
+         680         142           5          63           8          25           7
+         117         153           6          63           8          25           7
+         512         166           5          63           8          25           7
+         407         160           6          95           9          25           7
+         654         140           5          97           8          24           6
+         186         141           6          51           9          31           8
+         NaN         118           6          73           8          31           9
+         248         134           6          58           8          32          11
+        2259         151           5          79           8          24           7
+         171         186           5          92           7          23           6
+         114         155           6          43           8          31          10
+         240         175           6          68           8          25           8
+         204         124           6          52           8          32          10
+         594         140           5          57           8          24           6
+         227         167           5          79           8          25           7
+        1514         207           8         103           7          25           8
+         119         127           8          55          10          27          10
+         164         109           5          51           7          24           7
+         170         225           7          46           8          33          11
+          91         110           6          40           9          26           8
+          69          99           5          38           7          24           6
+         112         131           6          58           8          31          10
+          70         106           6          38           7          24           8
+    }
+	\pgfplotstabletypeset[precision=1, sci, sci zerofill, sci e]{
+	F IO N P PN CPN CN
+   1.1702e-02   3.6086e-02   3.4900e-04   1.5980e-03   8.0200e-04   3.5160e-03   9.4600e-04
+   4.4800e-04   2.2564e-02   5.8300e-04   1.9520e-03   8.6700e-04   5.6890e-03   1.4480e-03
+   4.9900e-04   2.1043e-02   3.3300e-04   1.0700e-03   1.0310e-03   4.9210e-03   1.3960e-03
+   1.4210e-03   9.1580e-03   2.8800e-04   1.8880e-03   1.5030e-03   3.4000e-03   5.7700e-04
+   2.1220e-03   5.1799e-02   3.4900e-04   2.4310e-03   1.0880e-03   5.9710e-03   1.5900e-03
+   8.5610e-03   1.0403e-01   3.9500e-04   5.4940e-03   1.0340e-03   2.7520e-03   7.9300e-04
+   1.4034e-02   7.8736e-02   3.3000e-04   5.3060e-03   8.2400e-04   2.3660e-03   5.7400e-04
+   2.7900e-03   8.2011e-02   3.8100e-04   5.1570e-03   9.2200e-04   1.9830e-03   5.5600e-04
+   1.2057e-02   9.7721e-02   3.1300e-04   5.6680e-03   9.0200e-04   2.3250e-03   6.4500e-04
+   8.3460e-03   1.0757e-01   4.8800e-04   9.1090e-03   1.3460e-03   2.3160e-03   5.5300e-04
+   1.4852e-02   8.0472e-02   3.2300e-04   8.1700e-03   8.3900e-04   1.9770e-03   5.4100e-04
+   3.8830e-03   7.9527e-02   3.7100e-04   4.3750e-03   1.0190e-03   3.0020e-03   7.3500e-04
+          NaN   7.7689e-02   4.2000e-04   7.0090e-03   8.5600e-04   2.8140e-03   7.6600e-04
+   5.3890e-03   7.7547e-02   3.5400e-04   4.9110e-03   8.5600e-04   3.3270e-03   8.6400e-04
+   4.6632e-02   8.1549e-02   3.6800e-04   6.1700e-03   7.8600e-04   2.0600e-03   5.8100e-04
+   3.7750e-03   9.0435e-02   3.8300e-04   7.0680e-03   7.4100e-04   2.0020e-03   6.0500e-04
+   2.4250e-03   8.1873e-02   3.6000e-04   3.4340e-03   9.2900e-04   2.7290e-03   8.5900e-04
+   4.8880e-03   9.9168e-02   3.8600e-04   6.0570e-03   9.1500e-04   2.2680e-03   5.9600e-04
+   4.4800e-03   6.9830e-02   3.8500e-04   4.4740e-03   8.9600e-04   2.6060e-03   8.1900e-04
+   1.2394e-02   7.7063e-02   3.1500e-04   4.6590e-03   8.4400e-04   2.4340e-03   6.1400e-04
+   4.7990e-03   9.5875e-02   3.3200e-04   6.6660e-03   8.9900e-04   2.7850e-03   6.1900e-04
+   3.1778e-02   2.0431e-01   1.8000e-03   3.3675e-02   2.1470e-03   1.3683e-02   1.6450e-03
+   7.0580e-03   2.4390e-01   2.4150e-03   9.5870e-03   9.2380e-03   6.2940e-03   5.2160e-03
+   1.4582e-02   1.5107e-01   4.6600e-04   1.3581e-02   9.4700e-04   2.8940e-03   3.2820e-03
+   1.2237e-02   2.8130e-01   6.6800e-04   7.0760e-03   7.0640e-03   7.5390e-03   1.7040e-03
+   3.5150e-03   1.5668e-01   1.3130e-03   6.3350e-03   1.9010e-03   1.0376e-02   1.5690e-03
+   5.9180e-03   1.0661e-01   1.9760e-03   1.0195e-02   1.2870e-03   4.3350e-03   3.5720e-03
+   7.2970e-03   1.5740e-01   5.3000e-04   1.3809e-02   2.0710e-03   4.0560e-03   1.1570e-03
+   2.1280e-03   1.1396e-01   5.3900e-04   7.8750e-03   4.1190e-03   4.1670e-03   9.4500e-04
+   }	
+	\caption{Iteration counts and times for the 29 benchmark tensors and $\alpha = 0.90$}
+\end{table}
+
+\begin{table}
+\footnotesize
+	\pgfplotstabletypeset[]{
+	F IO N P PN CPN CN
+        1386          43           4          21           7          23           6
+          20          42           6          24           8          36          12
+          20          42           6          13           7          36          12
+          88          26           4          19           7          23           6
+          35          56          55          22           9          27          16
+         NaN         263           7         145         NaN          34          12
+         NaN         174           5         117           8          25           7
+         313         273           7         149           8          25           8
+         NaN         263           5         150           8          25           7
+         NaN         226           6         656           8          31           9
+         NaN         181           5        1152           8          24           6
+        3027         207           6         101          10          32           9
+         NaN         135           6         168           8          31           9
+         NaN         195           6         146          10          32          11
+         NaN         254           6         735           9          24           7
+         683         416           5         258           7          24           6
+         155         153           8          79          14          33          12
+         NaN         271           6         152          10          32          10
+         NaN         174           7          94           9          32          10
+         NaN         175           6          94           8          25           7
+        3793         260           6         200           9          26           8
+         NaN        1037         NaN         586          19          97         NaN
+         647         212         NaN         127         NaN          29         NaN
+         657         128           5          82           7          25           7
+         203         193          77          75         NaN          43          30
+         394         222           9         128         NaN          33          11
+         124         150           6          65           8          24           7
+         322         196           6         109          10          32          11
+         134         168           6          65           8          30          10
+         }
+	\pgfplotstabletypeset[precision=1, sci, sci zerofill, sci e]{
+	F IO N P PN CPN CN
+   3.2828e-02   1.9584e-02   5.8300e-04   3.6110e-03   1.9850e-03   8.5290e-03   2.4550e-03
+   9.1400e-04   4.5195e-02   7.0500e-04   4.3010e-03   2.3260e-03   5.5480e-03   1.1660e-03
+   5.5700e-04   2.5828e-02   3.7400e-04   1.0600e-03   1.2380e-03   3.2290e-03   9.4000e-04
+   1.9240e-03   9.5550e-03   2.6600e-04   1.3740e-03   6.3800e-04   1.6400e-03   4.9500e-04
+   7.5600e-04   3.5013e-02   2.7620e-03   2.8520e-03   1.0140e-03   2.1810e-03   9.2600e-04
+          NaN   1.9387e-01   4.1100e-04   1.3876e-02          NaN   4.1970e-03   9.0200e-04
+          NaN   1.5153e-01   3.1700e-04   1.0175e-02   8.5600e-04   2.0530e-03   5.6600e-04
+   6.9970e-03   1.8541e-01   4.0700e-04   1.2489e-02   8.2600e-04   2.4490e-03   6.0300e-04
+          NaN   1.7786e-01   4.6400e-04   1.4178e-02   8.7500e-04   2.1360e-03   1.0550e-03
+          NaN   1.6325e-01   4.5200e-04   5.8866e-02   9.4900e-04   4.3570e-03   7.4500e-04
+          NaN   1.4122e-01   3.1500e-04   1.0551e-01   9.5300e-04   1.8530e-03   5.2000e-04
+   6.4470e-02   1.3859e-01   4.1300e-04   8.6260e-03   1.1260e-03   4.0860e-03   7.5300e-04
+          NaN   9.2997e-02   3.8300e-04   1.4005e-02   9.2700e-04   2.8950e-03   8.2500e-04
+          NaN   1.4520e-01   5.0500e-04   1.3980e-02   1.2470e-03   3.0560e-03   8.4800e-04
+          NaN   1.6787e-01   4.5500e-04   6.3981e-02   9.3400e-04   1.8880e-03   6.0800e-04
+   1.5546e-02   2.2834e-01   3.5000e-04   1.9790e-02   7.5200e-04   2.7240e-03   5.2600e-04
+   3.1270e-03   9.7252e-02   5.1700e-04   5.9740e-03   1.7660e-03   3.6560e-03   9.0300e-04
+          NaN   1.8532e-01   3.5600e-04   1.3674e-02   1.6700e-03   2.7710e-03   7.6700e-04
+          NaN   1.4233e-01   4.1700e-04   9.6470e-03   1.1590e-03   3.0970e-03   8.1100e-04
+          NaN   1.4594e-01   4.0000e-04   9.5320e-03   1.6150e-03   4.2230e-03   9.6000e-04
+   8.5913e-02   1.7180e-01   3.8300e-04   1.7298e-02   9.9700e-04   3.2290e-03   7.1200e-04
+          NaN   8.0667e-01          NaN   5.6404e-02   2.3720e-03   1.2301e-02          NaN
+   1.9804e-02   1.5049e-01          NaN   1.2703e-02          NaN   5.7470e-03          NaN
+   2.2515e-02   8.0935e-02   3.1100e-04   7.6560e-03   7.6300e-04   2.2310e-03   5.9100e-04
+   4.3470e-03   1.4030e-01   3.8440e-03   6.8320e-03          NaN   8.3110e-03   3.8080e-03
+   1.3580e-02   1.6889e-01   5.7100e-04   1.4353e-02          NaN   7.6060e-03   1.7830e-03
+   6.5710e-03   1.7039e-01   4.1000e-04   7.3640e-03   9.2100e-04   4.4760e-03   2.7830e-03
+   1.1810e-02   1.6349e-01   6.5100e-04   1.1741e-02   1.4480e-03   3.2480e-03   9.3900e-04
+   2.9330e-03   9.3327e-02   4.6300e-04   6.4080e-03   9.5200e-04   3.2110e-03   9.4500e-04
+	}	
+	\caption{Iteration counts and times for the 29 benchmark tensors and $\alpha = 0.95$}
+\end{table}
+
+\begin{table}
+\footnotesize
+	\pgfplotstabletypeset[]{
+	F IO N P PN CPN CN
+         NaN          42           5          21           6          22           6
+          23          48           6          26           7          36          13
+          23          48           6          10           7          36          13
+         114          24           4          19           6          22           6
+          22          41          17          15           7          26          29
+         NaN         639           7         NaN         NaN          39          14
+         NaN         234           5         369           8          24           7
+         NaN        1221           6        1845           9          26           9
+         NaN         532           5         NaN           7          24           7
+         NaN         339           6         NaN           7          30           9
+         NaN         228           5         NaN           7          23           7
+         NaN         357           6         362         NaN          31           9
+         NaN         156           6        7509           6          31          10
+         NaN         329           6         NaN         NaN          32          11
+         NaN         550           6         NaN           8          23           7
+         NaN         NaN           5         NaN           7          23           7
+         NaN        1173         NaN         NaN          71          32          11
+         NaN         541           6        1595         NaN          31          10
+         NaN         273         NaN         248           8          37          12
+         NaN         230           7         196           7          24           7
+         NaN         533           6         NaN           9          31          10
+         NaN         NaN           7         205           6          32          16
+         NaN         435         NaN         504         NaN          35         NaN
+         NaN         147           5         137           7          29           8
+         NaN         835         NaN         NaN          44          59          36
+         NaN         654         NaN         NaN         NaN          33          12
+         NaN         NaN         NaN        8025        1326         903         NaN
+         NaN         334           6         307         NaN          37          13
+        2005        2100           9         909          10          33          14
+    }
+	\pgfplotstabletypeset[precision=1, sci, sci zerofill, sci e]{
+	F IO N P PN CPN CN
+          NaN   2.2584e-02   3.6700e-04   1.5930e-03   6.4100e-04   2.0230e-03   9.3500e-04
+   5.5400e-04   2.4239e-02   3.6400e-04   1.9410e-03   7.2400e-04   3.1350e-03   1.0240e-03
+   5.3900e-04   2.4588e-02   3.8300e-04   8.0300e-04   7.4600e-04   2.9520e-03   1.5350e-03
+   2.2770e-03   7.6890e-03   2.7000e-04   1.3960e-03   6.5600e-04   2.3630e-03   9.4500e-04
+   5.1500e-04   2.4535e-02   7.8900e-04   1.1460e-03   6.8700e-04   2.1060e-03   2.6250e-03
+          NaN   5.3659e-01   4.1300e-04          NaN          NaN   4.3790e-03   1.2970e-03
+          NaN   1.7082e-01   3.2900e-04   3.2384e-02   9.9900e-04   2.0820e-03   5.7300e-04
+          NaN   7.7947e-01   3.8700e-04   1.4910e-01   1.1120e-03   2.2050e-03   6.3800e-04
+          NaN   3.4171e-01   3.1700e-04          NaN   2.1620e-03   3.4200e-03   9.3200e-04
+          NaN   2.3493e-01   3.5800e-04          NaN   1.2010e-03   2.9190e-03   7.5200e-04
+          NaN   2.0794e-01   3.6100e-04          NaN   1.3470e-03   2.2580e-03   6.1600e-04
+          NaN   2.9058e-01   4.2000e-04   3.4537e-02          NaN   3.3810e-03   9.1400e-04
+          NaN   1.2589e-01   4.0900e-04   6.6143e-01   9.7400e-04   3.4820e-03   8.0200e-04
+          NaN   2.4520e-01   3.6600e-04          NaN          NaN   6.5870e-03   9.0200e-04
+          NaN   4.4586e-01   4.2500e-04          NaN   1.2980e-03   2.3570e-03   6.1200e-04
+          NaN          NaN   1.0890e-03          NaN   1.1640e-03   2.3020e-03   1.0750e-03
+          NaN   9.1925e-01          NaN          NaN   1.4036e-02   3.6080e-03   1.7730e-03
+          NaN   3.8618e-01   3.9200e-04   1.4446e-01          NaN   7.9680e-03   1.7180e-03
+          NaN   2.0309e-01          NaN   2.6283e-02   1.1620e-03   3.8240e-03   9.7600e-04
+          NaN   1.6503e-01   4.3500e-04   1.7139e-02   8.6400e-04   2.1780e-03   9.8500e-04
+          NaN   3.5686e-01   3.6800e-04          NaN   2.0630e-03   4.8210e-03   1.1050e-03
+          NaN          NaN   4.9300e-04   1.5977e-02   1.1550e-03   3.5570e-03   1.0090e-03
+          NaN   3.2779e-01          NaN   5.6949e-02          NaN   4.9450e-03          NaN
+          NaN   1.0962e-01   3.1500e-04   1.1842e-02   7.8300e-04   2.3310e-03   7.4200e-04
+          NaN   6.0952e-01          NaN          NaN   1.2767e-02   1.1629e-02   3.8200e-03
+          NaN   4.8661e-01          NaN          NaN          NaN   7.3620e-03   1.6520e-03
+          NaN          NaN          NaN   8.3073e-01   2.5737e-01   1.9704e-01          NaN
+          NaN   3.0900e-01   4.4900e-04   3.9522e-02          NaN   6.2710e-03   2.1540e-03
+   4.9685e-02   1.1251e+00   5.6400e-04   9.2073e-02   1.4950e-03   4.5540e-03   1.2710e-03
+}	
+	\caption{Iteration counts and times for the 29 benchmark tensors and $\alpha = 0.99$}
+\end{table}
+
+\begin{table}
+\footnotesize
+	\pgfplotstabletypeset[]{
+	F IO N P PN CPN CN
+         NaN          41           5          21           6          22           6
+          29          51           6          28           7          36          13
+          29          51           6           9           6          36          13
+         122          24           4          19           6          22           6
+          18          38         336          13           8          26          71
+         NaN         NaN           7         NaN         NaN          39          14
+         NaN         251           5         723           8          24           7
+         NaN         NaN           6         NaN           9          26           9
+         NaN         NaN           5         NaN           7          24           7
+         NaN         383           6         NaN           7          31           9
+         NaN         243           5         NaN           7          23           7
+         NaN         442           6         824         NaN          31           9
+         NaN         164           6         NaN           6          31          10
+         NaN         396           6         NaN         NaN          36          12
+         NaN         812           6         NaN           8          23           7
+         NaN         NaN           5         NaN           7          23           7
+         NaN         NaN         NaN         NaN         NaN          33          12
+         NaN         848           6         NaN         NaN          31          10
+         NaN         323         NaN         388           8          37          12
+         NaN         253           7         258           7          24           7
+         NaN         857           6         NaN           9          31          10
+         NaN         334           7         165           6          32          16
+         NaN         577         NaN        1185         NaN          35         NaN
+         NaN         150           5         160           7          29           8
+         NaN         NaN         NaN         NaN         NaN          60          37
+         NaN         NaN         NaN         NaN         NaN          38          14
+         348         358          50         276         192          64          54
+         NaN         406           7         522         NaN          38          13
+         205         224          12         108         NaN         NaN          17
+         }
+	\pgfplotstabletypeset[precision=1, sci, sci zerofill, sci e]{
+	F IO N P PN CPN CN
+          NaN   2.7202e-02   1.0410e-03   1.4629e-02   2.2880e-03   4.1530e-03   4.9770e-03
+   1.4880e-03   6.6652e-02   8.5400e-04   3.6640e-03   1.3740e-03   5.3280e-03   1.9050e-03
+   1.2320e-03   3.2028e-02   5.1500e-04   7.8500e-04   8.2000e-04   3.3350e-03   1.0240e-03
+   2.5230e-03   7.6650e-03   2.7100e-04   1.4100e-03   8.4900e-04   1.8610e-03   6.8900e-04
+   4.3100e-04   2.1888e-02   1.5099e-02   1.0520e-03   1.3070e-03   2.9500e-03   3.2430e-03
+          NaN          NaN   4.5100e-04          NaN          NaN   3.8990e-03   1.1710e-03
+          NaN   1.6381e-01   3.6800e-04   5.8052e-02   9.7100e-04   1.9250e-03   5.9300e-04
+          NaN          NaN   3.6900e-04          NaN   1.4730e-03   2.6430e-03   6.7500e-04
+          NaN          NaN   3.5300e-04          NaN   9.9400e-04   2.0340e-03   6.0700e-04
+          NaN   2.6521e-01   3.6600e-04          NaN   1.5330e-03   3.3730e-03   8.6500e-04
+          NaN   1.6048e-01   3.2500e-04          NaN   1.2340e-03   2.2530e-03   5.8100e-04
+          NaN   2.9745e-01   3.6300e-04   6.7813e-02          NaN   5.2480e-03   1.6600e-03
+          NaN   1.2001e-01   3.6200e-04          NaN   8.0800e-04   2.6580e-03   9.3300e-04
+          NaN   2.5484e-01   3.5600e-04          NaN          NaN   4.0190e-03   1.0080e-03
+          NaN   4.4770e-01   4.1800e-04          NaN   1.3270e-03   2.3900e-03   7.4300e-04
+          NaN          NaN   3.4300e-04          NaN   9.3000e-04   1.9090e-03   6.0300e-04
+          NaN          NaN          NaN          NaN          NaN   3.4880e-03   1.0520e-03
+          NaN   7.1828e-01   3.7500e-04          NaN          NaN   5.6200e-03   1.6270e-03
+          NaN   2.5879e-01          NaN   3.8235e-02   1.0840e-03   3.4620e-03   1.0040e-03
+          NaN   1.6570e-01   4.3800e-04   2.0693e-02   7.7000e-04   2.0490e-03   5.7100e-04
+          NaN   5.0271e-01   3.6000e-04          NaN   1.4690e-03   3.1450e-03   7.9100e-04
+          NaN   2.2542e-01   4.0600e-04   1.1721e-02   5.9100e-04   2.6760e-03   1.0140e-03
+          NaN   3.7486e-01          NaN   1.1023e-01          NaN   4.4670e-03          NaN
+          NaN   1.0086e-01   3.9000e-04   1.2517e-02   7.8700e-04   2.4110e-03   7.5600e-04
+          NaN          NaN          NaN          NaN          NaN   8.3790e-03   2.6680e-03
+          NaN          NaN          NaN          NaN          NaN   8.7160e-03   3.4950e-03
+   9.6220e-03   2.5514e-01   2.5230e-03   2.4067e-02   2.6906e-02   7.7690e-03   2.8530e-03
+          NaN   2.6926e-01   5.5900e-04   4.5771e-02          NaN   7.6270e-03   1.8800e-03
+   8.6240e-03   1.9161e-01   7.2600e-04   9.6870e-03          NaN          NaN   2.4730e-03
+   }	
+	\caption{Iteration counts and times for the 29 benchmark tensors and $\alpha = 0.999$} \label{lasttable}
+\end{table}
+
+We comment briefly on the results. Newton-based methods typically require a constant number of iterations to converge, but on some of the benchmarks they fail to converge or require a much larger number of iterations. From the point of view of reliability, combining the Perron-Newton algorithm with the continuation strategy gives a definite advantage: the resulting method CPN is the only one (among the ones considered) that can solve successfully all the problems in the original benchmark set in~\cite{GleLY15}, which contained the experiments with all values of $\alpha$ up to $0.99$. Raising $\alpha$ to the more extreme value of $0.999$ reveals a failure case for this method as well, the last problem \texttt{R6\_5}. However, if one lowers the parameter $\tau$ to $0.001$, method CPN converges in 652 iterations on this problem, too.
+
+These results confirm the findings of~\cite{GleLY15} that problem \texttt{R6\_3} (the third to last one) for $\alpha=0.99$ is the hardest problem; Perron-based algorithms can solve it successfully in the end, but (like the algorithms in~\cite{GleLY15}) they stagnate for a large number of iterations around a point which is far away from the true solution.
+
+\section{Conclusions} \label{sec:conclusions}
+We have used the theory of quadratic vector equations in~\cite{BinMP11,MeiP11,Pol13} to attack the multilinear pagerank problem described in~\cite{GleLY15}. Considering all nonnegative solutions instead of only the stochastic ones reveals some new properties on the structure of these solutions, and allows one to use a broader array of algorithms, with computational advantage. The new algorithms achieve better results when $\alpha \approx 1$, which is the most interesting and computationally challenging case.
+
+\bibliography{mlpr.bib}
+\end{document}

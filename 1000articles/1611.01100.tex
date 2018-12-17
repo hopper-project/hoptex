@@ -1,0 +1,1484 @@
+
+\documentclass[final]{siamltex}
+\usepackage{amsmath,amsfonts,amssymb}
+\newtheorem{remark}{Remark}
+\newtheorem{assumption}{Assumption}
+
+\usepackage{latexsym}
+\usepackage{epsfig,overpic}
+\usepackage{todonotes}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks= true,
+  allcolors = {green!50!black},
+  urlcolor  = {red!50!black},
+}
+
+\usepackage{pgfplots}
+\usetikzlibrary{shapes,arrows,snakes,calendar,matrix,backgrounds,folding,calc,positioning,spy}
+\usepackage{tikz}
+
+\usepackage{siunitx}
+\sisetup{round-precision=2,round-mode=figures,retain-zero-exponent=true}
+\sisetup{exponent-product = {\!\cdot}, output-product = \cdot}
+
+ 
+ 
+ 
+
+ 
+
+\DeclareSIUnit[number-unit-product = {~}]\Q{~}
+\DeclareSIPrefix\kilo{K}{3}
+\DeclareSIPrefix\mega{M}{6}
+\DeclareSIPrefix\terra{K}{9}
+
+\title{Analysis of a high order Trace Finite Element Method for PDEs on level set surfaces}
+\author{
+J\"org Grande\thanks{Institut f\"ur
+Geometrie und Praktische Mathematik, RWTH Aachen University, D-52056 Aachen,
+Germany; email: {\tt \{grande,reusken\}@igpm.rwth-aachen.de}}
+\and
+Christoph Lehrenfeld\thanks{Institut f\"ur Numerische und Angewandte Mathematik, WWU M\"unster, D-48149 M\"unster,
+Germany; email: {\tt lehrenfeld@math.uni-goettingen.de}}
+\and
+Arnold Reusken\footnotemark[1] 
+}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+We present a new high order finite element method for the discretization of partial differential equations on stationary smooth surfaces which are implicitly described as the zero level of a level set function. The discretization is based on a trace finite element technique. The higher discretization accuracy is obtained by using an isoparametric mapping of the volume mesh, based on the level set function, as introduced in [C. Lehrenfeld, \emph{High order unfitted finite element methods on level set domains using isoparametric mappings}, Comp. Meth. Appl. Mech. Engrg. 2016]. The resulting trace finite element method is easy to implement. We present an error analysis of this method and derive optimal order $H^1(\Gamma)$-norm error bounds. A second main topic of this paper 
+ is a unified analysis of several stabilization methods for trace finite element methods. Three methods known from the literature and one new method are analyzed in a general framework. Only the new stabilization method, which is based on adding an anisotropic diffusion in the volume mesh, is able to control the condition number of the stiffness matrix also for the case of higher order discretizations. Results of numerical experiments are included which confirm the theoretical findings on optimal order discretization errors and uniformly bounded condition numbers.
+\end{abstract}
+
+\begin{keywords} 
+trace finite element method,
+isoparametric finite element method,
+high order methods,
+geometry errors,
+conditioning,
+surface PDEs
+ \end{keywords}
+ \begin{AMS} 
+   58J32, 65N15, 65N22, 65N30
+ \end{AMS}
+
+\section[Introduction]{Introduction}\label{sec:introduction}
+Recently there has been an increasing interest in \emph{unfitted finite element methods}. These methods offer the possibility to handle complex geometries which are not aligned with a computational (background) mesh. Also the development and analysis of numerical methods for PDEs on (evolving) surfaces is a rapidly growing research area.
+
+The trace finite element method (TraceFEM) \cite{olshanskii2009finite} is an unfitted FEM for PDEs on implicit domains which are described via a level set function. 
+In this paper we introduce and analyze a \emph{higher order} TraceFEM for surface PDEs. Furthermore, several \emph{stabilization methods} are studied. The aim of these methods is to obtain condition numbers which are uniformly bounded with respect to the location of the surface in the underlying volume triangulation. 
+
+\subsection*{Literature}
+The TraceFEM was introduced in \cite{olshanskii2009finite} for elliptic PDEs on smooth stationary surfaces. 
+For piecewise linears, the method has been studied extensively. For stationary surfaces, the conditioning properties of the resulting stiffness matrices are discussed in \cite{reusken10matrixprop}. 
+Convection dominated problems are considered in \cite{olshanskii14advection,burman15cutdgimajna}. In \cite{olshanskii14advection} a streamline diffusion stabilization is treated, whereas in \cite{burman15cutdgimajna} a Discontinuous Galerkin formulation is studied.
+For PDEs on \emph{evolving} surfaces, space-time formulations of the TraceFEM were first considered in \cite{grande2014movingsurfaces}. A space-time formulation of the TraceFEM is analyzed in \cite{grande2014spacetime,olshanskii14spacetime,olshanskii14spacetimeanalysis} .
+In all these publications, only piecewise linears are considered. 
+
+One major issue in the design and realization of high order methods in the context of unfitted finite element methods is the problem of numerical integration on domains which are represented implicitly. Different approaches to deal with this issue exist, cf. the literature overview in \cite{lehrenfeld2015cmame}. 
+
+For surface PDEs on implicit domains, higher order FE methods have first been considered in \cite{demlow2009higher}. In that paper it is crucial that the surface is given as the \emph{zero level of a smooth signed distance function $d$ which is explicitly known}. Based on $d$ a parametric mapping of a shape regular piecewise triangular surface approximation to the zero level of the distance function is constructed which results in a higher order surface representation. In that method the finite element space is explicitly defined with respect to this triangular surface approximation. Hence, it is not a TraceFEM.
+In \cite{grande2014highordersjna} a higher order TraceFEM discretization is introduced for PDEs on surfaces which are represented as the zero level of a level set function, which is not necessarily a signed distance function. To this end, 
+a \emph{parametric mapping of a piecewise planar interface approximation} 
+is constructed based on quasi-normal fields. Both in \cite{demlow2009higher} and \cite{grande2014highordersjna} optimal a-priori error bounds are derived. 
+An approach, similar to the one in \cite{grande2014highordersjna}, to enhance the geometry approximation of a piecewise planar interface approximation has recently been introduced in \cite{lehrenfeld2015cmame}. In the latter paper, however, a \emph{parametric mapping of the underlying mesh} is used. The construction of such a mapping is presented in \cite{lehrenfeld2015cmame}, and optimal approximation properties have been derived in \cite{CLARH1} for an elliptic interface model problem. 
+The parametric mapping of the underlying mesh allows for a high order approximation of both bulk domains and implicitly defined surfaces/interfaces. Hence this approach can be used to obtain higher order discretizations for interface problems (as in \cite{CLARH1}) as well as for surface-bulk coupled problems with Trace FEM (as considered in \cite{goresaim}).
+
+Different aspects, which are less relevant for the topic of this paper, of high order discretizations on \emph{triangulated surface} are treated in \cite{demlow2009higher,langer2014discontinuousbook,antonietti2015high}.
+
+Related to the conditioning of stiffness matrices in TraceFEM we note the following. To improve the conditioning of the stiffness matrices in the TraceFEM  the ``full gradient volume stabilization'' has been considered in \cite{burman16fullgradcmame,reusken2015}. Other techniques known in the literature are the ``ghost penalty stabilization'' \cite{Burman2010,BHL15} and the ``full gradient surface stabilization'' \cite{DER14,reusken2015}. A comparison of these methods is given in section~\ref{sec:condition-number}.
+
+\subsection*{Main contributions of this paper}
+We use the approach presented in \cite{lehrenfeld2015cmame} to obtain a \emph{higher order isoparametric TraceFEM for surface PDEs}. The method needs as input only a (high order) finite element approximation of the level set function and is easy to implement (in particular, easier as the method treated in \cite{grande2014highordersjna}). In this TraceFEM a finite element space is defined 
+on a \emph{transformed} background mesh and a discretization is obtained by restricting the corresponding functions to an (approximated) surface and applying a Galerkin formulation. The isoparametric mapping of the background mesh is the key ingredient for obtaining a higher order discretization, very similar to the standard finite element isoparametric technique for higher order boundary approximation. We present an error analysis for this method and derive \emph{optimal order $H^1$-norm discretization error bounds}. A second main contribution of this paper is concerned with stabilization methods for obtaining condition numbers which are uniformly bounded with respect to the location of the surface in the underlying volume triangulation. We present a \emph{unified framework} for analyzing such methods and introduce a \emph{new stabilization technique}. The analysis reveals that none of the known methods yields satisfactory results for higher order discretizations. The new stabilization method, however, is applicable also to higher order discretizations. 
+\subsection*{Structure of the paper}
+In section \ref{sec:problem} we recall the weak formulation of the Laplace--Beltrami equation and introduce our assumptions concerning the geometry description based on a level set function. The parametric mapping used to obtain a high order accurate geometry description is introduced in section 
+\ref{sec:mapping}. The isoparametric trace FEM is given in section \ref{sec:itracefem}. In that section we introduce a generic stabilization $s_h(\cdot,\cdot)$. In section \ref{sec:error-analysis}
+we derive an optimal a-priori discretization error bound in the $H^1$-norm. For this we need two conditions on the stabilization bilinear form $s_h(\cdot,\cdot)$ to hold. 
+In section \ref{sec:condition-number} we derive condition number bounds for the stiffness matrix which are robust with respect to the
+position of the surface in the computational mesh. In this analysis a third condition for the stabilization bilinear form $s_h(\cdot,\cdot)$ is introduced. It is shown that the three conditions on $s_h(\cdot,\cdot)$ that arise in the analysis are satisfied for certain known stabilization methods applied to linear FE discretizations. We furthermore introduce a new stabilization technique which is suitable not only for the linear but also for the higher order case. 
+An analysis of this new stabilization is given in section \ref{sec:new-stab}. 
+ Numerical experiments which illustrate the (optimal) higher order of convergence and the conditioning of the corresponding stiffness matrices are provided in section \ref{sec:numex}. A summary and outlook are given in section \ref{sec:conclusion}.
+
+\section{Problem formulation} \label{sec:problem}
+Let $\Omega\subseteq{\mathbb{R}}^3$
+be a polygonal domain and $\Gamma \subset \Omega $ a smooth, closed, connected 2D surface.
+Given $f\in H^{-1}(\Gamma)$, with $f(1)=0$ we consider the following Laplace--Beltrami equation:
+Find $u\in H_\ast^1(\Gamma):= \{\, v \in H^1(\Gamma)~|~\int_\Gamma v \, {\,\mathrm{d} {s}}=0 \, \}$ such that
+\begin{equation}\label{eq:weak-LB}
+  a(u,v)= f(v)\quad\text{for all } v\in H_\ast^1(\Gamma)
+\end{equation}
+with
+\[
+  a(u,v)= \int_\Gamma \nabla_\Gamma u \cdot \nabla_\Gamma v \, {\,\mathrm{d} {s}}.
+\]
+
+\subsection{Geometry description through a level set function} \label{prelim}
+We assume that the smooth surface $\Gamma$ is the zero level of a smooth level set function $\phi$, i.e., $\Gamma= \{\, x \in \Omega~|~\phi(x)=0\,\}$.
+This level set function is not necessarily close to a distance function, but has the usual properties of a level set function: 
+\begin{equation} \label{eq:lsetprops}
+\|\nabla \phi(x)\| \sim 1~,~~\|D^2 \phi(x)\| \leq c \quad \text{for all}~x~~ \text{in a neighborhood $U$ of $\Gamma$}.
+\end{equation}
+We assume that the level set function has the smoothness property $\phi \in C^{k+2}(U)$, where $k$ denotes the polynomial degree of the finite element space introduced below. The assumptions on the level set function \eqref{eq:lsetprops} imply the following relation, which is fundamental in the analysis below:
+\begin{equation} \label{eq:lsetdist}
+ |\phi(x+\epsilon \nabla \phi(x)) - \phi(x+\tilde \epsilon \nabla \phi(x))| \sim |\epsilon - \tilde \epsilon|, \quad x \in U,
+\end{equation}
+for $|\epsilon|, |\tilde \epsilon|$ sufficiently small.
+
+We assume a simplicial triangulation of $\Omega$, denoted by ${\mathcal{T}} \in \{{\mathcal{T}}_h\}_{h>0}$, and the standard finite element space of continuous piecewise polynomials up to degree $k$ by $V_h^k$. 
+The nodal interpolation operator in $V_h^k$ is denoted by ${I^k}$. 
+
+For ease of presentation we assume quasi-uniformity of the mesh, and $h$ denotes a characteristic mesh size with $h\sim h_T:={\rm diam}(T)$, $~T\in{\mathcal{T}}$.
+
+As input for the parametric mapping we need an approximation $\phi_h \in V_h^k$ of $\phi$, and in the error analysis we assume that this approximation satisfies the error estimate
+\begin{equation} \label{err2}
+  \max_{T\in {\mathcal{T}}} |\phi_h - \phi|_{m,\infty,T \cap U} \lesssim h^{k+1-m},\quad 0 \leq m \leq k+1.
+\end{equation}
+Here $|\cdot|_{m,\infty,T\cap U}$ denotes the usual semi-norm on the Sobolev space $H^{m,\infty}(T\cap U)$ and the constant used in $\lesssim$ depends on $\phi$ but is independent of $h$.
+Note that \eqref{err2} implies the estimate
+\begin{equation} \label{err1}
+ \|\phi_h - \phi\|_{\infty, U} + h\|\nabla(\phi_h - \phi)\|_{\infty, U} \lesssim h^{k+1}. 
+\end{equation}
+The zero level of the finite element function $\phi_h$ (implicitly) characterizes an approximation of the interface. 
+\emph{The piecewise linear nodal interpolation of $\phi_h$ is denoted by ${\hat \phi_h} = {I^1} \phi_h$.} Hence, ${\hat \phi_h}(x_i)=\phi_h(x_i)$ at all vertices $x_i$ in the triangulation ${\mathcal{T}}$. 
+The low order geometry approximation of the interface, which is needed in our discretization method, is the zero level of this function:
+\[
+  {\Gamma^{\text{lin}}} := \{ x\in\Omega\mid {\hat \phi_h}(x) = 0\}.
+\]
+All elements in the triangulation ${\mathcal{T}}$ which are cut by ${\Gamma^{\text{lin}}}$ are collected in the set ${{\mathcal{T}}^{\Gamma}} := \{T \in {\mathcal{T}}\mid T \cap {\Gamma^{\text{lin}}} \neq \emptyset \}$. The corresponding domain is ${\Omega^{\Gamma}} := \{ x \in T \mid T\in {{\mathcal{T}}^{\Gamma}}\}$. 
+We define the set of facets \emph{inside} $\Omega^\Gamma$, $\mathcal{F}^\Gamma := \{ F = \overline{T}_a \cap \overline{T}_b; T_a,T_b \in {\mathcal{T}}^\Gamma, \operatorname{\operatorname{meas}}_{d-1}(F) > 0\}$.
+
+\section{The isoparametric mapping} \label{sec:mapping}
+We use the mesh transformation introduced in \cite{lehrenfeld2015cmame} and \cite{CLARH1}. 
+We only outline the important ingredients in the construction of the mapping. For details we refer to the thorough discussion in \cite[Section 3]{CLARH1}. 
+
+We first introduce a mapping $\Psi$ on ${\Omega^{\Gamma}}$ with the property $\Psi({\Gamma^{\text{lin}}})=\Gamma$. Using $G:=\nabla \phi$ a function $d: {\Omega^{\Gamma}} \to \mathbb{R}$ is defined as follows: $d(x)$ is the (in absolute value) smallest number such that
+\begin{equation} \label{cond1}
+  \phi(x + d(x) G(x))=\hat \phi_h(x) \quad \text{for}~~x \in {\Omega^{\Gamma}}.
+\end{equation}
+Let $C^l({{\mathcal T}^{\Gamma}}) := \{ v \mid v|_T \in C^l(T),~ T \in {{\mathcal T}^{\Gamma}}\},~l \in \mathbb{N}_0,$ be the space of element-wise $C^l$-continuous functions that can be discontinuous across element faces.
+In \cite{CLARH1} it is shown that for $h$ sufficiently small the relation in \eqref{cond1} defines a unique 
+ $d(x)$ and $d \in C({\Omega^{\Gamma}}) \cap H^{1,\infty} ({\Omega^{\Gamma}}) \cap C^{k+1}({{\mathcal T}^{\Gamma}})$. Given the function
+ $dG \in [C({\Omega^{\Gamma}})]^3 \cap [H^{1,\infty}({\Omega^{\Gamma}})]^3$ we define:
+\begin{equation} \label{psi1}
+ \Psi(x):= x + d(x) G(x), \quad x \in {\Omega^{\Gamma}}.
+\end{equation}
+In general, e.g., if $\phi$ is not explicitly known, the mapping $\Psi$ is not computable. We introduce an easy to construct accurate approximation of $\Psi$ as follows.
+
+We define the polynomial extension 
+$\mathcal{E}_T: \mathcal{P}(T) \rightarrow \mathcal{P}(\mathbb{R}^3)$ so that for $v \in V_h^k$ we have $(\mathcal{E}_T v)|_T = v|_T,~T\in{{\mathcal T}^{\Gamma}}$.
+For a search direction $G_h$ we need a sufficiently accurate approximation of $\nabla \phi$. In this paper we take 
+\[ G_h = \nabla \phi_h,
+\]
+but there are other options.
+Given $G_h$ we define a function $d_h: {{\mathcal{T}}^{\Gamma}} \to [-\delta,\delta]
+$, with $\delta > 0$ sufficiently small, as follows: 
+$d_h(x)$ is the (in absolute value) smallest number such that
+\begin{equation} \label{eq:psihmap}
+  \mathcal{E}_T \phi_h(x + d_h(x) G_h(x)) = {\hat \phi_h}(x), \quad \text{for}~~ x\in T \in {{\mathcal{T}}^{\Gamma}}.
+\end{equation}
+In the same spirit as above, corresponding to $d_h$ we define
+\begin{equation} \label{eq:psih}
+  \Psi_h(x) := x + d_h(x) G_h(x), \quad \text{for}~~ x\in T \in {{\mathcal{T}}^{\Gamma}},
+\end{equation}
+which is an approximation of the mapping $\Psi$ in \eqref{psi1}.
+The mapping may be discontinuous across facets. Using a simple projection $P_h$ we map this transformation into the continuous finite element space, resulting in 
+\begin{equation} \label{defThetah} \Theta_h := P_h \Psi_h \in [V_h^k]^3,
+\end{equation}
+ cf. \cite[Section 2.2]{CLARH1} for details. Based on this transformation we define
+\begin{equation}
+\Gamma_h := \Theta_h({\Gamma^{\text{lin}}}) = \{ x~|~\hat\phi_h \big( \Theta_h^{-1}(x)\big) = 0 \}.
+\end{equation}
+ \begin{figure}[h!]
+   \vspace*{-0.2cm}
+   \begin{center}
+     \begin{tikzpicture}[scale=1.5]
+       \node(Olin) {
+     \begin{tikzpicture}[scale=1.5]
+       \coordinate (A) at (0.0,0.0);
+       \coordinate (B) at (0.7,0.7);
+       \coordinate (C) at (1.0,0.0);
+       \coordinate (D) at (0.6,-0.6);
+       \coordinate (E) at (-0.2,-0.8);
+       \coordinate (F) at ($(A)!0.6!(E)$);
+       \coordinate (G) at ($(A)!0.5!(D)$);
+       \coordinate (H) at ($(A)!0.5!(C)$);
+       \coordinate (I) at ($(B)!0.5!(C)$);
+       \draw[line width=1pt] (A) -- (B) -- (C) --cycle;
+       \draw[line width=1pt] (A) -- (C) -- (D) --cycle;
+       \draw[line width=1pt] (A) -- (D) -- (E) --cycle;
+       \draw[red!85!black,line width=1.5pt] (F) -- (G) -- (H) -- (I);
+       \node[above right] at (I) {\color{red!85!black}${\Gamma^{\text{lin}}}$};
+       \node[right] at (D) {\color{black}${\Omega^{\Gamma}}$};
+       \coordinate (J) at (0.625,0.125);
+       \coordinate (K) at (0.475,0.275);
+       \draw[red!85!black,line width=0.75pt,->] (J) -- (K);
+       \node[above right,scale=0.7] at (K) {\!\!\color{red!85!black}$n_{\text{lin}}$};
+     \end{tikzpicture}
+   };
+   \node[right= 2cm of Olin.north east](Oexa) {
+     \begin{tikzpicture}[scale=1.5]
+       \coordinate (A) at (0.0,0.0);
+       \coordinate (B) at (0.7,0.7);
+       \coordinate (C) at (1.0,0.0);
+       \coordinate (D) at (0.6,-0.6);
+       \coordinate (E) at (-0.2,-0.8);
+       \coordinate (F) at (-0.2,-0.55);
+       \coordinate (I) at (0.92,0.42);
+       \draw[line width=1pt] (A) to[in=-160,out=70] (B) to[in=100,out=-30] (C);
+       \draw[line width=1pt] (A) to[in=170,out=-12] (C) to[in=60,out=-150] (D);
+       \draw[line width=1pt] (A) to[in=150,out=-60] (D) to[in=0,out=-160] (E) to[in=-130,out=95] (A);
+       \draw[green!85!black,line width=1.5pt] (F) to[in=-170,out=0] (I);
+       \node[above right] at (I) {\color{green!85!black}$\Gamma$};
+       \node[right] at (D) {\color{black}${\Omega^{\Gamma}}_{\Psi}$};
+       \coordinate (J) at (0.575,0.215);
+       \coordinate (K) at (0.425,0.335);
+       \draw[green!85!black,line width=0.75pt,->] (J) -- (K);
+       \node[above right,scale=0.7] at (K) {\!\!\color{green!85!black}$n$};
+     \end{tikzpicture}
+   };
+   \node[right = 2cm of Oexa.east, anchor=north west](Oh) {
+     \begin{tikzpicture}[scale=1.5]
+       \coordinate (A) at (0.0,0.0);
+       \coordinate (B) at (0.7,0.7);
+       \coordinate (C) at (1.0,0.0);
+       \coordinate (D) at (0.6,-0.6);
+       \coordinate (E) at (-0.2,-0.8);
+       \coordinate (F) at (-0.2,-0.55);
+       \coordinate (G) at (0.255,-0.35);
+       \coordinate (H) at (0.5,0.04);
+       \coordinate (I) at (0.94,0.42);
+       \draw[line width=1pt] (A) to[in=-160,out=70] (B) to[in=95,out=-35] (C);
+       \draw[line width=1pt] (A) to[in=170,out=10] (C) to[in=73,out=-138] (D);
+       \draw[line width=1pt] (A) to[in=150,out=-60] (D) to[in=5,out=-155] (E) to[in=-130,out=95] (A);
+       \draw[blue!85!black,line width=1.5pt] (F) to[in=-135,out=5] (G) to[in=-130,out=65] (H) to[out=70,in=-170] (I);
+       \node[above right] at (I) {\color{blue!85!black}$\Gamma_h$};
+       \node[right] at (D) {\color{black}${\Omega^{\Gamma}}_{\Theta}$};
+       \coordinate (J) at (0.59,0.23);
+       \coordinate (K) at (0.425,0.335);
+       \draw[blue!85!black,line width=0.75pt,->] (J) -- (K);
+       \node[above right,scale=0.7] at (K) {\!\!\color{blue!85!black}$n_h$};
+     \end{tikzpicture}
+   };
+   \draw[line width=0.75pt,->] (Olin.east) to[in=-160,out=-20] node[below] {$\Theta_h$} (Oh.west);
+   \draw[line width=0.75pt,->] (Olin.north) to[in=160,out=45] node[above left] {$\Psi$} (Oexa.west);
+   \draw[line width=0.75pt,->] (Oexa.east) to[in=130,out=0] node[above right] {$F_h$} (Oh.north);
+
+   \end{tikzpicture}
+   \end{center}
+   \vspace*{-0.4cm}
+   \caption{Sketch of different transformations. $\Psi$ maps the interface approximation ${\Gamma^{\text{lin}}}$ onto the exact interface $\Gamma$; $\Theta_h$ is the discrete approximation of $\Psi$. The transformation $F_h := \Theta_h \circ \Psi^{-1}$ has the property $F_h(\Gamma)=\Gamma_h$.}
+   \label{fig:trafos}
+ \end{figure}
+
+\begin{remark} \label{rem:polext} \rm
+The polynomial extension $\mathcal{E}_T$ used in \eqref{eq:psih} ensures that the computation of $d_h|_T$ only depends on $\phi_h|_T$, i.e. element-local quantities. This avoids searches in a neighborhood of the element, which enhances the computational efficiency, especially in case of a parallel implementation.
+\end{remark}
+
+A key result of the error analysis in \cite{CLARH1} is summarized in the following lemma.
+\begin{lemma} \label{lem:phih} The following estimates hold:
+\begin{align} 
+\Vert \Theta_h - \Psi \Vert_{\infty,{\Omega^{\Gamma}}} + h \Vert D (\Theta_h - \Psi)\Vert_{\infty,{\Omega^{\Gamma}}} & \lesssim h^{k+1},
+\label{eq:phih1} \\
+\Vert I - \Psi \Vert_{\infty,{\Omega^{\Gamma}}} + \Vert I - D\Psi\Vert_{\infty,{\Omega^{\Gamma}}} & \lesssim h. \label{eq:phi2}
+\end{align}
+\end{lemma}
+\begin{proof}
+ \cite[Lemma~5.5 and (5.28)]{CLARH1}.
+\end{proof}
+
+We emphasize that the constants hidden in the $\lesssim$ notation in \eqref{eq:phih1}, \eqref{eq:phi2}, and also in the estimates in the remainder, do not depend on how $\Gamma^{\rm lin}$ intersects the triangulation ${\mathcal{T}}^\Gamma$.
+We define the transformed cut mesh domains ${\Omega^{\Gamma}}_{\Theta} := \Theta_h({\Omega^{\Gamma}})$, ${\Omega^{\Gamma}}_{\Psi} := \Psi({\Omega^{\Gamma}})$, cf. Fig.~\ref{fig:trafos}.
+The results in Lemma~\ref{lem:phih} imply that, for $h$ sufficiently small, both $\Theta_h:\, {\Omega^{\Gamma}} \to {\Omega^{\Gamma}}_{\Theta}$ and $\Psi:\, {\Omega^{\Gamma}} \to {\Omega^{\Gamma}}_{\Psi}$ are homeomorphisms.
+Furthermore, using \eqref{eq:phih1} one easily derives (\cite[Lemma 5.6]{CLARH1}):
+\begin{equation} \label{resdist}
+ {\rm dist}(\Gamma_h,\Gamma) \lesssim h^{k+1}.
+\end{equation}
+For the analysis we also need a result on the approximation of normals in a neighborhood of $\Gamma$. Let $n(x)$, $x \in \Gamma$ be the unit normal to $\Gamma$ (in the direction of $\phi > 0$). In a (sufficiently small) neighborhood of $\Gamma$ we define $n(x):= \nabla \phi / \Vert \nabla \phi \Vert_2$. In case that $\phi$ is a signed distance function this coincides with $n(x) = n(p(x))$ where $p$ is the closest point projection on $\Gamma$.
+In the following lemma we consider a computable accurate approximation of $n(x)$.
+\begin{lemma} \label{Lemnormals}
+ For $x \in T \in {{\mathcal T}^{\Gamma}}$ define 
+\[ {n_{\rm lin}}= {n_{\rm lin}}(T):= \frac{\nabla \hat \phi_h(x)}{\|\nabla \hat \phi_h(x)\|_2} = \frac{\nabla \hat\phi_{h|T}}{\|\nabla \hat \phi_{h|T}\|_2}, \quad n_h(\Theta_h(x)):= \frac{D\Theta_h(x)^{-T}{n_{\rm lin}}}{\|D\Theta_h(x)^{-T}{n_{\rm lin}}\|_2}.
+\] 
+Let $n_{\Gamma_h}(x)$, $x\in \Gamma_h$ a.e., be the unit normal on $\Gamma_h$ (in the direction of $\phi_h > 0$). The following holds
+\begin{align}
+ \|n_h - n\|_{\infty, {\Omega^{\Gamma}}_{\Theta}} & \lesssim h^k \label{normalres1} \\
+ \|n_{\Gamma_h} - n\|_{\infty, \Gamma_h} & \lesssim h^k. \label{normalres2} 
+\end{align}
+\end{lemma}
+\begin{proof} 
+ Define the isosurface ${\Gamma^{\text{lin}}}_c:= \{\, x \in {\Omega^{\Gamma}}~|~\hat \phi_h(x)=c \,\}$ (not necessarily connected) and its image $\Gamma_{h,c}:= \{\, \Theta_h(x)~|~x \in {\Gamma^{\text{lin}}}_c\,\}$. Note that $\Gamma_h=\Gamma_{h,0}$. Take $x \in T \in {{\mathcal T}^{\Gamma}}$ and $c$ such that $x \in {\Gamma^{\text{lin}}}_c$. The unit normal on ${\Gamma^{\text{lin}}}_c$ at $x$ is given by ${n_{\rm lin}}$. The unit normal on $\Gamma_{h,c}$ at $\Theta_h(x)$ is given by $n_h(\Theta_h(x))$. Hence, for $y=\Theta_h(x) \in \Gamma_h$ we have $n_{\Gamma_h}(y) - n(y)= n_h(\Theta_h(x))-n(\Theta_h(x))$, and thus \eqref{normalres2} follows from \eqref{normalres1}. Let $\Gamma_c:=\{ x \in {\Omega^{\Gamma}}_{\Psi}~|~ \phi(x)=c \,\}$ be the $c$-isosurface of $\Gamma$. The definition of $\Psi$ implies that
+$\Gamma_c= \{\,\Psi(x)~|~x \in {\Gamma^{\text{lin}}}_c\,\}$. Thus we get 
+\[ n(\Psi(x))=\frac{D\Psi(x)^{-T}{n_{\rm lin}}}{\|D\Psi(x)^{-T}{n_{\rm lin}}\|_2}. \]
+Using this and the result in Lemma~\ref{lem:phih} we get (uniformly in $x$ and $T$):
+\begin{align*}
+ \|n_h(\Theta_h(x)) - n(\Theta_h(x))\|_2 & \leq \|n_h(\Theta_h(x)) - n(\Psi(x))\|_2 +\|n(\Theta_h(x))- n(\Psi(x))\|_2 \\
+ & \lesssim \left\| \frac{D\Theta_h(x)^{-T}{n_{\rm lin}}}{\|D\Theta_h(x)^{-T}{n_{\rm lin}}\|_2} - \frac{D\Psi(x)^{-T}{n_{\rm lin}}}{\|D\Psi(x)^{-T}{n_{\rm lin}}\|_2} \right\|_2 + h^{k+1} \\
+ & \lesssim\frac{ \Vert \big(D\Theta_h(x)^{-T}- D\Psi(x)^{-T} \big){n_{\rm lin}} \Vert_2}{\|D\Psi(x)^{-T}{n_{\rm lin}}\|_2} + h^{k+1} \lesssim h^k.
+\end{align*}
+In the last inequality we used \eqref{eq:phi2} and \eqref{eq:phih1}. This proves \eqref{normalres1}.
+\end{proof}
+
+One further property that we need in the analysis is the uniform local regularity of the mapping $\Theta_h$ that we will show in Lemma \ref{lemregu}. As a preliminary we give the following lemma.
+
+\begin{lemma}\label{lem:dh}
+For $h$ sufficiently small, $T\in{\mathcal{T}}^\Gamma$, and $F\in\mathcal{F}^\Gamma$, the functions $d_h$ and $\Psi_h$ defined in \eqref{eq:psihmap} and \eqref{eq:psih} have the properties
+\begin{subequations}
+\begin{align}
+ \max_{T\in{{\mathcal{T}}^{\Gamma}}} \Vert d_h \Vert_{H^{l,\infty}(T)} \lesssim 1, ~ & ~ \max_{T\in{{\mathcal{T}}^{\Gamma}}} \Vert \Psi_h \Vert_{H^{l,\infty}(T)} \lesssim 1, \qquad l \leq k+1,
+\label{eq:psihbound}\\
+ \max_{F \in {{\mathcal{F}}^{\Gamma}}} \Vert {[\![{d_h}]\!]}_F \Vert_{\infty,F} \lesssim h^{k+1}, ~ & ~
+ \max_{F \in {{\mathcal{F}}^{\Gamma}}} \Vert {[\![{\Psi_h}]\!]}_F \Vert_{\infty,F} \lesssim h^{k+1},
+\label{eq:jumpbound}
+\end{align}
+where ${[\![{\cdot}]\!]}_F$ denotes the usual jump operator across the facet $F$.
+\end{subequations}
+\end{lemma}
+\begin{proof}
+The proof of the first bound in \eqref{eq:psihbound} follows similar lines as the proof of \cite[Lemma 5.3]{CLARH1}. The proof of the second bound is similar to the proof of \cite[Lemma 5.4]{CLARH1}. For completeness we include a proof in Appendix \ref{sec:proof:lem:dh}.
+\end{proof}
+
+\begin{lemma}\label{lemregu}
+  The following holds: $\max_{T\in{{\mathcal{T}}^{\Gamma}}} \Vert \Theta_h \Vert_{H^{l,\infty}(T)} \lesssim 1$, $l \leq k+1.$
+\end{lemma}
+\begin{proof}
+Recall that $\Theta_h = P_h \Psi_h$, cf.~\eqref{defThetah}. We fix an element $T \in {{\mathcal{T}}^{\Gamma}}$ and set $\Psi_T = \Psi_h|_T \in C^{k+1}(T)$.
+We have 
+\[
+\Vert \Theta_h \Vert_{H^{l,\infty}(T)} \leq \Vert \Psi_T \Vert_{H^{l,\infty}(T)} + \Vert P_h \Psi_h - \Pi \Psi_T\Vert_{H^{l,\infty}(T)} + \Vert \Pi \Psi_T - \Psi_T\Vert_{H^{l,\infty}(T)},
+\]
+where $\Pi$ is the nodal interpolation operator into ${\mathcal{P}}^k(T)$. 
+For the latter interpolation error we have
+\[
+\Vert \Pi \Psi_T - \Psi_T \Vert_{H^{l,\infty}(T)} \lesssim \Vert \Psi_T \Vert_{H^{l,\infty}(T)}.
+\]
+With Lemma \ref{lem:dh} we have
+$
+\Vert \Psi_T \Vert_{H^{l,\infty}(T)} \lesssim 1
+$ 
+uniformly in $T$ and hence can bound the first and the last term with $\mathcal{O}(1)$.
+It remains to show the estimate for $P_h \Psi_h - \Pi \Psi_T$. Let $\{\psi_i\}_{i\in {\mathcal{I}}_T}$, be the nodal basis in ${\mathcal{P}}(T)$, as also used in the definition of $P_h$ (cf. \cite[Section 2.2]{CLARH1}), and $\{x_i\}_{i\in {\mathcal{I}}_T}$ the corresponding nodes, we can write (on $T$) 
+\[
+P_h \Psi_h - \Pi \Psi_T = \sum_{i\in {\mathcal{I}}_T} (A_{x_i}(\Psi_h) - \Psi_T(x_i)) \psi_i,
+\]
+where $A_{x_i}(\Psi_h)$ is an average of values of $\Psi_h$ on different elements that share the node $x_i$. For finite element nodes which lie inside an element $T$, i.e. $x_i \not\in \partial T$, we have
+$A_{x_i}(\Psi_h) = \Psi_T(x_i)$. For $x_i \in\partial T$ we can use Lemma \ref{lem:dh} and thus obtain: 
+\begin{equation} \label{eq:boundq}
+|A_{x_i}(\Psi_h) - \Psi_T(x_i)| = |A_{x_i}(\Psi_h - \mathcal{E}_T\Psi_T)| \lesssim \sum_{F \in {\mathcal{F}}^{\Gamma}\cap T} \Vert {[\![{\Psi_h}]\!]} \Vert_{\infty,F} \lesssim h^{k+1}.
+\end{equation}
+In this estimate we used that the number of facets that share a point is uniformly bounded on shape regular meshes. 
+With the bound in \eqref{eq:boundq} we get 
+\[
+\Vert P_h \Psi_h - \Pi \Psi_T \Vert_{H^{l,\infty}(T)}
+\lesssim \sum_{i\in {\mathcal{I}}_T} \underbrace{|A_{x_i}(\Psi_h) - \Psi_T(x_i)|}_{\lesssim ~ h^{k+1}} \underbrace{\Vert \psi_i \Vert_{H^{l,\infty}(T)}}_{\lesssim ~ h^{-l}} \lesssim 1, \quad l \leq k+1.
+\]
+which completes the proof.
+\end{proof}
+
+We note that Lemma \ref{lemregu} implies that for $u \in H^l(T)$, $T \in {{\mathcal{T}}^{\Gamma}}$, $l \leq k+1$, we have $\Vert u \circ \Theta_h^{-1} \Vert_{H^l(\Theta_h(T))} \lesssim \Vert u \Vert_{H^l(T)}$.
+\section{The isoparametric trace FEM} \label{sec:itracefem}
+We start by introducing the space used in the isoparametric trace FEM. We consider the local volume triangulation ${{\mathcal T}^{\Gamma}}$ and the standard affine polynomial finite element space $V_h^k$ restricted to ${{\mathcal T}^{\Gamma}}$, i.e., $(V_h^k)_{|{\Omega^{\Gamma}}}$. To this space we apply the transformation $\Theta_h$ resulting in the isoparametric space
+\begin{equation} \label{isoFEspace} \begin{split}
+ V_{h,\Theta}^k & := \{\, v_h \circ \Theta_h^{-1} \mid v_h \in (V_h^k)_{|{\Omega^{\Gamma}}}\, \},\\
+ V_{h,\Theta}^{k,0} & := \{ v_h \in V_{h,\Theta}^k \mid \int_{\Gamma_h} v_h {\,\mathrm{d} {s_h}}=0 \}.
+ \end{split}
+\end{equation}
+The latter space will be used in our finite element discretization \eqref{eq:varform} below. 
+In the error analysis of the method we also use the following larger (infinite dimensional) space:
+\[
+ {V_{\text{reg},h}} := \{ v \in H^1({\Omega^{\Gamma}}_{\Theta})~|~ {\operatorname{tr}}|_{\Gamma_h} v \in H^1(\Gamma_h)\} \supset V_{h,\Theta}^k,
+\]
+on which the bilinear forms introduced below are well-defined.
+Besides the bilinear form related to the Laplace--Beltrami operator, we also use a \emph{stabilization} $s_h(\cdot, \cdot)$ which we assume to be \emph{symmetric positive semi-definite} and well-defined on the space ${V_{\text{reg},h}}$. We allow $s_h(\cdot,\cdot) \equiv 0$. The error analysis will reveal that for $s_h(\cdot,\cdot) \equiv 0$ we have optimal order discretization error bounds. For $s_h(\cdot,\cdot) \equiv 0$, however, the stiffness matrix can be very ill-conditioned, depending on how the interface cuts the outer triangulation. The stabilization is used to obtain the usual $\mathcal{O}(h^{-2})$-bound for the condition number of the stiffness matrix, uniformly w.r.t. the cut geometry. In the analysis below we derive conditions on $s_h(\cdot,\cdot)$ such that the latter property holds and we still have optimal order discretization error bounds. Specific choices for $s_h(\cdot,\cdot)$ are discussed in Section \ref{sec:condition-number}.
+We introduce the bilinear form 
+\begin{align}
+ A_h(u,v) & := a_h(u,v)+ s_h(u,v), \quad u,v \in {V_{\text{reg},h}}, \label{eq:blf2} \\
+ a_h(u,v) & := \int_{\Gamma_h} \nabla_{\Gamma_h} u \cdot \nabla_{\Gamma_h} v \, {\,\mathrm{d} {s_h}} \label{eq:blf3}.
+\end{align}
+For the discrete problem we need a suitable extension of the data $f$ to $\Gamma_h$, which is denoted by $f_h$. Specific choices for $f_h$ are discussed in Remark~\ref{daterror}. 
+The discrete problem is as follows: 
+Find $u_h \in {V_{h,\Theta}^{k,0}}$ such that 
+\begin{equation} \label{eq:varform} 
+ A_h(u_h,v_h) = \int_{\Gamma_h} f_h v_h \, {\,\mathrm{d} {s_h}} \quad \text{ for all } v_h \in {V_{h,\Theta}^{k,0}}.
+\end{equation}
+
+\begin{remark} \label{remnonunique} \rm Because we take the trace of outer finite element functions on the surface approximation $\Gamma_h$ it is natural to introduce the following trace spaces:
+\begin{equation} \label{tracespace}
+ \begin{split}
+V_{h,\Theta}^\Gamma & := \text{tr}|_{\Gamma_h} (V_{h,\Theta}^k), \\
+ V_{h,\Theta}^{\Gamma,0} & := \{\, v_h \in V_{h,\Theta}^\Gamma \mid \int_{\Gamma_h} v_h {\,\mathrm{d} {s_h}}=0\,\}.
+\end{split} 
+\end{equation}
+Concerning \eqref{eq:varform}, there is the issue that there may be different $w_h,\tilde w_h\in{V_{h,\Theta}^{k,0}}$ with the same trace $v_h^\Gamma \in{V_{h,\Theta}^{\Gamma,0}}$. In the case $s_h(\cdot,\cdot) \equiv 0$ only trace values on $\Gamma_h$ are used in \eqref{eq:varform}, an thus  we can replace the trial and test space $ {V_{h,\Theta}^{k,0}}$ in \eqref{eq:varform} by $V_{h,\Theta}^{\Gamma,0}$. The latter formulation then has a unique solution $u_h^\Gamma \in {V_{h,\Theta}^{\Gamma,0}}$, whereas the one in \eqref{eq:varform} may have more solutions, which however, all have the same trace $u_h^\Gamma$. This non-uniqueness issue is directly related to the fact that the set of traces of the outer finite element nodal basis functions form only a frame (in general not a basis) of the trace space $V_{h,\Theta}^\Gamma $. In some of the stabilization approaches introduced further on, the bilinear form $s_h(u_h,v_h)$ will depend also on function values $u_h(x),v_h(x)$ with $x \in \Theta_h(\Omega^\Gamma) \setminus \Gamma_h$. This is the reason why we use ${V_{h,\Theta}^{k,0}}$ (instead of ${V_{h,\Theta}^{\Gamma,0}}$) in \eqref{eq:varform}. Adding an appropriate stabilization term $s_h$ will remove the above-mentioned non-uniqueness issue. 
+\end{remark}
+
+\begin{remark}[Implementational aspects]\rm
+The integrals in \eqref{eq:varform} can be implemented based on numerical integration rules with respect to ${\Gamma^{\text{lin}}}$ and the transformation $\Theta_h$. We illustrate this for the bilinear form $a_h(\cdot,\cdot)$, cf. \eqref{eq:blf3}. With $\tilde{u}_h = u_h \circ \Theta_h,~\tilde{v}_h = v_h \circ \Theta_h \in V_h^\Gamma$, there holds
+\begin{equation*}
+\int_{\Gamma_h} \nabla_{\Gamma_h} u_h \cdot \nabla_{\Gamma_h} v_h \, {\,\mathrm{d} {s_h}} = 
+\int_{\Gamma^{\text{lin}}} \mathcal{J}_\Gamma \cdot P_h (D \Theta_h)^{-T} \nabla \tilde{u}_h \cdot 
+\ P_h (D \Theta_h)^{-T} \nabla \tilde{v}_h \, {\,\mathrm{d} {s_h'}},
+\end{equation*}
+with $P_h = I - n_h n_h^T$ the tangential projection, $n_h = N / {\left\lVert {N} \right\rVert}$ the unit-normal on $\Gamma_h$ with $N = (D \Theta_h)^{-T} \hat{n}_h$ where $\hat{n}_h = \nabla {\hat \phi_h} / \Vert\nabla {\hat \phi_h}\Vert$ is the normal with respect to ${\Gamma^{\text{lin}}}$, and $\mathcal{J}_\Gamma = \det(D \Phi_h) \cdot \Vert N \Vert$.
+This means that we only need an accurate integration with respect to the low order geometry ${\Gamma^{\text{lin}}}$ and the explicitly available mesh transformation $\Theta_h \in [V_h^k]^3$.
+\end{remark}
+
+\section{Discretization error analysis}
+\label{sec:error-analysis}
+The discretization error analysis that we present is along similar lines as in most papers on finite elements for surface PDEs. We use a Strang Lemma which bounds the discretization error in terms of an approximation error and a consistency error (due to the geometric error). For bounding these two error terms we use results known from the literature. The only essential difference between the analysis below and the analyses known in the literature is that we allow for a generic stabilization $s_h(\cdot,\cdot)$ and introduce conditions on this bilinear form which are sufficient for deriving optimal order discetization error bounds.
+
+We need an extension of the solution $u$ of \eqref{eq:weak-LB} to a neighborhood of the interface.
+Let $ U_r=\{x\in{\mathbb{R}}^3\mid \lvert d(x) \rvert \le r\}$ , with ${\Omega^{\Gamma}}_{\Theta} \subset U_r$ be a tubular neighborhood of $\Gamma$. The closest-point projector onto $\Gamma$ is denoted as $p\colon U_r\to \Gamma$. We define the extension $w^e$ of $w \in H^1(\Gamma)$ by $w^e(x):=w(p(x))$ for all $x \in U_r$. We then have $n\cdot \nabla w^e =0$ on $U_r$. In the error analysis we use the natural (semi-)norms
+\begin{equation}\label{eq:def-h-norm}
+  {\Vert {u} \Vert_h}^2 :=\|u\|_a^2 + s_h(u,u), \quad \|u\|_a^2:=a_h(u,u), \quad u \in {V_{\text{reg},h}}.
+\end{equation}
+
+\begin{remark} \rm 
+On ${V_{h,\Theta}^{\Gamma,0}}$ the semi-norm $\|\cdot\|_a$ defines a norm. This follows from a Poincar{\'e} inequality in ${V_{h,\Theta}^{\Gamma,0}}$. This implies that, for a solution $u_h\in{V_{h,\Theta}^{k,0}}$ of the discrete problem \eqref{eq:varform}, the trace $u_h|_{\Gamma_h}\in {V_{h,\Theta}^{\Gamma,0}}$ is unique. The uniqueness of $u_h\in{V_{h,\Theta}^{k,0}}$ depends on the stabilization term and will addressed in Remark~\ref{uniquesol} below.
+\end{remark}
+
+The error analysis is based on a Strang Lemma:
+\begin{lemma} \label{Strang} Let $u \in H^1_\ast(\Gamma)$ be the unique solutions of \eqref{eq:weak-LB} with the extension $u^e \in {V_{\text{reg},h}}$ and $u_h \in {V_{h,\Theta}^{k,0}}$ be a solution of \eqref{eq:varform}. Then we have the discretization error bound
+\begin{equation} \label{Strangbound}
+ {\Vert {u^e-u_h} \Vert_h} \leq 2 \min_{v_h \in {V_{h,\Theta}^{k,0}}} {\Vert {u^e - v_h} \Vert_h} + \sup_{w_h \in {V_{h,\Theta}^{k,0}}} \frac{|A_h(u^e,w_h)-\int_{\Gamma_h} f_h w_h \, {\,\mathrm{d} {s_h}}|}{{\Vert {w_h} \Vert_h}}.
+\end{equation}
+\end{lemma}
+\begin{proof}
+For $v_h \in {V_{h,\Theta}^{k,0}}$ and $w_h = u_h - v_h \in {V_{h,\Theta}^{k,0}}$ we have 
+\[
+ \Vert u_h - v_h \Vert_h \leq \frac{A_h(u_h-v_h,u_h-v_h)}{\Vert w_h \Vert_h} \leq \Vert u^e - v_h \Vert_h + \frac{A_h(u_h-u^e,w_h)}{\Vert w_h \Vert_h}.
+\]
+Together with \eqref{eq:varform} and the triangle inequality
+$
+{\Vert {u^e - u_h} \Vert_h} \leq {\Vert {u^e - v_h} \Vert_h} + {\Vert {u_h - v_h} \Vert_h}
+$ the claim follows.
+\end{proof}
+
+In the following two subsections we analyze the terms in the Strang error bound.
+
+\subsection{Approximation error}
+We first recall some known approximation results from the literature. The isoparametric interpolation ${I_{\Theta}^k}:\, C({\Omega^{\Gamma}}_\Theta) \to {V_{h,\Theta}^k}$ is defined by $({I_{\Theta}^k} v)\circ \Theta_h= {I^k}(v\circ \Theta_h)$. Using the property in Lemma~\ref{lemregu}, the theory on isoparametric finite elements, cf.~\cite{Lenoir86},
+yields the following optimal interpolation error bound for $0 \leq l \leq k+1$:
+\begin{equation} \label{interpol}
+ \|v - {I_{\Theta}^k} v\|_{H^l(\Theta_h(T))} \lesssim h^{k+1-l} \|v\|_{H^{k+1}(\Theta_h(T))} ~~ \text{for all}~v \in H^{k+1}(\Theta_h(T)), ~T \in {\mathcal{T}}.
+\end{equation}
+We will also need the following trace estimate \cite{hansbo2002unfitted}:
+\begin{equation} \label{Hansboest}
+\|v\|_{L^2(\Gamma_T)}^2 \lesssim h^{-1} \|v\|_{L^2(\Theta_h(T))}^2 + h \|\nabla v\|_{L^2(\Theta_h(T))}^2, \quad v \in H^1(\Theta_h(T)),
+\end{equation}
+with $\Gamma_T:=\Gamma_h \cap \Theta_h(T)$.
+To obtain an interpolation in ${V_{h,\Theta}^{k,0}}$, we define 
+\[
+ {I_{\Theta}^{k,0}} v := {I_{\Theta}^k} v - |\Gamma_h|^{-1} \int_{\Gamma_h} {I_{\Theta}^k} v \, {\,\mathrm{d} {s_h}}.
+\]
+For this interpolation operator we have the following error estimate.
+\begin{lemma} \label{lemintb} The following holds for all $v \in H^{k+1}({\Omega^{\Gamma}}_\Theta))$, $l=0,1,2$:
+\[
+  \| v - {I_{\Theta}^{k,0}} v \|_{H^l({\Omega^{\Gamma}}_\Theta)} \lesssim h^{k+1-l} \|v\|_{H^{k+1}({\Omega^{\Gamma}}_\Theta)} + h^\frac12 \left|\int_{\Gamma_h} v {\,\mathrm{d} {s_h}} \right|.
+\]
+\end{lemma}
+\begin{proof}
+From a triangle inequality and $|{\Omega^{\Gamma}}_\Theta| \lesssim | \Gamma_h | h$ we get: 
+\[
+  \| v - {I_{\Theta}^{k,0}} v \|_{H^l({\Omega^{\Gamma}}_\Theta)} \lesssim \| v - {I_{\Theta}^k} v \|_{H^l({\Omega^{\Gamma}}_\Theta)} + h^\frac12 \left\vert \int_{\Gamma_h} {I_{\Theta}^k} v {\,\mathrm{d} {s_h}} \right\vert, \quad l=0,1,2.
+\]
+The first term on the right-hand side can be bounded by $ch^{k+1-l} \|v\|_{H^{k+1}({\Omega^{\Gamma}}_\Theta)}$ using the result in \eqref{interpol}.
+For the second term we have, using \eqref{Hansboest}, 
+\begin{align*}
+ h^\frac12 & \left\vert \int_{\Gamma_h} {I_{\Theta}^k} v {\,\mathrm{d} {s_h}} \right\vert 
+\leq 
+h ^\frac12 \left|\int_{\Gamma_h} v - {I_{\Theta}^k} v {\,\mathrm{d} {s_h}} \right| + h^\frac12 \left|\int_{\Gamma_h} v {\,\mathrm{d} {s_h}} \right| \lesssim h^\frac12 \| v - {I_{\Theta}^k} v \|_{L^2(\Gamma_h)} \\
+ & + h^\frac12 \left|\int_{\Gamma_h} v {\,\mathrm{d} {s_h}} \right| \lesssim \| v - {I_{\Theta}^k} v \|_{L^2({\Omega^{\Gamma}}_\Theta)} + h \| v - {I_{\Theta}^k} v \|_{H^1({\Omega^{\Gamma}}_\Theta)}+ h^\frac12 \left|\int_{\Gamma_h} v {\,\mathrm{d} {s_h}} \right|.
+\end{align*}
+Together with \eqref{interpol} this completes the proof.
+\end{proof}
+\ \\[1ex]
+\begin{lemma} \label{intertrace} For the space ${V_{h,\Theta}^{k,0}}$ we have the approximation error estimate
+\begin{equation}
+ \begin{split} 
+ & \min_{v_h \in {V_{h,\Theta}^{k,0}}} \big( \|v^e-v_h\|_{L^2(\Gamma_h)} + h \|\nabla(v^e-v_h)\|_{L^2(\Gamma_h)} \big) \\
+ & \leq \|v^e-{I_{\Theta}^{k,0}} v^e \|_{L^2(\Gamma_h)} + h \|\nabla(v^e- {I_{\Theta}^{k,0}} v^e)\|_{L^2(\Gamma_h)} 
+ \lesssim h^{k+1} \|v\|_{H^{k+1}(\Gamma)} 
+\end{split}
+\end{equation}
+for all $v \in H^{k+1}(\Gamma) \cap H^1_\ast(\Gamma)$. (Recall that $v^e$ is a normal extension of $v$.)
+\end{lemma}
+\begin{proof} Take $v \in H^{k+1}(\Gamma) \cap H^1_\ast(\Gamma)$, hence $\int_{\Gamma} v {\,\mathrm{d} s} =0 $ holds.
+From \eqref{Hansboest} and Lemma~\ref{lemintb} we obtain
+\begin{align}
+  & \|v^e-{I_{\Theta}^{k,0}} v^e \|_{L^2(\Gamma_h)} + h \|\nabla(v^e- {I_{\Theta}^{k,0}} v^e)\|_{L^2(\Gamma_h)} \nonumber \\ & \lesssim h^{-\frac12}\| v^e - {I_{\Theta}^{k,0}} v^e \|_{L^2({\Omega^{\Gamma}}_\Theta)} + h^\frac12 \| v^e - {I_{\Theta}^{k,0}} v^e \|_{H^1({\Omega^{\Gamma}}_\Theta)} + h^\frac32 \| v^e - {I_{\Theta}^{k,0}} v^e \|_{H^2({\Omega^{\Gamma}}_\Theta)} \nonumber \\
+   & \lesssim h^{k+\frac12} \|v^e \|_{H^{k+1}({\Omega^{\Gamma}}_\Theta)}+ \left|\int_{\Gamma_h} v^e {\,\mathrm{d} {s_h}} \right|. \label{tt}
+\end{align}
+Now note that 
+\begin{equation} \label{nb}
+ \|D^\mu u^e\|_{L^2({\Omega^{\Gamma}}_\Theta)} \lesssim h^\frac12 \|u\|_{H^m(\Gamma)} \quad \text{for all}~~u \in H^m(\Gamma), ~|\mu| \leq m,
+ \end{equation} 
+holds, cf. \cite[Lemma 3.1]{reusken2015}. Using this we get
+\begin{equation} \label{pp}
+  \|v^e \|_{H^{k+1}({\Omega^{\Gamma}}_\Theta)} \lesssim h^\frac12 \|v \|_{H^{k+1}(\Gamma)}. 
+\end{equation}
+We now treat the term $\lvert \int_{\Gamma_h} v^e {\,\mathrm{d} {s_h}}\rvert$ in \eqref{tt}.
+Recall that $p$ is the closest point projection on $\Gamma$. We use standard results from the literature. For the transformation of the surface measure the relation 
+\begin{equation} \label{surfmeasuer}
+ \mu_h ds_h(x) = ds(p(x)), \quad \text{for}~~ x \in \Gamma_h,
+\end{equation}
+holds. The function $\mu_h$ satisfies
+\begin{equation} \label{estmu}
+ \|1- \mu_h\|_{\infty,\Gamma_h} \lesssim h^{k+1},
+\end{equation}
+cf. \cite{Demlow06,reusken2015}.
+Using this and $v \in H_\ast^1(\Gamma)$ we get
+\begin{equation} \label{ttp} \begin{split}
+ \left| \int_{\Gamma_h} v^e {\,\mathrm{d} {s_h}} \right|& = 
+\Big| \int_{\Gamma_h} v^e {\,\mathrm{d} {s_h}} - \int_{\Gamma} v {\,\mathrm{d} {s}} \Big|
+ = \Big| \int_{\Gamma_h} v^e ( 1 - \mu_h) {\,\mathrm{d} {s_h}} \Big| \\ & \lesssim h^{k+1} \Vert v^e \Vert_{L^2(\Gamma_h)} \lesssim h^{k+1} \Vert v \Vert_{L^2(\Gamma)}. 
+\end{split} \end{equation}
+Combining this with the results in \eqref{tt}, \eqref{pp} completes the proof.
+\end{proof}
+
+Using this interpolation bound one easily obtains a bound for the approximation term in the Strang Lemma.
+\begin{lemma} Assume that the stabilization satisfies
+\begin{equation} \label{conds1}
+ s_h(w,w) \lesssim h^{-3}\|w\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 + h^{-1} \|\nabla w\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \quad \text{for all} ~~w \in {V_{\text{reg},h}}.
+\end{equation}
+Then 
+\[
+  \min_{v_h \in {V_{h,\Theta}^{k,0}}} {\Vert {u^e - v_h} \Vert_h} \lesssim h^k \|u\|_{H^{k+1}(\Gamma)} \quad \text{holds for all}~~u \in H^{k+1}(\Gamma) \cap H_\ast^1(\Omega).
+\]
+\end{lemma}
+\begin{proof} 
+ Take $u \in H^{k+1}(\Gamma)\cap H_\ast^1(\Gamma)$ and $v_h:= {I_{\Theta}^{k,0}} u^e$. From Lemma~\ref{intertrace} we get $\|u^e-v_h\|_a \lesssim h^k \|u\|_{H^{k+1}(\Gamma)} $.
+ From the assumption \eqref{conds1} combined with the results in
+  Lemma~\ref{lemintb}
+and the estimates \eqref{pp} and \eqref{ttp} we get $s_h(u^e-v_h,u^e-v_h)^\frac12 \lesssim h^k \|u\|_{H^{k+1}(\Gamma)}$, which completes the proof.
+\end{proof}
+
+\subsection{Consistency error}
+We derive a bound for the consistency error term on the right-hand side in the Strang estimate \eqref{Strangbound}. We have to quantify the accuracy of the data extension $f_h$. 
+We recall the definition of $\mu_h$, cf. \eqref{surfmeasuer}, and define
+\[
+  \delta_f:=f_h- \mu_h f^e \quad \text{on}~~\Gamma_h.
+\]
+ \begin{lemma} \label{lem:conserr}
+Let $u \in H_\ast^1(\Gamma)$ be the solution of \eqref{eq:weak-LB}. Assume that the data error satisfies $\|\delta_f\|_{L^2(\Gamma_h)} \lesssim h^{k+1} \|f\|_{L^2(\Gamma)}$ and the stabilization satisfies
+\begin{equation} \label{conds2}
+ \sup_{w_h \in {V_{h,\Theta}^{k,0}}} \frac{s_h(u^e,w_h)}{{\Vert {w_h} \Vert_h}} \lesssim h^{l}\|f\|_{L^2(\Gamma)}, \quad \text{with $l=k$ or $l=k+1$}.
+\end{equation}
+ Then the following holds:
+\[ \sup_{w_h \in {V_{h,\Theta}^{k,0}}} \frac{|A_h(u^e,w_h)-\int_{\Gamma_h} f_h w_h \, {\,\mathrm{d} {s_h}}|}{{\Vert {w_h} \Vert_h}} \lesssim h^{l}\|f\|_{L^2(\Gamma)}.
+\]
+\end{lemma}
+\begin{proof}
+ We use the splitting
+\[
+   |A_h(u^e,w_h)-\int_{\Gamma_h} f_h w_h \, {\,\mathrm{d} {s_h}}| \leq |a_h(u^e,w_h)-\int_{\Gamma_h} f_h w_h {\,\mathrm{d} {s_h}}| + s_h(u^e,w_h).
+\]
+The first term has been analyzed in \cite{reusken2015}, Lemma 5.5. In the analysis one essentially only needs the closeness properties in \eqref{resdist}, \eqref{normalres2} and the bound on the data error.
+The analysis yields
+\[
+  \sup_{w_h \in {V_{h,\Theta}^{k,0}}} \frac{|a_h(u^e,w_h)-\int_{\Gamma_h} f_h w_h \, {\,\mathrm{d} {s_h}}|}{{\Vert {w_h} \Vert_h}} \lesssim h^{k+1}\|f\|_{L^2(\Gamma)}.
+\]
+We use assumption \eqref{conds2} to bound the second term.
+\end{proof}
+
+\subsection{Optimal $H^1$-error bound}
+As an immediate consequence of the previous results we obtain the following main theorem.
+\begin{theorem} \label{mainthm}
+Let $u \in H^{k+1}(\Gamma)\cap H_\ast^1(\Gamma)$ be the solution of \eqref{eq:weak-LB} and $u_h \in {V_{h,\Theta}^{k,0}}$ a solution of \eqref{eq:varform}. Assume that the data error satisfies $\|\delta_f\|_{L^2(\Gamma_h)} \lesssim h^{k+1} \|f\|_{L^2(\Gamma)}$ and the stabilization satisfies the conditions \eqref{conds1}, \eqref{conds2}. Then the following holds:
+\begin{equation}
+  {\Vert {u^e - u_h } \Vert_h} \lesssim h^k \Vert u \Vert_{H^{k+1}(\Gamma)} + h^{l} \Vert f \Vert_{L^2(\Gamma)}.
+\end{equation}
+\end{theorem}
+\begin{remark} \rm
+\label{daterror}
+ We comment on the data error $\|\delta_f\|_{L^2(\Gamma_h)}$, with $\delta_f=f_h -\mu_h f^e$. For the choice $f_h= f^e- \frac{1}{|\Gamma_h|} \int_{\Gamma_h} f^e {\,\mathrm{d} {s_h}}$, which in practice often can \emph{not} be realized, we obtain, using \eqref{estmu}, the data error bound $\| \delta_f\|_{L^2(\Gamma_h)} \leq c h^{k+1} \|f\|_{L^2(\Gamma)}$ (as in Lemma \ref{intertrace}). For this data error bound we only need $f \in L^2(\Gamma)$, i.e., we avoid higher order regularity assumptions on $f$. Another, more feasible, possibility arises if we assume $f$ to be defined in a neighborhood $U_{\delta_0}$ of $\Gamma$. As extension one can then use
+\begin{equation} \label{extens}
+ f_h(x)= f(x)- c_f, \quad c_f:=\frac{1}{|\Gamma_h|} \int_{\Gamma_h} f\, {\,\mathrm{d} {s_h}}.
+\end{equation}
+Using $\int_{\Gamma} f \, {\,\mathrm{d} {s}}=0$, \eqref{resdist}, \eqref{estmu} and a Taylor expansion we get $|c_f| \leq c h^{k+1} \|f\|_{H^{1,\infty}(U_{\delta_0})}$ and $\|f- \mu_h f^e\|_{L^2(\Gamma_h)} \leq c h^{k+1} \|f\|_{H^{1,\infty}(U_{\delta_0})}$. Hence, we obtain a data error bound $\|\delta_f\|_{L^2(\Gamma_h)} \leq \hat c h^{k+1}\|f\|_{L^2(\Gamma)}$ with $\hat c=\hat c(f)=c \|f\|_{H^{1,\infty}(U_{\delta_0})} \|f\|_{L^2(\Gamma)}^{-1}$ and a constant $c$ independent of $f$. Thus in problems with smooth data, $ f \in H^{1,\infty}(U_{\delta_0})$, the extension defined in \eqref{extens} satisfies the condition on the data error in Theorem~\ref{mainthm}.
+\end{remark}
+
+\begin{corollary} As a trivial consequence of the theorem above we obtain optimal $H^1$-error bounds for the case \emph{without} stabilization, i.e., $s_h(\cdot,\cdot)\equiv 0$. 
+\end{corollary}
+\section{Condition number analysis}
+\label{sec:condition-number}
+In this section, we derive condition number bounds for the stiffness matrix resulting from the discretization \eqref{eq:varform}.
+It is well-known that in the case $s_h(\cdot,\cdot)=0$ already for $k=1$ the stiffness matrix of the discrete problem may have a condition number that does not scale like $h^{-2}$. This is due to the fact that the condition number depends on the position of the interface with respect to the volume triangulation. Remedies were proposed in \cite{BHL15,burman16fullgradcmame,reusken2015} for the case $k=1$. Below we formulate an assumption on the generic stabilization $s_h(\cdot,\cdot)$ that, together with \eqref{conds1} and \eqref{conds2}, is sufficient to guarantee a stiffness matrix condition number of $\mathcal{O}(h^{-2})$, while still preserving optimal order a-priori discretization error bounds. We thus have a general framework for comparing and analyzing different stabilization techniques. In Sections \ref{sec:ghostpen}--\ref{sec:fullgradvol}, for $k=1$
+we discuss three stabilizations known from the literature. In Section \ref{sec:normal-derivative-volume}, we introduce a fourth stabilization which is easy to implement and satisfies the aforementioned conditions also in the higher order case $k\geq 1$.
+
+Let ${\mathbf{u}} \in \mathbb{R}^N$ be the representation of $u_h \in V_{h,\Theta}^k$ with respect to the standard nodal basis in $V_{h,\Theta}^k$, i.e., $u_h =\sum_{i=1}^N u_i \phi_i$, and similarly ${\mathbf v} \in \mathbb{R}^N$ is the representation of $v_h \in V_{h,\Theta}^k$.
+The \emph{volume} mass matrix is defined by 
+\[
+  \langle {\mathbf{M}} {\mathbf{u}},{\mathbf v}\rangle= \int_{{\Omega^{\Gamma}}_\Theta} u_h v_h \, {\,\mathrm{d} {x}} \quad \text{for all}~~u_h,v_h \in {V_{h,\Theta}^k}.
+\]
+This matrix is symmetric positive definite and from standard finite element theory it follows that there are positive constants $c_L$ and $c_U$, depending only on $k$ and on the shape regularity of the outer triangulation ${\mathcal{T}}$, such that
+\begin{equation} \label{estM}
+ c_L \leq \frac{\langle {\mathbf{M}} {\mathbf{u}}, {\mathbf{u}} \rangle}{\langle{\mathbf{u}},{\mathbf{u}}\rangle} \leq c_U \quad \text{for all}~~{\mathbf{u}} \in \mathbb{R}^N, ~ {\mathbf{u}} \neq 0.
+\end{equation}
+The stiffness matrix ${\mathbf S} \in \mathbb{R}^{N\times N}$ is defined by
+\[
+  \langle {\mathbf S} {\mathbf{u}}, {\mathbf v}\rangle= A_h(u_h,v_h) \quad \text{for all}~~u_h,v_h \in V_{h,\Theta}^k.
+\]
+This matrix is symmetric positive semi-definite. In the discretization we search for $u_h \in V_{h,\Theta}^k$ with $\int_{\Gamma_h} u_h {\,\mathrm{d} s}_h=0$. For the vector representation of the latter constraint we introduce ${\mathbf{c}} \in \mathbb{R}^N$ with $c_i:= \int_{\Gamma_h} \phi_i {\,\mathrm{d} s}_h$, $1\leq i \leq N$, and define 
+\begin{equation} \label{cdef}
+\mathbb{R}^N_\ast:= \{\, {\mathbf{u}} \in \mathbb{R}^N~|~{\mathbf{u}}\cdot {\mathbf{c}} =0\,\}. 
+\end{equation}
+Hence $u_h \in {V_{h,\Theta}^{k,0}}$ iff ${\mathbf{u}} \in \mathbb{R}^N_\ast$.
+Let $q_L >0$, $q_U >0$ be such that
+\begin{equation}\label{estA}
+ q_L \leq \frac{A_h(u_h,u_h)}{\|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2} \leq q_U \quad \text{for all}~~u_h \in {V_{h,\Theta}^{k,0}}, ~u_h \neq 0.
+\end{equation}
+The estimates in \eqref{estM} and \eqref{estA} imply
+\begin{equation} \label{estS}
+ \frac{\max_{{\mathbf{u}} \in \mathbb{R}^N_\ast, \|{\mathbf{u}}\|_2=1}\langle {\mathbf S} {\mathbf{u}}, {\mathbf{u}} \rangle}{\min_{{\mathbf{u}} \in \mathbb{R}^N_\ast, \|{\mathbf{u}}\|_2=1}\langle {\mathbf S} {\mathbf{u}}, {\mathbf{u}} \rangle} =: \operatorname{cond_\ast}({\mathbf S}) \leq \frac{c_U q_U}{c_Lq_L}.
+\end{equation}
+ Hence, we want to obtain (sharp) estimates for the bounds in \eqref{estA}. We are interested in the dependence of $q_L,q_U$ on $h$. Recall that in the inequalities $\lesssim$ (also used below) the constant is independent of $h$ \emph{and of how the surface cuts the volume triangulation}. Concerning the upper bound in \eqref{estA} we have the following result.
+\begin{lemma} \label{lemqU}
+ Assume that the stabilization satisfies \eqref{conds1}. The following holds:
+\begin{equation} \label{b1}
+ \frac{A_h(u_h,u_h)}{\|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2} \lesssim h^{-3} \quad \text{for all}~~u_h \in {V_{h,\Theta}^k}, ~u_h \neq 0.
+\end{equation}
+\end{lemma}
+\begin{proof}
+We use Lemma \ref{lem:phih} and finite element inverse inequalities which we apply to $\hat{u}_h := u_h \circ \Theta_h |_T$, $T \in {\mathcal{T}}^\Gamma$, so that for all $u_h \in {V_{h,\Theta}^k}$ there holds
+\begin{align*}
+  \Vert \nabla u_h \Vert_{\Gamma_h \cap \Theta_h(T)}^2 \!
+\lesssim \!
+  \Vert \nabla \hat{u}_h \Vert_{{\Gamma^{\text{lin}}} \cap T}^2 \!
+\lesssim \!
+h^{-1} \Vert \nabla \hat{u}_h \Vert_{L^2(T)}^2 \!
+\lesssim \!
+h^{-3} \Vert \hat{u}_h \Vert_{L^2(T)}^2 \!
+\lesssim \!
+h^{-3} \Vert u_h \Vert_{L^2(\Theta_h(T))}^2.
+\end{align*}
+Summing over $T \in {\mathcal{T}}^\Gamma$ we get
+\begin{align*}
+ a_h(u_h,u_h) & = \Vert \nabla_{\Gamma_h} u_h \Vert_{L^2(\Gamma_h)}^2 \leq \Vert \nabla u_h \Vert_{L^2(\Gamma_h)}^2 \lesssim h^{-3} \| u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2. 
+\end{align*}
+The assumption \eqref{conds1} and an inverse inequality yield the same bound for $s_h(\cdot,\cdot)$
+\[
+ s_h(u_h,u_h) \lesssim h^{-3} \|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 + h^{-1} \|\nabla u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \lesssim h^{-3} \|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2.
+\]
+\end{proof}
+
+From Lemma~\ref{lemqU} and the result in \eqref{estS}, we obtain as a corollary the following main result.
+\begin{theorem}\label{coro:condition-number}
+Assume that the stabilization satisfies \eqref{conds1} and that
+\begin{equation}
+a_h(u_h,u_h) + s_h(u_h,u_h) \gtrsim h^{-1} \| u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \quad \text{for all}~~u_h \in {V_{h,\Theta}^{k,0}}. \label{conds3}
+\end{equation}
+Then, the spectral condition number satisfies
+\begin{equation} \label{condbound}
+ \operatorname{cond_\ast}({\mathbf S}) \lesssim h^{-2}.
+\end{equation}
+\end{theorem}
+
+\begin{remark} \label{uniquesol} \rm From the previous theorem it follows that if the stabilization satisfies \eqref{conds1} and \eqref{conds3} then the stiffness matrix is regular and thus the discrete problem \eqref{eq:varform} has a unique solution, cf. Remark~\ref{remnonunique}.
+\end{remark}
+
+\subsection{Assumptions on the stabilization term}
+We summarize the assumptions on the stabilization term $s_h$ used to derive Theorem \ref{mainthm} (optimal discretization error bound) and Theorem \ref{coro:condition-number} (condition number bound):
+\begin{subequations} \label{conds}
+\begin{align}
+  s_h(w,w) & \lesssim h^{-3}\|w\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 + h^{-1} \|\nabla w\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 ~~\text{for all}~w \in {V_{\text{reg},h}}, \label{conds1A} \\ 
+\sup_{w_h \in {V_{h,\Theta}^{k,0}}} \frac{s_h(u^e,w_h)}{{\Vert {w_h} \Vert_h}} & \lesssim h^{l}\|f\|_{L^2(\Gamma)}, \quad \text{with }l=k \text{ or } l=k+1, \label{conds2A} \\
+\!\!\! a_h(u_h,u_h) + s_h(u_h,u_h) & \gtrsim h^{-1} \| u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \quad \text{for all}~~u_h \in {V_{h,\Theta}^{k,0}}. \label{conds3A} 
+\end{align}
+\end{subequations}
+The first two are needed for optimal discretization error bounds, and the first and third one are needed for the uniform $\mathcal{O}(h^{-2})$ condition number bound.
+We note that we only need $l=k$ in \eqref{conds2A} to obtain optimal $H^1$ error bounds. Having \eqref{conds2A} with $l=k+1$ may be useful in order to derive $L^2$ error bounds. The latter has not been studied, yet.\\
+
+\subsection{Ghost penalty stabilization} \label{sec:ghostpen}
+The ``ghost penalty'' stabilization is introduced in \cite{Burman2010} as a stabilization mechanism for unfitted finite element discretizations. In \cite{BHL15}, it is applied to a trace finite element discretization of the Laplace--Beltrami equation with piecewise linear finite elements ($k=1$). This stabilization is defined by the facet-based bilinear form 
+\[
+s_h(u_h,v_h) = \rho_s \sum_{F \in \mathcal{F}_h} \int_F {[\![{\nabla u_h \cdot n_h}]\!]} {[\![{\nabla v_h \cdot n_h}]\!]} {\,\mathrm{d} {s}},
+\]
+with a stabilization parameter $\rho_s > 0$, $\rho_s \simeq 1$, and with $n_h$ the normal to the facet.
+For $k=1$, the assumptions in \eqref{conds} are satisfied due to results in \cite{BHL15}: Assumption\eqref{conds1A} follows from \cite[Lemma 4.6]{BHL15}, \eqref{conds2A} follows from ${[\![{\nabla u^e \cdot n_h}]\!]}=0$ for the smooth solution $u$, and \eqref{conds3A} follows from \cite[Lemma 4.5]{BHL15}.
+
+A less nice property of the ghost-penalty method is that the jump of the derivatives on the element-facets changes the sparsity pattern of the stiffness matrix. The facet-based terms enlarge the discretization stencils. 
+
+To our knowledge, there is no higher order version of the ghost penalty method for surface PDEs which provides a uniform bound on the condition number.
+
+\subsection{Full gradient surface stabilization} \label{sec:fullgradsurf}
+The ``full gradient'' stabilization is a method which does not rely on facet-based terms and keeps the sparsity pattern intact. It was introduced in \cite{DER14,reusken2015}. The bilinear form which describes this stabilization is
+\begin{equation} \label{fullgradient}
+ s_h(u_h,v_h):= \int_{\Gamma_h} \nabla u_h \cdot n_h \, \nabla v_h \cdot n_h \, {\,\mathrm{d} {s_h}},
+\end{equation}
+where $n_h$ denotes the normal to $\Gamma_h$.
+Thus, we get $A_h(u_h,v_h)=\int_{\Gamma_h} \nabla u_h \cdot \nabla v_h \, {\,\mathrm{d} {s_h}}$, which explains the name of the method. 
+The stabilization is very easy to implement. The conditions \eqref{conds1A} and \eqref{conds2A} hold for any $k$ with $l=k$, cf. \cite[Lemma 5.5]{reusken2015}.
+
+For the case $k=1$, it is shown in \cite{reusken2015} that one has a uniform condition number bound as in \eqref{condbound}. The proof in \cite{reusken2015} relies on estimates similar to \eqref{conds1A} and \eqref{conds3A}, see \cite[Lemma 6.3]{reusken2015}.
+For the case $k >1$, full gradient stabilization does not result in a uniform bound on the condition number, cf. \cite[Remark 6.5]{reusken2015}. This can be traced back to a failure to satisfy \eqref{conds3A}.
+
+\subsection{Full gradient volume stabilization} \label{sec:fullgradvol}
+Another ``full gradient'' stabilization was introduced in \cite{burman16fullgradcmame}. It uses the full gradient in the volume instead of (only) on the surface. The stabilization bilinear form is
+\[
+ s_h(u_h,v_h) = \rho_s \int_{{\Omega^{\Gamma}}_{\Theta}} \nabla u_h \cdot \nabla v_h {\,\mathrm{d} {x}},
+\]
+with a stabilization parameter $\rho_s > 0$, $\rho_s \simeq h$. Again, it is easy to implement this stabilization as its bilinear form is provided by most finite element codes.
+
+Condition \eqref{conds1A} is satisfied as $s_h(w,w) \simeq h \Vert \nabla w \Vert_{L^2(\Omega_\Theta^\Gamma)}^2$. In \cite[Lemma 4.2]{burman16fullgradcmame}, the condition \eqref{conds3A} is shown to hold. Hence, the bound \eqref{condbound} for the spectral condition number holds for arbitrary $k \geq 1$. 
+The consistency condition \eqref{conds2A}, however, is satisfied only in the case $l=k=1$, cf. \cite[Lemma 6.2, Term III]{burman16fullgradcmame}.
+
+\subsection{Normal derivative volume stabilization}
+\label{sec:normal-derivative-volume}
+In the lowest-order case $k=1$, the stabilization methods discussed in Section \ref{sec:ghostpen}, \ref{sec:fullgradsurf}, and \ref{sec:fullgradvol} satisfy the conditions \eqref{conds1A}, \eqref{conds2A}, and \eqref{conds3A}. For $k>1$, however, for all of these methods at least one of the three conditions in \eqref{conds} is violated. 
+We now introduce a new stabilization method which fulfills \eqref{conds} for arbitrary $k \geq 1$. Its bilinear form is given by
+\begin{equation}\label{eq:def-normal-gradient-volume-stab}
+ s_h(u_h,v_h):= \rho_s \int_{{\Omega^{\Gamma}}_\Theta} n_h \cdot \nabla u_h \, n_h \cdot \nabla v_h \, {\,\mathrm{d} {x}}
+\end{equation}
+with $n_h$ as in Lemma~\ref{Lemnormals} and $\rho_s>0$.
+This is a (natural) variant of the stabilizations treated in Section \ref{sec:fullgradsurf} and \ref{sec:fullgradvol}. As in the full gradient surface stabilization only normal derivatives are added, but this time (as in the full gradient volume stabilization) in the volume ${\Omega^{\Gamma}}_\Theta$. 
+The implementation of this stabilization term is fairly simple as it fits well into the structure of many finite element codes.
+The scaling of the stabilization parameter $\rho_s$ is assumed to satisfy
+\begin{equation}\label{eq:as-rho}
+  h \lesssim \rho_s \lesssim h^{-1}.
+\end{equation}
+In the next section we prove that this stabilization satisfies all three conditions in \eqref{conds}, for arbitrary $k \geq 1$.
+
+\section{Analysis of the normal derivative volume stabilization} \label{sec:new-stab}
+ In this section we analyze the normal derivative volume stabilization \eqref{eq:def-normal-gradient-volume-stab}. We will prove that this method satisfies the conditions in \eqref{conds}. 
+ The structure of this section is as follows. In section \ref{sec:proofs:easy} we consider the, relatively easy to prove, conditions \eqref{conds1A} and \eqref{conds2A}. It turns out that condition \eqref{conds3A} is more difficult to prove and requires more analysis, which is given in section~\ref{sectproof3A}.
+
+\subsection{The conditions \eqref{conds} for the normal derivative volume stabilization} \label{sec:proofs:easy}
+\begin{lemma}
+  If the scaling assumption \eqref{eq:as-rho} holds, the normal derivative volume stabilization satisfies condition \eqref{conds1A}.
+\end{lemma}
+
+\begin{proof}
+Using the scaling assumption we get
+\[
+  s_h(w,w) = \rho_s\|n_h \cdot \nabla w\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \lesssim h^{-1} \|\nabla w\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2,
+\]
+and thus
+\eqref{conds1A} holds.
+\end{proof}
+
+\begin{lemma}
+  If the scaling assumption \eqref{eq:as-rho} holds, the normal derivative volume stabilization satisfies condition \eqref{conds2A} with $l=k$.
+\end{lemma}
+
+\begin{proof}
+Using the Cauchy--Schwarz inequality and \eqref{eq:def-h-norm}, we obtain
+\[
+  \sup_{w_h\in {V_{h,\Theta}^{k,0}}}\frac{s_h(u^e,w_h)}{{\left\lVert {w_h} \right\rVert}_h}\le \rho_s^{\frac12}{\left\lVert {n_h\cdot\nabla u^e} \right\rVert}_{L^2({\Omega^{\Gamma}}_\Theta)}.
+\]
+From $n\cdot\nabla u^e\equiv 0$, \eqref{normalres1} and \eqref{nb} we get
+\[
+  {\left\lVert {n_h\cdot\nabla u^e} \right\rVert}_{L^2({\Omega^{\Gamma}}_\Theta)}\le h^k{\left\lVert {\nabla u^e} \right\rVert}_{L^2({\Omega^{\Gamma}}_\Theta)}\le h^{k+\frac12}{\left\lVert {\nabla_\Gamma u} \right\rVert}_{L^2(\Gamma)}.
+\]
+Together with the well-posedness of \eqref{eq:weak-LB}, this yields
+\[
+  \sup_{w_h\in {V_{h,\Theta}^{k,0}}}\frac{s_h(u^e,w_h)}{{\left\lVert {w_h} \right\rVert}_h}\le \rho_s^{\frac12}h^{k+\frac12}{\left\lVert {\nabla_\Gamma u} \right\rVert}_{L^2(\Gamma)}\le \rho_s^{\frac12}h^{k+\frac12}{\left\lVert {f} \right\rVert}_{L^2(\Gamma)}.
+\]
+The assertion follows from the upper bound for $\rho_s$ in \eqref{eq:as-rho}.
+\end{proof}
+\begin{remark} \rm From the proof above it follows that if $\rho_s \sim h$ the normal derivative volume stabilization satisfies condition \eqref{conds2A} with $l=k+1$.
+\end{remark}
+\begin{lemma} \label{lemma3A}
+   If the scaling assumption \eqref{eq:as-rho} holds, the normal derivative volume stabilization satisfies \eqref{conds3A} for $h$ sufficiently small.
+\end{lemma}
+
+\begin{proof}
+ The analysis is given in the next section, cf. Corollary \ref{coro:cond3A}. 
+\end{proof}
+\subsection{Proof of Lemma~\ref{lemma3A}} \label{sectproof3A}
+In a neighborhood of $\Gamma$ we introduce the following local coordinate system. We write $x=(\xi,s)$, with $\xi \in \Gamma$ and $s \in (-\epsilon,\epsilon)$ (with $\epsilon >0$ suffciently small) iff $x= \xi + s n(\xi)$, with $n=n_\Gamma$.
+
+Let $\gamma \subset \Gamma$ be a simply connected subdomain of $\Gamma$ with ${\rm meas_2}(\gamma) >0$ (e.g., $\gamma=\Gamma$). Below, we consider neighborhoods $U_\gamma$ of $\Gamma$ which have the form
+\begin{equation} \label{defU}
+ U_\gamma = \{ (\xi,s) \mid \xi \in \gamma, -g(\xi)h\le s\le G(\xi)h \},
+\end{equation}
+with scalar Lipschitz functions $g \ge 0$, $G\ge 0$. This means that $U_\gamma$ is bounded by the graphs of $g$ and $G$ over $\Gamma$ (when mapped in the normal direction), cf. the sketch in Figure \ref{fig:ass1} below.
+
+The following lemma is of fundamental importance in our analysis.
+\begin{lemma}\label{lemJoerg-local}
+Let $U_\gamma$ be a set as in \eqref{defU} and assume $\|g+G\|_{L^\infty(\gamma)} \lesssim 1$. The following holds:
+\begin{equation} \label{fundest}
+ \|u\|_{L^2(U_\gamma)}^2 \lesssim h \|u\|_{L^2(\gamma)}^2 + h^2 \|n_\Gamma\cdot \nabla u\|_{L^2(U_\gamma)}^2 \quad \text{for all} ~~u \in H^1(U_\gamma).
+\end{equation}
+\end{lemma}
+\begin{proof}
+Let $u\in C^\infty(U_\gamma)$. For each $\xi\in\gamma$, let $F_\xi$ denote the line-segment $\{\xi +s n(\xi)\mid -g(\xi)h\le s\le G(\xi)h\}\subseteq U_\gamma$. From the fundamental theorem of integration, we get for each $x= \xi+s n (\xi)\in F_\xi$ that
+\[
+  u(x)^2= u(\xi)^2 + 2\int_0^s u(\xi+tn(\xi))n(\xi)\cdot\nabla u(\xi+tn(\xi)) {\,\mathrm{d} t}.
+\]
+The Cauchy--Schwarz inequality implies
+\[
+  u(x)^2\le u(\xi)^2 + 2{\left\lVert {u} \right\rVert}_{L^2(F_\xi)}{\left\lVert {n\cdot\nabla u} \right\rVert}_{L^2(F_\xi)}.
+\]
+We integrate over $x\in F_\xi$ and apply the inequality $2ab\le r_\xi^{-1}a^2 + r_\xi b^2$ with $r_\xi = \operatorname{\operatorname{meas}}_1(F_\xi)$ to obtain
+\[
+  {\left\lVert {u} \right\rVert}_{L^2(F_\xi)}^2\le 2r_\xi u(\xi)^2 + r_\xi^2{\left\lVert {n\cdot\nabla u} \right\rVert}_{L^2(F_\xi)}^2.
+\]
+
+The coarea formula for the retract $p\colon U_\gamma\to \gamma \subset \Gamma$ along $n$ and a function $f\in C^\infty(U_\gamma)$ is
+\[
+  \int_{U_\gamma} f {\,\mathrm{d} x} = \int_\gamma \int_{F_\xi} f{\,\mathrm{d} t} {\,\mathrm{d} \sigma}(\xi).
+\]
+For $f\!=\!u^2$, we get ${\left\lVert {u} \right\rVert}_{L^2(U_\gamma)}^2 \!\le\! 2\int_\gamma r_\xi u^2 + \int_\gamma r_\xi^2 {\left\lVert {n\cdot\nabla u} \right\rVert}_{L^2(F_\xi)}^2$.\! Using ${\left\lVert {g+G} \right\rVert}_{L^\infty(\gamma)}\lesssim 1$ gives $r_\xi \lesssim h$ and thus the result in \eqref{fundest}. A density argument completes the proof.
+\end{proof}
+
+This lemma shows that one can control the $L^2$-norm in the volume $U_\gamma$ with the normal derivative in the same volume (as used in the stabilization) and the $L^2$-norm on the surface. The result in \eqref{fundest} can be interpreted as a ``local version'' of \eqref{conds3A}. Below we will use this in combination with a localization argument to obtain a result as in \eqref{conds3A} up to a geometric error (${\Omega^{\Gamma}}_\Psi$ vs. ${\Omega^{\Gamma}}_\Theta$). This geometric error can be dealt with as shown in Lemma~\ref{lemJoergpert}.
+
+\subsubsection{Localization argument}
+\begin{figure}[h!]
+  \vspace*{-0.2cm}
+  \begin{center}
+    \begin{tikzpicture}[scale=1.5,line cap=round]
+      
+      \coordinate (A) at (0.0,0.0);
+      \coordinate (B) at (1.0,0.0);
+      \coordinate (C) at (2.0,0.0);
+      \coordinate (D) at (3.0,0.0);
+      \coordinate (E) at (0.0,1.0);
+      \coordinate (F) at (1.0,1.0);
+      \coordinate (G) at (2.5,2.0);
+      \coordinate (H) at (2.0,1.0);
+      \coordinate (I) at (3.0,1.0);
+      \tikzstyle{mytriangles}=[line width=0.8pt, line join=round];
+      \draw[mytriangles] (A) -- (F) -- (E) -- cycle;
+      \draw[mytriangles] (A) -- (B) -- (F) -- cycle;
+      \draw[mytriangles] (B) -- (G) -- (F) -- cycle;
+      \draw[mytriangles] (B) -- (H) -- (G) -- cycle;
+      \draw[mytriangles] (B) -- (C) -- (H) -- cycle;
+      \draw[mytriangles] (C) -- (I) -- (H) -- cycle;
+      \draw[mytriangles] (C) -- (D) -- (I) -- cycle;
+      \node[right] at (D) {\color{black}${\Omega^{\Gamma}}_\Psi$};
+      
+      \tikzstyle{myborder}=[line width=1pt, line cap=round, line join=round];
+      \draw[myborder] (A) -- (B) -- (C) -- (D);
+      \draw[myborder] (E) -- (F) -- (G) -- (H) -- (I);
+      
+      \coordinate (MA) at (-0.5, 0.5);
+      \coordinate (MB) at (3.5,0.5);
+      \draw[line width=1pt,red!80!black] (MA) -- (MB) node[right]{$\Gamma$};
+      
+      \coordinate (P) at (2.0,1.6667);
+      \coordinate (Q) at (2.5,0.5);
+      \coordinate (R) at (2.5,1.0);
+      \draw[line width=1pt, line join=round, green, fill=green,fill opacity=0.3] (H) -- (G) -- (P) -- cycle;
+      \draw[line width=1pt, green]         (R) -- (Q);
+      \draw[line width=1pt, green, dotted] (Q) -- (G);
+    \end{tikzpicture}
+  \end{center}
+  \vspace*{-0.4cm}
+  \caption{Depending on the shape of the $T\in{\mathcal{T}}$, ${\Omega^{\Gamma}}_\Psi$ is not a graph over $\Gamma$ as in \eqref{defU}.}
+  \label{fig:obtuse-neighborhood}
+\end{figure}
+In general, we cannot expect ${\Omega^{\Gamma}}_\Psi=U_\Gamma$ for some $U_\Gamma$ as in \eqref{defU}, cf.~Figure~\ref{fig:obtuse-neighborhood}. Therefore, we present a localization argument which is based on the following observation (lemma~\ref{la:norm-B} below): On the finite element space (as opposed to $H^1(U_\gamma)$ used in \eqref{fundest}), it suffices to control the $L^2$-norm on suitable subsets in order to get a bound on the $L^2({\Omega^{\Gamma}}_\Psi)$-norm. We apply the localization argument to the triangulation ${\mathcal{T}}^\Gamma_\Psi =\{ \, \Psi(T)\mid T\in {\mathcal{T}}^\Gamma \,\}$ because this triangulation corresponds to the globally smooth surface $\Gamma$, cf.~Fig.~\ref{fig:trafos}. On ${\mathcal{T}}^\Gamma_\Psi$ we define the finite element space
+ \[
+  V_{h,\Psi}^k:= \{\, \tilde u_h = u_h \circ F_h \mid u_h \in {V_{h,\Theta}^k} \,\}.
+ \]
+Let $\{B_T\mid T\in {\mathcal{T}}^\Gamma_\Psi\}$ be a collection of balls with $B_T\subset T$ and ${\rm radius}(B_T)=: r_T\gtrsim h$ for all $T\in {\mathcal{T}}^\Gamma_\Psi$.
+Let
+\begin{equation}\label{eq:norm-B}
+  \|u\|_B^2= \sum_{T\in{\mathcal{T}}^\Gamma_\Psi} {\left\lVert {u} \right\rVert}_{L^2(B_T)}^2.
+\end{equation}
+
+\begin{lemma}\label{la:norm-B}
+  On $V_{h,\Psi}^k$ the uniform norm equivalence $\|\cdot\|_B \sim \|\cdot\|_{L^2({\Omega^{\Gamma}}_\Psi)}$ holds.
+\end{lemma}\begin{proof}
+As $B_T\subset T$ holds for all $T\in{\mathcal{T}}^\Gamma_\Psi$, we immediately find $\|u\|_B \le \|u\|_{L^2({\Omega^{\Gamma}}_\Psi)}$ for all $u\in V_{h,\Psi}^k$.
+
+To prove the other direction of the estimate, let $u\in V_{h,\Psi}^k$ and $T\in{\mathcal{T}}^\Gamma_\Psi$ be arbitrary. We can write $T=\Psi(S)$, $S\in{{\mathcal{T}}^{\Gamma}}$. Furthermore, $u|_T=\hat u\circ \Psi^{-1}|_T$ for some polynomial $\hat u$ of degree $k$. Using $\Psi= I + \mathcal{O}(h)$, cf. \eqref{eq:phi2}, it follows that there is a ball $S_T \subset \Psi^{-1}(B_T)$ with ${\rm radius}(S_T) \gtrsim h$. From standard finite element analysis we obtain $\|\hat u\|_{L^2(S)} \sim \|\hat u\|_{L^2(S_T)}$. Using this and 
+$
+  {\left\lVert {u} \right\rVert}_{L^2(T)}\sim {\left\lVert {\hat u} \right\rVert}_{L^2(S)} $, which follows from \eqref{eq:phi2}, we get
+\[
+ \| u\|_{L^2(B_T)} \sim \|\hat u\|_{L^2(S_T)}\sim {\left\lVert {u} \right\rVert}_{L^2(T)},
+\]
+and summing over $T\in{\mathcal{T}}^\Gamma_\Psi$ completes the proof.
+\end{proof}
+
+The following assumption specifies quantitatively that each $T\in{\mathcal{T}}^\Gamma_\Psi$ contains a sufficiently big ball which is ``locally visible'' from $\Gamma$ in a set as in \eqref{defU}.
+
+\begin{assumption}\label{as:local-tubular-neighborhoods}
+  For each $T\in{\mathcal{T}}^\Gamma_\Psi$ there exists a set $U_{\gamma_T}$ as in \eqref{defU} with the following properties. The graph functions $g_T\ge 0$, $G_T\ge 0$ on $\gamma_T$ satisfy ${\left\lVert {g_T+G_T} \right\rVert}_{L^\infty(\gamma_T)}\lesssim 1$. Furthermore, $U_{\gamma_T} \subseteq {\Omega^{\Gamma}}_\Psi$, ${\rm diam}(\gamma_T) \lesssim h$ and $U_{\gamma_T}$ contains a ball $B_T\subset T$ with radius $r_T\gtrsim h$.
+\end{assumption}
+
+For a sketch of the domains involved in Assumption \ref{as:local-tubular-neighborhoods} we refer to Figure \ref{fig:ass1}.
+
+\begin{figure}
+  \begin{center}
+    \begin{tikzpicture}[scale=0.45]
+       
+       \coordinate (A) at (0.5,6.1);
+       \coordinate (B) at (3.5,0.8);
+       \coordinate (C) at (6.2,5.5);
+       \coordinate (D) at (9.7,0.6);
+       \coordinate (E) at (12.3,5.5);
+       \coordinate (F) at (1.0,0.7);
+       
+       \draw[line width=1pt] (D)
+       to[in=6,out=182] (B)
+       to[in= -90,out= 135] (A)
+       to[in= 166,out=  -2] (C)
+       to[in= 180,out=  14] (E)
+       to[in=  70,out=-115] (D)
+       to[in= -75,out= 135] (C)
+       to[in=  83,out=-100] (B);
+       
+       \draw[fill=gray,opacity=0.2, draw=none] (D)
+       to[in= -75,out= 135] (C)
+       to[in=  83,out=-100] (B)
+       to[in= 186,out=   2] (D) -- cycle;
+
+       
+       \coordinate (XA) at (-.25, 3.5);
+       \coordinate (XB) at ( 2.5, 3.5);
+       \coordinate (XC) at (10.0, 3.5);
+       \coordinate (XD) at (12.0, 3.5);
+       
+       \draw[line width=1pt,red!80!black,->] (XA) -- (XD) node[right]{$\xi$};
+       
+       \draw[line width=2pt,blue!80!black] (XB) -- (XC);
+
+       
+       \coordinate (YA) at ( 5.6, 1.4);
+       \coordinate (YB) at ( 7.6, 2.1);
+       
+       \coordinate (ZA) at ( 5.0, 4.5);
+       \coordinate (ZB) at ( 6.8, 4.9);
+       
+       \draw[fill=green,opacity=0.3] (XB)
+       to[ in= 160, out= -35] (YA)
+       to[out= -20,  in=-130] (YB)
+       to[out=  50,  in=-174] (XC)
+       to[ in=  45, out= 180] (ZB)
+       to[ in=   0, out=-135] (ZA)
+       to[ in=  22, out= 180] (XB);
+       
+       
+       \coordinate (BXB) at ( 2.5, 0.0);
+       \coordinate (BXC) at (10.0, 0.0);
+       \coordinate (BXM) at (6.25, 0.0);
+       
+       \draw[line width=0.75pt,blue!80!black,densely dotted,<->] (BXB) -- (BXC);
+       \node[below,scale=0.8] at (BXM)
+       {\color{blue!80!black} $\operatorname{diam}(\gamma_T)\lesssim h$};
+
+       
+       \coordinate (XX)  at ( 6.08, 2.6);
+       \coordinate (XXA) at ( 4.83, 2.6);
+       \coordinate (XXB) at ( 7.33, 2.6);
+       
+       \filldraw[orange,opacity=0.3,draw=black] (XX) circle (1.25);
+       \draw[line width=0.75pt,orange!50!black,densely dotted,<->] (XXA) -- (XXB);
+       \node[below,scale=0.8] at (XX)
+       {\color{orange!50!black} $\gtrsim h$};
+       
+       
+       \coordinate (GAA) at (-0.25, 5.15);
+       \coordinate (GAB) at ( 12.0, 5.15);
+       \coordinate (GBA) at (-0.25, 1.3);
+       \coordinate (GBB) at ( 12.0, 1.3);
+       
+       \draw[line width=0.75pt,black,densely dotted] (GAA) -- (GAB);
+       \draw[line width=0.75pt,black,densely dotted] (GBA) -- (GBB);
+       \draw[line width=0.75pt,black,densely dotted,<->] (GAA) -- (GBA);
+       \node[left,scale=0.8]  at (XA)
+       { $\Vert g_T + G_T\Vert_{L^\infty({\color{blue!80!black}}\gamma_T)} \cdot h \lesssim h$};
+
+       
+       
+       \coordinate (LR1) at ( 14.5, 5.5);
+       \coordinate (LR2) at ( 15.5, 5.5);
+       \draw[line width=1pt,red!80!black] (LR1) -- (LR2) node[right]{$\Gamma$};
+       
+       \coordinate (LB1) at ( 14.5, 4.5);
+       \coordinate (LB2) at ( 15.5, 4.5);
+       \draw[line width=2pt,blue!80!black] (LB1) -- (LB2) node[right]{$\gamma_T$};
+       
+       \coordinate (LU) at ( 15, 3.4);
+       \coordinate (LUR) at ( 15.5, 3.3);
+       \filldraw[green,opacity=0.3,draw=black] (LU) circle (0.5);
+       \node[right] at (LUR) {\color{green!50!black} $U_{\gamma_T}$};
+       
+       \coordinate (LBT) at ( 15, 2.1);
+       \coordinate (LBTR) at ( 15.5, 2.0);
+       \filldraw[orange,opacity=0.3,draw=black] (LBT) circle (0.5);
+       \node[right] at (LBTR) {\color{orange!50!black} $B_T$};
+       
+       \coordinate (LT) at ( 15, 0.8);
+       \coordinate (LTR) at ( 15.5, 0.7);
+       \filldraw[gray,opacity=0.2,draw=black] (LT) circle (0.5);
+       \filldraw[fill=none,draw=black] (LT) circle (0.5);
+       \node[right] at (LTR) {\color{gray!50!black} $T$};
+     \end{tikzpicture} \vspace*{-0.25cm}
+   \end{center}
+   \caption{Sketch of the domains involved in Assumption \ref{as:local-tubular-neighborhoods}.}
+   \label{fig:ass1}
+\end{figure}
+
+\begin{lemma}\label{lemJoerg}
+  If Assumption \ref{as:local-tubular-neighborhoods} is satisfied, the following holds:
+  \[
+    {\left\lVert {u} \right\rVert}_{L^2({\Omega^{\Gamma}}_\Psi)}^2 \lesssim h{\left\lVert {u} \right\rVert}_{L^2(\Gamma)}^2 + h^2{\left\lVert {n_\Gamma\cdot\nabla u} \right\rVert}_{L^2({\Omega^{\Gamma}}_\Psi)}^2 \quad\text{for all } u\in V_{h,\Psi}^k.
+  \]
+\end{lemma}
+
+\begin{proof}
+Let $u\in V_{h,\Psi}^k$ be arbitrary. From Lemma \ref{la:norm-B} and Assumption \ref{as:local-tubular-neighborhoods}, we get
+\[
+  {\left\lVert {u} \right\rVert}_{L^2({\Omega^{\Gamma}}_\Psi)}^2 \lesssim {\left\lVert {u} \right\rVert}_B^2\le \sum_{T\in{{\mathcal{T}}^{\Gamma}}_\Psi} {\left\lVert {u} \right\rVert}_{U_{\gamma_T}}^2.
+\]
+We apply Lemma \ref{lemJoerg-local} on each $T\in{{\mathcal{T}}^{\Gamma}}_\Psi$,
+\[
+  \sum_{T\in{{\mathcal{T}}^{\Gamma}}_\Psi} {\left\lVert {u} \right\rVert}_{U_{\gamma_T}}^2 \lesssim \sum_{T\in{{\mathcal{T}}^{\Gamma}}_\Psi}\left( h{\left\lVert {u} \right\rVert}_{L^2(\gamma_T)}^2 + h^2{\left\lVert {n_\Gamma\cdot\nabla u} \right\rVert}_{L^2(U_{\gamma_T})}^2 \right).
+\]
+Due to ${\rm diam}(\gamma_T) \lesssim h$, cf. Assumption \ref{as:local-tubular-neighborhoods}, we can apply a standard finite intersection argument. Hence the right-hand side of the previous estimate is uniformly bounded by \vspace*{-0.25cm}
+\[
+  \sum_{T\in{{\mathcal{T}}^{\Gamma}}_\Psi}\left( h{\left\lVert {u} \right\rVert}_{L^2(\Gamma\cap T)}^2 + h^2{\left\lVert {n_\Gamma\cdot\nabla u} \right\rVert}_{L^2(T)}^2 \right).\vspace*{-0.25cm}
+ 
+\]
+\end{proof}
+
+\noindent
+Finally we treat Assumption \ref{as:local-tubular-neighborhoods}:
+\begin{lemma}\label{la:as-local-tubular-neighborhoods}
+  On a quasi-uniform family of triangulations, for sufficiently small $h$, Assumption \ref{as:local-tubular-neighborhoods} holds.
+\end{lemma}
+\begin{proof}
+By $h_{\min}$ we denote the minimal radius of the (maximal) inscribed spheres over all $T \in {\mathcal{T}}^\Gamma_\Psi$. Due to quasi-uniformity we have $h \sim h_{\min}$. The local intersection is denoted by $\Gamma_T:= \Gamma \cap T$, $T \in {\mathcal{T}}^\Gamma_\Psi$.
+We assume that $h$ is sufficiently small such that $\Gamma_T$ is ``flat'' in the following sense. Due to smoothness of $\Gamma$ we can take $h$ small such that there is a 2D plane $P$, which intersects $\Gamma$, and $\Gamma_T$ can be represented as the graph of a function $g_T: P_T \to \mathbb{R}^3$, $P_T \subset P$. We assume $h$ small enough such that for some fixed $\epsilon$ with $0 < \epsilon \ll 1$ we have $\|\nabla_p g_T\|_{L^\infty(P_T)} \leq \epsilon h_{\min}$. 
+The idea of the proof is as follows.
+We will define sets $U_{\gamma_T}$ as in \eqref{defU} based on (parts of) spheres in local coordinates with radius $\sim h$. We distinguish two cases. Either such a sphere can be put strictly inside $T$ or such a sphere is centered around a vertex. In the former case all requirements in Assumption \ref{as:local-tubular-neighborhoods} are satisfied by taking $U_{\gamma_T}$ equal to this sphere, whereas in the latter case we take $U_{\gamma_T}$ equal to a suitably defined intersection of the sphere with a half-space, which then satisfies all requirements.
+
+\begin{figure}
+     \begin{tikzpicture}[scale=2]
+       \coordinate (A) at (0.0,0.0);
+       \coordinate (B) at (2.0,0.0);
+       \coordinate (C) at (1.0,1.2);
+
+       \coordinate (D) at (0.1,0.5);
+       \coordinate (E) at (1.9,0.9);
+       
+       \coordinate (F) at (1.0,0.7);
+
+       \coordinate (G) at (0.51,0.59);
+       \coordinate (H) at (1.49,0.81);
+       \coordinate (I) at (0.96,0.56);
+
+       \coordinate (LR1) at (2.2,1.0);
+       \coordinate (LR2) at (2.4,1.0);
+
+       \coordinate (LB1) at (2.2,0.75);
+       \coordinate (LB2) at (2.4,0.75);
+
+       \coordinate (LU)  at (2.3,0.5);
+       \coordinate (LBT) at (2.3,0.2);
+       \coordinate (LUR)  at (2.4,0.5);
+       \coordinate (LBTR) at (2.4,0.2);
+       
+       
+       \filldraw[green,opacity=0.3,draw=black] (F) circle (0.5);
+       \filldraw[draw=black] (F) circle (0.02) node[below right]{$\xi_0$};
+       \draw[line width=1pt] (A) to[in=-170,out=10] (B) to[in=-60,out=135] (C) -- cycle;
+       \draw[line width=1pt,red!80!black,->] (D) -- (E) node[right] {$\xi$};
+       \draw[line width=2pt,blue!80!black] (G) -- (H);
+       \filldraw[orange,opacity=0.3,draw=black] (I) circle (0.35);
+
+       \draw[line width=1pt,red!80!black] (LR1) -- (LR2) node[right]{$\Gamma$};
+       \draw[line width=2pt,blue!80!black] (LB1) -- (LB2) node[right]{$\gamma_T$};
+       \filldraw[green,opacity=0.3,draw=black] (LU) circle (0.1);
+       \node[right] at (LUR) {\color{green!50!black} $U_{\gamma_T}$};
+       \filldraw[orange,opacity=0.3,draw=black] (LBT) circle (0.1);
+       \node[right] at (LBTR) {\color{orange!50!black} $B_T$};
+     \end{tikzpicture}
+     \begin{tikzpicture}[scale=2]
+       \coordinate (A) at (0.0,0.0);
+       \coordinate (AL) at (0.0,-0.1);
+       \coordinate (AU) at (0.0,0.1);
+       \coordinate (B) at (2.0,-0.05);
+       \coordinate (C) at (1.0,1.2);
+
+       \coordinate (D) at (-1.0,0.1);
+       \coordinate (E) at (2.0,0.1);
+       
+       \coordinate (F) at (1.0,0.7);
+
+       \coordinate (G) at (-0.9,0.1);
+       \coordinate (H) at (0.9,0.1);
+       
+       \coordinate (I) at (0.585,0.33);
+
+       \coordinate (LR1) at (2.2,1.0);
+       \coordinate (LR2) at (2.4,1.0);
+
+       \coordinate (LB1) at (2.2,0.75);
+       \coordinate (LB2) at (2.4,0.75);
+
+       \coordinate (LU)  at (2.3,0.5);
+       \coordinate (LUR)  at (2.4,0.5);
+       \coordinate (LBT) at (2.3,0.2);
+       \coordinate (LBTR) at (2.4,0.2);
+
+       \draw[fill=gray,opacity=0.3,draw=none] (AL) -- ++ (0.9,0.0) arc (-6.5:186.5:0.9) -- cycle;
+       \draw[fill=green,opacity=0.3] (AU) -- ++ (0.9,0.0) arc (6:173.5:0.9) -- cycle;
+       
+
+       \draw[dotted,->] (A) -- (0.0,0.9) node[below left]{$\delta_0 h$};
+       
+       
+       \draw[line width=1pt] (A) -- (B) to[in=-60,out=135] (C) -- cycle;
+       \draw[line width=1pt,red!80!black,->] (D) -- (E) node[right]{$\xi$};
+       \draw[line width=2pt,blue!80!black] (G) -- (H);
+       \filldraw[orange,opacity=0.3,draw=black] (I) circle (0.215);
+
+       \draw[line width=1pt,red!80!black] (LR1) -- (LR2) node[right]{$\Gamma$};
+       \draw[line width=2pt,blue!80!black] (LB1) -- (LB2) node[right]{$\gamma_T$};
+       \filldraw[green,opacity=0.3,draw=black] (LU) circle (0.1);
+       \node[right] at (LUR) {\color{green!50!black} $U_{\gamma_T}$};
+       \filldraw[orange,opacity=0.3,draw=black] (LBT) circle (0.1);
+       \node[right] at (LBTR) {\color{orange!50!black} $B_T$};
+     \end{tikzpicture}
+     \caption{Sketch of the two cases: There either exists $\xi_0 \in \Gamma$, so that
+       $\operatorname{dist}_{\ast}(\xi_0,\partial \Omega_{\Psi}^\Gamma) > \delta_1 h_{\min}$ (left) or $\operatorname{dist}_{\ast}(\Gamma,\partial \Omega_{\Psi}^\Gamma) < \delta_1 h_{\min}$ (right). According to the two cases the sets $U_{\gamma_T}$, $\gamma_T$ and $B_T$ can be found. Note that the sketch uses the local coordinates $(\xi,s)$ as in \eqref{defU}.}
+     \label{fig:sketchproofass1}
+\end{figure}
+
+First we introduce (small) spheres in local coordinates. In a fixed (sufficiently small) tubular neighborhood of $\Gamma$ we define the distance ${\rm dist}_\ast\big((\xi,s),(\tilde \xi,\tilde s)\big):= \big( \|\xi - \tilde \xi\|_2^2 + |s-\tilde s|^2\big)^\frac12$, where $\|\cdot\|_2$ is the Euclidean distance and $(\xi,s)$ are the local coordinates.
+This distance is equivalent to the Euclidean distance: there are constants $d_0 >0$ and $d_1$ such that for all $x=(\xi,s)$ and $\tilde x=(\tilde \xi, \tilde s)$ from the tubular neigborhood we have 
+\begin{equation} \label{normeq}
+ d_0 \|x- \tilde x\|_2 \leq {\rm dist}_\ast\big((\xi,s),(\tilde \xi,\tilde s)\big) \leq d_1 \|x- \tilde x\|_2 .
+\end{equation}
+In this distance the spheres with center $\xi_0 \in \Gamma$ are denoted by $B_\ast(\xi_0;\delta):= \{\, (\xi,s)\mid {\rm dist}_\ast \big((\xi_0,0),(\xi,s) \big) \leq \delta\,\}$. For defining the suitable half-spheres we introduce some further notation. We define the part of the domain $\Omega^\Gamma_\Psi$ with negative (positive) level set values and the corresponding part of the outer boundary:
+\begin{equation*}
+  {\Omega^{\Gamma}}_{\Psi,\mp} := \{\, x \in {\Omega^{\Gamma}}_\Psi \mid \phi(x) \lessgtr 0\,\}, \quad 
+ \Gamma_{\pm} := \partial{\Omega^{\Gamma}}_{\Psi,\pm} \setminus \Gamma
+\end{equation*}
+ For $\xi_0 \in \Gamma$ we define the ``half-spheres''
+ $B_\ast^{\pm}(\xi_0;\delta):=B_\ast(\xi_0;\delta)\cap {\Omega^{\Gamma}}_{\Psi,\pm}$.
+ Using the quasi-uniformity assumption on the family of triangulations one can show 
+ that $dist_2(\Gamma_+,\Gamma_-) \gtrsim h$. Hence, also
+ $dist_\ast(\Gamma_+,\Gamma_-) \gtrsim h$ holds.
+ Using this we conclude that there exists a $\delta_0 >0$ (independent of $h$) such that for all $\xi_0 \in \Gamma$
+ \begin{equation} \label{either}
+  B_\ast^+(\xi_0;\delta_0 h) \subset {\Omega^{\Gamma}}_{\Psi,+} \quad \text{or}~~ B_\ast^-(\xi_0;\delta_0 h) \subset {\Omega^{\Gamma}}_{\Psi,-}
+ \end{equation}
+ holds. In the remainder we take such a fixed $\delta_0 > 0$. One checks that $B_\ast(\xi_0;\delta_0 h)$ and also the corresponding half-spheres are of the form $U_\gamma$ as in \eqref{defU}, with $\gamma:=\{\, \xi \in \Gamma \mid \|\xi- \xi_0\|_2 \leq \delta_0 h \,\}$ and $\|g+G\|_{L^\infty(\gamma)} \leq 2 \delta_0$, ${\rm diam (\gamma)} \lesssim h$. 
+
+ We now turn to the construction of sets $U_{\gamma_T}$ which satisfy the conditions required in Assumption \ref{as:local-tubular-neighborhoods}. For this we introduce the following boundary strip. For fixed $\delta_1$ with $0< \delta_1 \leq \frac12 \delta_0$ we define
+ \[
+  \Gamma_{\delta_1}:= \{\, x \in {\Omega^{\Gamma}}_\Psi \mid {\rm dist}_\ast(x, \partial{\Omega^{\Gamma}}_\Psi) \leq \delta_1 h_{\min}\,\}.
+ \]
+Take $T \in {\mathcal{T}}^\Gamma_\Psi$. Then either $\Gamma_T \subset \Gamma_{\delta_1}$ or there exists $\xi_0 \in \Gamma_T$ with ${\rm dist}_\ast((\xi_0,0), \partial{\Omega^{\Gamma}}_\Psi) > \delta_1 h_{\min}$.
+We first consider the latter case. Then we take $U_{\gamma_T}:=B_\ast(\xi_0;\delta_1 h_{\rm min}) \subset {\Omega^{\Gamma}}_\Psi$, see Figure \ref{fig:sketchproofass1} (left) for a sketch.
+Due to shape regularity of $T$ we have $|U_{\gamma_T} \cap T| \gtrsim h^3$ and thus we can construct a ball with radius $r_T \gtrsim h$ and $B_T \subset T \cap U_{\gamma_T}$. Hence, for this $U_{\gamma_T}$ all conditions in Assumption \ref{as:local-tubular-neighborhoods} are satisfied. 
+
+We now consider the case $\Gamma_T \subset \Gamma_{\delta_1}$ and take the vertex $x_V = (\xi_V,s_V)$ of $T$ which is closest to $\Gamma_T$. 
+We assume $(\xi_V,s_V) \in \Omega_{\Psi,-}^\Gamma$ and thus $B_\ast^+(\xi_V;\delta_0 h) \subset {\Omega^{\Gamma}}_{\Psi,+}$, cf. ~\eqref{either} (the other case can be treated by the same arguments). 
+We define $U_{\gamma_T} := B_\ast(x_V,\delta_0 h) \cap \Omega_{\Psi,+}^\Gamma \subset B_\ast^+(\xi_V;\delta_0 h)$
+and have
+$ |U_{\gamma_T} \cap T| \geq |B_\ast(\xi_V,\delta_0 h) \cap T| - | \Gamma_{\delta_1} \cap T|$, see Figure \ref{fig:sketchproofass1} (right) for a sketch. Due to shape regularity of the mesh we have that $|B_\ast(\xi_V,\delta_0 h) \cap T| \gtrsim h^3$ and $| \Gamma_{\delta_1} \cap T| \lesssim \delta_1 h^3$, so that for sufficiently small $\delta_1$ we can guarantee $|U_{\gamma_T} \cap T| \gtrsim h^3$ and thus we can construct a ball with radius $r_T \gtrsim h$ and $B_T \subset T \cap U_{\gamma_T}$. Hence, for this $U_{\gamma_T}$ all conditions in Assumption \ref{as:local-tubular-neighborhoods} are satisfied. 
+\end{proof}
+
+\subsubsection{Geometric error} \label{sec:approxnormal}
+In this section we treat the geometric error (${\Omega^{\Gamma}}_\Psi$ vs. ${\Omega^{\Gamma}}_\Theta$) by a straightforward perturbation argument.
+We assume that we have a quasi-uniform family of triangulations, hence Assumption \ref{as:local-tubular-neighborhoods} is satisfied (for $h$ sufficiently small).
+\begin{lemma} \label{lemJoergpert}
+ Let $\tilde n$ be such that $\|\tilde n - n_\Gamma\|_{\infty,{\Omega^{\Gamma}}_\Theta} \lesssim h$ holds. For $h$ sufficiently small, the following holds:
+  \begin{equation} \label{estpert}
+    \|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \lesssim h \|u_h\|_{L^2(\Gamma_h)}^2 + h^2 \|\tilde n \cdot \nabla u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \quad \text{for all}~~u_h \in V_{h,\Theta}^k.
+  \end{equation}
+\end{lemma}
+
+\begin{proof}
+We use the homeomorphism $F_h = \Theta_h \circ \Psi^{-1}: {\Omega^{\Gamma}}_\Psi \to {\Omega^{\Gamma}}_\Theta$ (see also Figure \ref{fig:trafos}) which satisfies
+\begin{equation}\label{lemJoergpert-1}
+  \|I- F_h \|_{\infty,{\Omega^{\Gamma}}_\Psi} + h\|I- DF_h \|_{\infty,{\Omega^{\Gamma}}_\Psi} \lesssim h^{k+1},
+\end{equation}
+cf.~Lemma~\ref{lem:phih}. Take $u_h \in V_{h,\Theta}^k$ and define $\tilde u_h:=u_h \circ F_h\in V_{h,\Psi}^k$. Using standard transformation rules and the result in Lemma~\ref{lemJoerg} we obtain
+\begin{align*}
+  \|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 & \sim \|\tilde u_h \|_{L^2({\Omega^{\Gamma}}_\Psi)}^2 \lesssim h \|\tilde u_h\|_{L^2(\Gamma)}^2 + h^2 \|n_\Gamma \cdot \nabla \tilde u_h\|_{L^2({\Omega^{\Gamma}}_\Psi)}^2 \\
+  & \sim h \| u_h\|_{L^2(\Gamma_h)}^2 + h^2 \|(DF_h n_\Gamma)\circ F_h^{-1} \cdot \nabla u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 .
+\end{align*}
+From a triangle-inequality, $\|\tilde n - n_\Gamma\|_{\infty,{\Omega^{\Gamma}}_\Theta} \lesssim h$ and \eqref{lemJoergpert-1} we get, for $h$ sufficiently small:
+\[
+ \|(DF_h n_\Gamma)\circ F_h^{-1} - \tilde n\|_{\infty, {\Omega^{\Gamma}}_\Theta} \lesssim
+ h.
+\]
+Hence we obtain, using an inverse inequality:
+\[
+ \|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \lesssim h \| u_h\|_{L^2(\Gamma_h)}^2 + h^2 \| \tilde n \cdot \nabla u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 + h^2 \|u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2.
+\]
+For $h$ sufficiently small, we can adsorb the last term on the right-hand side in the term on the left hand-side, and this completes the proof.
+\end{proof}
+
+On $\Gamma$, there holds the Poincar{\'e} inequality ${\left\lVert {u} \right\rVert}_{L^2(\Gamma)}\lesssim {\left\lVert {\nabla_\Gamma u} \right\rVert}_{L^2(\Gamma)}$ for all $u\in H^1_\ast(\Gamma)$. Using the properties of the mapping $F_h\colon {\Omega^{\Gamma}}_\Theta\to{\Omega^{\Gamma}}_\Psi$ in Lemma \ref{lem:phih}, one can derive a Poincar{\'e} inequality on $\Gamma_h$ (see e.g. \cite[Remark 5.3]{reusken2015}), 
+\begin{equation}\label{eq:poincare-gamma-h}
+  {\left\lVert {u_h} \right\rVert}_{L^2(\Gamma_h)}\lesssim {\left\lVert {\nabla_{\Gamma_h} u_h} \right\rVert}_{L^2(\Gamma_h)}\quad \text{for all } u_h \in {V_{h,\Theta}^{k,0}}.
+\end{equation}
+
+\begin{corollary}\label{coro:cond3A} If the scaling assumption \eqref{eq:as-rho} holds, the normal derivative volume stabilization satisfies \eqref{conds3A} for $h$ sufficiently small. 
+\end{corollary}
+\begin{proof} Take $\tilde n=n_h$ as defined in Lemma \ref{Lemnormals}, cf.~\eqref{normalres1}. Hence, $\|\tilde n - n_\Gamma\|_{\infty,{\Omega^{\Gamma}}_\Theta} \lesssim h$ holds. Using this, Lemma \ref{lemJoergpert} and $h\lesssim \rho_s$ we get
+\[
+  h^{-1} \| u_h\|_{L^2({\Omega^{\Gamma}}_\Theta)}^2 \lesssim \|u_h\|_{L^2(\Gamma_h)}^2 + s_h(u_h, u_h) \quad \text{for all}~~u_h\in {V_{h,\Theta}^k}.
+\]
+The assertion follows from the Poincar{\'e} inequality \eqref{eq:poincare-gamma-h} and ${\left\lVert {\nabla_{\Gamma_h} u_h} \right\rVert}_{L^2(\Gamma_h)}^2 = a_h(u_h,u_h)$.
+\end{proof}
+
+\section{Numerical example} \label{sec:numex}
+In this section we present numerical results for the isoparametric trace FEM explained in section~\ref{sec:itracefem} with a stabilization $s_h(\cdot,\cdot)$ as in section \ref{sec:normal-derivative-volume}. 
+We first briefly discuss how we solve the linear systems arising from the discretization of the Laplace--Beltrami operator on the finite element spaces ${V_{h,\Theta}^k}$. The linear systems are singular because ${V_{h,\Theta}^k}$ contains constant functions.
+
+\begin{remark}[Solution of (singular) linear systems] \label{sec:solvelinsys}\rm
+Let ${\mathbf S} \in {\mathbb{R}}^{n \times n}$ be the stiffness matrix arising from the discretization such that 
+${\mathbf S}_{i,j} = A_h(\varphi_j,\varphi_i)$ for basis functions $\varphi_i,\varphi_j$ of ${V_{h,\Theta}^k}$, $i,j \in \{1,..,n\}$, $n = \mathrm{dim}(V_{h,\Theta}^k)$, cf. section \ref{sec:condition-number}.
+We seek a solution of 
+\[
+  {\mathbf S} {\mathbf{u}} = {\mathbf{f}} \text{ with } {\mathbf{u}} \text{ subject to } \langle {\mathbf{c}}, {\mathbf{u}} \rangle = 0,
+\]
+cf. \eqref{cdef}.
+Here ${\mathbf{u}} \in {\mathbb{R}}^n$ denotes the coefficient vector of the solution such that the discrete solution is $u_h = \sum_{i=1}^n {\mathbf{u}}_i \varphi_i$, ${\mathbf{f}} \in {\mathbb{R}}^n$ denotes the right-hand side functional, and ${\mathbf{c}} \in {\mathbb{R}}^n$ describes the constraint that the solution should be mean value free, cf.~\eqref{cdef}.
+We denote the coefficient vector of the discrete function which is (constant) one on $\Theta_h(\Omega_h^\Gamma)$ by ${\mathbf{e}}$ and note that $\mathrm{ker}({\mathbf S}) = \mathrm{span}({\mathbf{e}})$. 
+Note that ${\mathbf{c}}$ represents a functional (in $(V_{h,\Theta}^k)'$) whereas ${\mathbf{e}}$ represents a discrete function (in $V_{h,\Theta}^k$). There holds ${\mathbf{c}} = {\mathbf{M}}_\Gamma {\mathbf{e}}$ with the $L^2(\Gamma_h)$-mass-matrix ${\mathbf{M}}_\Gamma$ of $V_{h,\Theta}^k$.
+
+In order to obtain a solvable linear system the compatibility condition must hold on the discrete level: $\int_{\Gamma_h} f_h {\,\mathrm{d} {s_h}} = \langle {\mathbf{f}} , {\mathbf{e}} \rangle = 0$. Due to geometrical discretization errors it is not inherited from the corresponding property of the continuous problem \eqref{eq:weak-LB}. We proceed as suggested in Remark \ref{daterror}. Given an initial approximation $\tilde{f}$ on $\Gamma_h$ ($\tilde{\mathbf{f}}$ with $\tilde{\mathbf{f}}_i = \int_{\Gamma_h} \tilde{f} \varphi_i {\,\mathrm{d} {s_h}}$, $i\in\{1,..,n\}$), we define $f_h$ as in \eqref{extens} and let $ {\mathbf{f}} = \tilde{\mathbf{f}} - \frac{ \langle \tilde{\mathbf{f}}, {\mathbf{e}} \rangle }{ \langle {\mathbf{c}} , {\mathbf{e}} \rangle } {\mathbf{c}}$.
+Note that we have $f_h(v) = 0$ for every function $v$ which is constant on $\Gamma_h$, i.e. 
+${\mathbf{f}} \in \mathrm{range}({\mathbf S})$. 
+
+To solve the constrained linear system we consider the uniquely solvable problem
+\[
+  \tilde {\mathbf S}  {\mathbf{u}} = {\mathbf{f}}, \quad \text{with} ~~ \tilde {\mathbf S} := {\mathbf S} + \gamma {\mathbf{c}}  {\mathbf{c}}^T.
+\]
+Here, we choose $\gamma = ( \sum_{i=1}^n \mathrm{diag}({\mathbf S})_i ) / ( \sum_{i=1}^n {\mathbf{c}}_i^2 )$ to approximately match the scaling of both terms. 
+$\tilde{\mathbf S}$ is symmetric positive definite and the solution of this system is unique and fulfils the equation ${\mathbf S}  {\mathbf{u}} = {\mathbf{f}}$ and the constraint $ \langle {\mathbf{c}} , {\mathbf{u}} \rangle = 0$. To solve the system we apply a standard conjugate gradient method with diagonal preconditioning.
+\end{remark}
+
+\subsection{Laplace--Beltrami equation on a toroidal surface} \label{sec:torus}
+
+\begin{figure}[h!]
+  \vspace*{-0.2cm}
+  \includegraphics[trim=5cm 0.0cm 5cm 0.0cm, clip=true, 
+                   height=0.25\textwidth]{graphics/torus/lin_nolines.png} 
+                   \hspace*{-0.7cm}
+  \includegraphics[trim=5cm 0.0cm 5cm 0.0cm, clip=true, 
+                   height=0.25\textwidth]{graphics/torus/curved.png} 
+                   \hspace*{-0.7cm}
+  \includegraphics[trim=5cm 0.0cm 5cm 0.0cm, clip=true, 
+                   height=0.25\textwidth]{graphics/torus/sol_jet.png} 
+                   \hspace*{-0.7cm}
+  \includegraphics[trim=0cm 0.0cm 0cm 0.0cm, clip=true, 
+                   height=0.25\textwidth]{graphics/torus/scale_jet.png} 
+  \vspace*{-0.1cm}
+  
+  \caption{Numerical solution on the initial mesh for $k=3$ for the example in section \ref{sec:torus}: ${\mathcal{T}}^\Gamma$ and ${\Gamma^{\text{lin}}}$ (left), $\Theta_h({\mathcal{T}}^\Gamma)$ and $\Gamma_h$ (center), $u_h \in {V_{h,\Theta}^{k,0}}$ (right). }
+  \label{fig:torus} 
+\end{figure}
+
+We consider an example from \cite{grande2014highordersjna} and apply the discretization described above with the normal derivative stabilization. The surface is a torus prescribed by the level set function $\phi$, $\Gamma = \{x \in \Omega~|~\phi(x) = 0\}$ with
+\[
+ \phi(x) = \left(x_3^2 + \left( \left(x_1^2+x_2^2\right)^\frac12 - R \right)^2\right)^\frac12 - r, \quad R=1, r=0.6.
+\]
+The surface is embedded in the domain $\Omega=[-2,2]^3$, and the solution is given as $u(x) = \sin(3 \varphi) \cos(3 \theta + \varphi)$ where $(\varphi,\theta)$ are the angles describing a surface parametrization, cf. \cite{grande2014highordersjna} for details. 
+The right-hand side function $f$ is taken consistent with the solution $u$ and $\tilde{f}_h$ is chosen as the natural extension of this $f$. Then $f_h$ is constructed as described above, see remark \ref{sec:solvelinsys}.
+Note that $u$ and $f$ have mean value zero on $\Gamma$ while $u_h$ and $f_h$ have mean value zero on $\Gamma_h$.
+We start from a structured $16 \times 16 \times 16$ mesh ($h \approx \frac18$) and repeatedly apply uniform refinements (at the interface). 
+In Figure \ref{fig:torus} the initial mesh is shown along with the surface approximations ${\Gamma^{\text{lin}}}$, $\Gamma_h$ and the discrete solution for $k=3$.
+We investigate the behavior of the following quantities under mesh refinement. As a measure of the geometrical approximation quality we take $e_{dist} := \mathrm{dist}(\Gamma_h,\Gamma)$.
+We further investigate the convergence of the errors 
+$e_{L^2} := \Vert u^e - u_h \Vert_{L^2(\Gamma_h)}$, 
+$e_{H^1}^t := \Vert \nabla_{\Gamma_h} (u^e - u_h) \Vert_{L^2(\Gamma_h)}$ and 
+$e_{H^1}^n := \Vert \nabla u_h \cdot n \Vert_{L^2(\Gamma_h)}$. 
+Here $u^e$ is the constant extension of $u$ along the normals of $\Gamma$.
+In contrast to the stabilization term $s_h(\cdot,\cdot)$ 
+the error measure $e_{H^1}^n$ is evaluated on the (discrete) surface $\Gamma_h$.
+Finally, we also collect the number of CG iterations $N_{its}$ necessary to reduce the initial residual by a factor of $\num{1e-9}$.
+
+We carry out the numerical experiment for the cases $\rho_s \sim h^{-1}$ and $\rho_s \sim h$, $k \in \{1,..,5\}$ and apply mesh refinements up to meshes with around a million unknowns.
+In the numerical experiments we find that $\rho_s = h^{-1}$ gives much better results than $\rho_s = h$ in the sense that in the latter case we observe a strong dependence of the iteration number ($N_{its} \gtrsim k^2$) on the polynomial degree $k$. As a remedy we introduce a factor \emph{independent of $h$} into $\rho_s\sim h$. From a small test series we find that $\rho_s =   k^4 h$ gives results which are more robust with respect to variations in $k$.
+At this point, we have no mathematical justification for the choice of the factor $k^4$. Note  that in our analysis  the dependence of the constants in the estimates on $k$  has not been considered. The results of the numerical experiments are displayed in Table \ref{rho_s1}.
+
+\begin{table}[h!]
+  \vspace*{-0.1cm}
+  \footnotesize
+  \hfill
+  \begin{tabular}{l@{}r@{~~}l@{}r@{~~}l@{}r@{~~}l@{}r@{~}r}
+    \toprule
+    \multicolumn{9}{c}{$\rho_s \sim h^{-1}$} \vspace*{-0.02cm} \\
+\midrule
+$e_{dist}$&(eoc)&$e_{L^2}$&(eoc)&$e_{H^1}^t$&(eoc)&$e_{H^1}^n$&(eoc)&$N_{its}$ \\ 
+\midrule
+    \multicolumn{9}{l}{$k=1$ \quad ($912 - 900K$ unknowns)} \vspace*{-0.02cm} \\
+    \midrule
+\num{2.90286e-02} &              & \num{7.19179e-01} &              & \num{7.59399e+00} &              & \num{2.97248e+00} &              &       71  \\
+\num{7.98578e-03} & ({\bf  1.9}) & \num{2.22706e-01} & ({\bf  1.7}) & \num{3.76102e+00} & ({\bf  1.0}) & \num{1.98229e+00} & ({\bf  0.6}) &      118  \\
+\num{1.83402e-03} & ({\bf  2.1}) & \num{5.05149e-02} & ({\bf  2.1}) & \num{1.88546e+00} & ({\bf  1.0}) & \num{9.86263e-01} & ({\bf  1.0}) &      229  \\
+\num{4.87394e-04} & ({\bf  1.9}) & \num{1.28923e-02} & ({\bf  2.0}) & \num{9.53279e-01} & ({\bf  1.0}) & \num{4.95408e-01} & ({\bf  1.0}) &      442  \\
+\num{1.24949e-04} & ({\bf  2.0}) & \num{3.32666e-03} & ({\bf  2.0}) & \num{4.77926e-01} & ({\bf  1.0}) & \num{2.48855e-01} & ({\bf  1.0}) &      849  \\
+\num{3.10248e-05} & ({\bf  2.0}) & \num{9.46600e-04} & ({\bf  1.8}) & \num{2.38365e-01} & ({\bf  1.0}) & \num{1.24845e-01} & ({\bf  1.0}) &     1652  \\
+\midrule                                                                                                                                   
+    \multicolumn{9}{l}{$k=2$ \quad ($5.3K - 5.3M$ unknowns)} \vspace*{-0.02cm} \\                                                                   
+\midrule
+\num{3.85000e-03} &              & \num{5.36388e-02} &              & \num{1.36773e+00} &              & \num{1.22060e+00} &              &      130  \\
+\num{4.46928e-04} & ({\bf  3.1}) & \num{8.35991e-03} & ({\bf  2.7}) & \num{4.28053e-01} & ({\bf  1.7}) & \num{3.05451e-01} & ({\bf  2.0}) &      181  \\
+\num{5.92903e-05} & ({\bf  2.9}) & \num{1.11528e-03} & ({\bf  2.9}) & \num{1.10183e-01} & ({\bf  2.0}) & \num{7.65697e-02} & ({\bf  2.0}) &      326  \\
+\num{7.99525e-06} & ({\bf  2.9}) & \num{1.55728e-04} & ({\bf  2.8}) & \num{2.96749e-02} & ({\bf  1.9}) & \num{2.08708e-02} & ({\bf  1.9}) &      623  \\
+\num{1.02274e-06} & ({\bf  3.0}) & \num{1.90417e-05} & ({\bf  3.0}) & \num{7.31939e-03} & ({\bf  2.0}) & \num{5.17451e-03} & ({\bf  2.0}) &     1178  \\
+\num{1.26318e-07} & ({\bf  3.0}) & \num{2.36268e-06} & ({\bf  3.0}) & \num{1.81892e-03} & ({\bf  2.0}) & \num{1.28007e-03} & ({\bf  2.0}) &     2275  \\
+\midrule                                                                                                                              
+    \multicolumn{9}{l}{$k=3$ \quad ($16K - 4M$ unknowns)} \vspace*{-0.02cm} \\
+    \midrule
+\num{1.24052e-03} &              & \num{1.30372e-02} &              & \num{4.30460e-01} &              & \num{4.30498e-01} &              &      263  \\
+\num{8.16528e-05} & ({\bf  3.9}) & \num{7.29942e-04} & ({\bf  4.2}) & \num{4.98292e-02} & ({\bf  3.1}) & \num{5.11916e-02} & ({\bf  3.1}) &      344  \\
+\num{5.07904e-06} & ({\bf  4.0}) & \num{4.62651e-05} & ({\bf  4.0}) & \num{6.45915e-03} & ({\bf  2.9}) & \num{5.55089e-03} & ({\bf  3.2}) &      429  \\
+\num{6.45444e-07} & ({\bf  3.0}) & \num{3.14062e-06} & ({\bf  3.9}) & \num{8.66504e-04} & ({\bf  2.9}) & \num{7.60004e-04} & ({\bf  2.9}) &      768  \\
+\num{4.35992e-08} & ({\bf  3.9}) & \num{1.85714e-07} & ({\bf  4.1}) & \num{1.04391e-04} & ({\bf  3.1}) & \num{9.13136e-05} & ({\bf  3.1}) &     1420  \\
+\midrule
+    \multicolumn{9}{l}{$k=4$ \quad ($35K - 8.9M$ unknowns)} \vspace*{-0.02cm} \\ 
+    \midrule
+\num{6.51429e-04} &              & \num{1.44593e-03} &              & \num{6.53102e-02} &              & \num{1.20937e-01} &              &      528  \\
+\num{1.11642e-05} & ({\bf  5.9}) & \num{5.04099e-05} & ({\bf  4.8}) & \num{4.85311e-03} & ({\bf  3.8}) & \num{5.99704e-03} & ({\bf  4.3}) &      600  \\
+\num{4.34349e-07} & ({\bf  4.7}) & \num{1.79374e-06} & ({\bf  4.8}) & \num{3.22690e-04} & ({\bf  3.9}) & \num{3.49953e-04} & ({\bf  4.1}) &      681  \\
+\num{1.59668e-08} & ({\bf  4.8}) & \num{8.19386e-08} & ({\bf  4.5}) & \num{2.70109e-05} & ({\bf  3.6}) & \num{2.50651e-05} & ({\bf  3.8}) &      945  \\
+\num{5.45729e-10} & ({\bf  4.9}) & \num{2.58168e-09} & ({\bf  5.0}) & \num{1.49586e-06} & ({\bf  4.2}) & \num{1.53323e-06} & ({\bf  4.0}) &     1613  \\
+\midrule                                                                                                                              
+    \multicolumn{9}{l}{$k=5$ \quad ($66K - 1M$ unknowns)} \vspace*{-0.02cm} \\                                                     
+    \midrule
+\num{9.68761e-04} &              & \num{4.40866e-04} &              & \num{3.32631e-02} &              & \num{3.60224e-02} &              &     1071  \\
+\num{1.18222e-06} & ({\bf  9.7}) & \num{6.04831e-06} & ({\bf  6.2}) & \num{6.06451e-04} & ({\bf  5.8}) & \num{8.39301e-04} & ({\bf  5.4}) &     1236  \\
+\num{2.52701e-08} & ({\bf  5.5}) & \num{9.07531e-08} & ({\bf  6.1}) & \num{1.91119e-05} & ({\bf  5.0}) & \num{2.47323e-05} & ({\bf  5.1}) &     1312  \\
+\num{7.26693e-10} & ({\bf  5.1}) & \num{2.40375e-09} & ({\bf  5.2}) & \num{7.59469e-07} & ({\bf  4.7}) & \num{9.86219e-07} & ({\bf  4.6}) &     1676  \\
+    \bottomrule
+  \end{tabular}
+  \hfill
+  \hfill
+  \begin{tabular}{l@{}r@{~~}r}
+    \toprule
+    \multicolumn{3}{c}{$\rho_s \sim h$} \vspace*{-0.02cm} \\
+    \midrule
+    $e_{H^1}^n$&(eoc)&$N_{its}$ \\
+    \midrule
+    \vspace{-0.02cm}\\
+    \midrule
+    \num{5.45763e+00} &              &       69  \\
+    \num{3.98106e+00} & ({\bf  0.5}) &      121  \\
+    \num{3.10661e+00} & ({\bf  0.4}) &      248  \\
+    \num{2.59565e+00} & ({\bf  0.3}) &      473  \\
+    \num{2.39875e+00} & ({\bf  0.1}) &      937  \\
+    \num{2.32129e+00} & ({\bf  0.0}) &     1872  \\
+    \midrule
+    \vspace{-0.02cm}\\
+    \midrule
+    \num{1.21806e+00} &              &      130  \\
+    \num{4.01971e-01} & ({\bf  1.6}) &      192  \\
+    \num{1.29864e-01} & ({\bf  1.6}) &      378  \\
+    \num{4.53554e-02} & ({\bf  1.5}) &      730  \\
+    \num{1.37695e-02} & ({\bf  1.7}) &     1543  \\
+    \num{3.37812e-03} & ({\bf  2.0}) &     3118  \\
+    \midrule
+    \vspace{-0.02cm}\\
+    \midrule
+    \num{2.48577e-01} &              &      273  \\
+    \num{4.93405e-02} & ({\bf  2.3}) &      335  \\
+    \num{6.68864e-03} & ({\bf  2.9}) &      530  \\
+    \num{1.17189e-03} & ({\bf  2.5}) &     1011  \\
+    \num{1.71228e-04} & ({\bf  2.8}) &     2073  \\
+    \midrule
+    \vspace{-0.02cm}\\
+    \midrule
+    \num{8.44460e-02} &              &      482  \\
+    \num{4.97260e-03} & ({\bf  4.1}) &      464  \\
+    \num{3.49648e-04} & ({\bf  3.8}) &      680  \\
+    \num{3.21935e-05} & ({\bf  3.4}) &     1261  \\
+    \num{2.55372e-06} & ({\bf  3.7}) &     2582  \\
+    \midrule
+    \vspace{-0.02cm}\\
+    \midrule
+    \num{2.07080e-02} &              &      935  \\
+    \num{6.89020e-04} & ({\bf  4.9}) &     1016  \\
+    \num{2.28371e-05} & ({\bf  4.9}) &     1098  \\
+    \num{1.05918e-06} & ({\bf  4.4}) &     1836  \\
+    \bottomrule
+  \end{tabular}
+  \hfill
+  \caption{Results for the example in section \ref{sec:torus} with $\rho_s = h^{-1}$ (left) and $\rho_s = hk^4$ (right).} 
+  \label{rho_s1}
+  \vspace*{-0.45cm}
+\end{table}
+
+As predicted in \eqref{resdist} we observe $\mathcal{O}(h^{k+1})$-convergence for the geometrical error measure $e_{dist}$. We note that the initial triangulation is sufficiently fine to guarantee the mesh regularity of the deformed meshes at all refinement levels.
+
+With respect to the error measures $e_{H^1}^t$ and $e_{L^2}$ we only display the results for $\rho_s = h^{-1}$ in Table \ref{rho_s1} because the differences between the different stabilization scalings in those error measures are only marginal. For $e_{H^1}^t$
+we observe $\mathcal{O}(h^k)$-convergence which is in agreement with the prediction of Theorem \ref{mainthm}. For $e_{L^2}$, we observe the optimal rate $\mathcal{O}(h^{k+1})$, but have no a priori analysis for this, yet.
+
+The previous error measures are essentially unaffected by the choice of the stabilization scaling. This is different for the number of iterations $N_{its}$ and the error measure $e_{H^1}^n$. 
+For $k=1$ we observe that $e_{H^1}^n$ does not convergence for $\rho_s\sim h$ while it converges with order one for $\rho_s \sim h^{-1}$. 
+In the higher order case, $k\geq 1$, the difference in the results is much smaller. For both scalings we observe at least $e_{H^1}^n \lesssim h^{k-1/2} \rho_s^{-1/2}$. The results even indicate a convergence order $k$ in both cases, although this is more pronounced for $\rho_s \sim h^{-1}$ than for $\rho_s \sim h$.
+
+The iteration counts for both scalings increase linearly with the mesh size for sufficiently fine meshes which is in agreement with the condition number bound in Theorem \ref{coro:condition-number}. On coarser grids and for increasing order $k$ the numbers of iterations stagnate before the asymptotic regime starts and the iteration counts grow linearly. 
+
+\begin{remark}[No stabilization, $s_h(\cdot,\cdot) \equiv 0$] \rm
+It is known that for $k=1$  stabilization is in general not necessary for satisfactory iteration numbers in the CG method, provided diagonal preconditioning is applied, cf. \cite{reusken10matrixprop}. Accordingly, we repeated the previous numerical experiment with $k=1$ and $\rho_s=0$. We obtain similar results for $e_{H^1}^t$ and $e_{L^2}$, whereas $e_{H^1}^n$ does not converge (with similar errors as for $k=1$ and $\rho_s \sim h$). The iteration counts are larger (95, 175, 360, 793, 1470, 2890), but also increase linearly with $h$.
+In our experience, for moderate orders, $k=2,3$, a discretization with $\rho_s=0$  \emph{often}  yields results for $e_{H^1}^t$, $e_{L^2}$ and $N_{its}$ which are similar to those obtained with stabilization. However, there is no control on $e_{H^1}^n$ and, more importantly, \emph{sometimes} the linear solver fails to converge or the iteration numbers are very high (even with diagonal preconditioning). For even higher order, $k \geq 4$, in general the (diagonally preconditioned) CG solver does not converge for $\rho_s=0$.
+\end{remark}
+
+\section{Conclusion and outlook} \label{sec:conclusion}
+We introduced and analyzed a higher order iso\-para\-metric trace FEM. The higher discretization accuracy was obtained by using an isoparametric mapping of the volume mesh, based on a high order approximation of the level set function. The resulting trace finite element method was easy to implement. We presented an error analysis of this method and derived optimal order $H^1(\Gamma)$-norm error bounds. A second main topic of this paper was a unified analysis of several stabilization methods for this class of surface finite element methods. A new stabilization method, which was based on adding an anisotropic diffusion in the volume mesh, was introduced. This method was able to control the condition number of the stiffness matrix also for the case of higher order discretizations.
+ 
+We mention a few topics which we consider to be of interest for future research. Firstly, the derivation of an optimal order $L^2$-error bound has not been investigated, yet. We think that most ingredients needed for such an anlysis are available from this paper, e.g. the $\mathcal{O}(h^{k+1})$-consistency-bound in Lemma~\ref{lem:conserr}. A second, much more challenging, topic is the extension of the higher trace finite element technique presented in this paper to the class of PDEs on \emph{evolving} surfaces. It may be possible to extend the isoparametric mapping technique to a space-time setting and then combine it with the trace space-time method for discretization of PDEs on evolving surfaces given in \cite{olshanskii14spacetime,olshanskii14spacetimeanalysis}. As a final topic we mention the extension of the higher order discretization technique presented in this paper to coupled bulk-surface problems. 
+\appendix
+
+\section{Proof of Lemma~\ref{lem:dh}} \label{sec:proof:lem:dh}
+\begin{proof}
+First we prove the bound in \eqref{eq:psihbound}.
+For $T \in {{\mathcal T}^{\Gamma}}$ we consider the function $F(x,y) = \mathcal{E}_T \phi_h (x + y G_h(x))-{\hat \phi_h}(x)$ for $(x,y) \in T \times (-\alpha_0 h, \alpha_0 h)$, with $G_h:= \nabla \phi_h$. 
+From \cite[Lemma 3.2]{CLARH1} we know that there exists a $h_0 > 0$ so that for all $0< h < h_0$ the function $d_h(x) = y(x)$ solves $F(x,y(x)) = 0$ on $T$. 
+Since ${\hat \phi_h}, \mathcal{E}_T \phi_h$ and $G_h$ are polynomials and hence 
+$F \in C^{\infty}(T \times (-\alpha_0 h, \alpha_0 h))$ it follows from the implicit function theorem that $y \in C^{\infty}(T)$.
+Due to $D^{\alpha} {\hat \phi_h} = 0$ for $|\alpha|>1$ we have $\Vert D^{\alpha} {\hat \phi_h} \Vert_{\infty,T} \lesssim \Vert \phi \Vert_{H^{2,\infty}(T)}$ independent of $\alpha$. Using the extended element $U(T) := \{x+w\mid x \in T, |w| \leq 2 \alpha_0 h \}$ and the continuity of the polynomial extension operator $\mathcal{E}_T$ we have with $l = |\alpha|\leq k+1$:
+\begin{equation} \label{implbound} \begin{split}
+  \Vert D^{\alpha}_{(x,y)} F \Vert_{\infty,T\times(-\alpha_0 h, \alpha_0 h)} &
+  \lesssim \Vert \mathcal{E}_T \phi_h \Vert_{H^{l,\infty}(U(T))} \Vert G_h\|_{H^{l,\infty}(T)} \\
+  & \lesssim \Vert \phi_h \Vert_{H^{l,\infty}(T)}\Vert\phi_h\Vert_{H^{l+1,\infty}(T)} \lesssim\Vert\phi\Vert_{H^{l+1,\infty}(T)}^2 \lesssim 1. 
+\end{split} \end{equation}
+Differentiating $F(x,y(x))=0$ yields, for $|\alpha|=1$:
+\begin{equation} \label{impl1}
+D^{\alpha} y(x) = - D_y F(x,y(x))^{-1} D_x^{\alpha} F(x,y(x)) = -A(x) D_x^{\alpha} F(x,y(x)).
+\end{equation}
+with $A(x) = S(x)^{-1}$, $S(x) = D_y F(x,y(x)) = \nabla \mathcal{E}_T \phi_h (x + y G_h(x))^T \nabla \phi_h \in [c_0,c_1]$ with $c_0,c_1 > 0$ independent of $h, x, T$. Differentiating $S(x) A(x) = 1$ yields 
+\begin{equation} \label{impl2}
+D^{\alpha} A(x) = - A(x)^2 D^{\alpha} S(x), \quad |\alpha|=1.
+\end{equation}
+From \eqref{impl1} and \eqref{impl2} we deduce that $| D^{\alpha} y(x)|,~|\alpha|=l$, can be bounded in terms of $\vert A(x) \vert$ and $| D^{\alpha}_{(x,y)} F(x,y(x))|,~|\alpha|\leq l$. Combining this with \eqref{implbound} gives the first bound in \eqref{eq:psihbound}.
+From $\Vert G_h \Vert_{H^{l,\infty}(T)} \lesssim \Vert \phi_h \Vert_{H^{l+1,\infty}(T)} \lesssim \Vert \phi \Vert_{H^{l+1,\infty}(T)}\lesssim 1$
+and the first bound we obtain the second bound in \eqref{eq:psihbound}.
+
+For \eqref{eq:jumpbound} we consider an interior facet $F \in {{\mathcal{F}}^{\Gamma}}$ with neighboring tetrahedra denoted by $T_1,T_2\in {{\mathcal{T}}^{\Gamma}}$. 
+We set $d_h^i = d_h|_{T_i}$ and $G_h^i = G_h|_{T_i}$ for $i=1,2$. As ${\hat \phi_h}$ is continuous we have
+\begin{equation}\label{jumpe}
+\mathcal{E}_{T_1} \phi_h(x+d_h^1(x) G_h^1(x)) - \mathcal{E}_{T_2} \phi_h(x+d_h^2(x) G_h^2(x)) = 0 \quad \text{for all}~ x \in F.
+\end{equation}
+Using \eqref{eq:lsetdist} we obtain for $x \in F$ and with $G:=\nabla \phi$,
+\begin{align*}
+  |d_h^1(x) - d_h^2(x)| & \sim | \phi(x+d_h^1(x)G(x)) - \phi(x+d_h^2(x)G(x)) | \\
+   & \lesssim | \phi(x+d_h^1(x)G_h^1(x)) - \phi(x+d_h^2(x)G_h^2(x)) | \\
+ & + \sum_{i=1}^2| \phi(x+d_h^i(x)G(x)) - \phi(x+d_h^i(x)G_h^i(x)) |. 
+\end{align*}
+For the sum we use the regularity of $\phi$ in $U$, \eqref{eq:lsetdist} and the estimates for $G_h^i - G$ (cf. \cite[Lemma 3.1]{CLARH1}): 
+\[
+| \phi(x+d_h^i(x)G(x)) - \phi(x+d_h^i(x)G_h^i(x)) | \lesssim |d_h^i(x)| \Vert G_h^i(x) - G(x) \Vert_2 \lesssim h^{k+2}.
+\]
+For the other term we use $y_i:=x+d_h^i(x)G_h^i(x)$ and \eqref{jumpe}:
+\[
+ |\phi(y_1)-\phi(y_2)| \leq |\phi(y_1)-\mathcal{E}_{T_1} \phi_h(y_1)| + |\phi(y_2)-\mathcal{E}_{T_2} \phi_h(y_2)|. \vspace*{-0.1cm}
+\]
+The two terms on the right-hand side can be bounded by $\mathcal{O}(h^{k+1})$ using Taylor expansion arguments, cf. \cite[Proof of Lemma 3.2]{CLARH1}, which concludes the proof of the first bound in \eqref{eq:jumpbound}. 
+
+Finally, we consider ${[\![{\Psi_h}]\!]} = {[\![{d_h G_h}]\!]} = {[\![{d_h}]\!]} {{\{\!\!\{} {G_h} {\}\!\!\}}} + {{\{\!\!\{} {d_h} {\}\!\!\}}} {[\![{G_h}]\!]}$ (with ${{\{\!\!\{} {a} {\}\!\!\}}} := \frac{a_1+a_2}{2}$).
+From \cite[Lemma 3.1]{CLARH1} and the assumed regularity of $\phi$ we have (uniform in $x$) $|{{\{\!\!\{} {G_h} {\}\!\!\}}}| \lesssim 1$, $|{[\![{G_h}]\!]}| \lesssim h^k$ and with the first bound in \eqref{eq:jumpbound} and \cite[Lemma 3.2]{CLARH1} we have $|{[\![{d_h}]\!]}| \lesssim h^{k+1}$ and $|{{\{\!\!\{} {d_h} {\}\!\!\}}}| \lesssim h^2$. Together this proves \eqref{eq:jumpbound}.
+\end{proof}
+
+\bibliographystyle{siam}
+\bibliography{literature}
+
+\end{document}
+

@@ -1,0 +1,1346 @@
+\pdfoutput=1
+
+\newif\ifsiam
+\siamtrue
+
+\newif\ifsubmit
+\submittrue
+
+\ifsiam
+\documentclass[hidelinks]{siamart1116}
+\else
+\documentclass[a4paper]{article}
+\usepackage{amsthm}
+\newtheorem{lemma}{Lemma}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{doi}
+\usepackage[square,numbers]{natbib}
+\hypersetup{pdfborder = 0 0 0, colorlinks=false,
+ linkcolor=black,citecolor=black, filecolor=black, urlcolor=black, }
+
+\fi
+
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{bm}
+\usepackage{commath}
+\usepackage{algorithm,algpseudocode}
+\usepackage[title]{appendix}
+\newtheorem{remark}{Remark}
+
+\usepackage[backgroundcolor=yellow]{todonotes}
+\usepackage{lastpage}
+\usepackage{lipsum}
+
+\newlength\fwidth
+\ifsubmit
+\usepackage{tikzexternal,tikzscale}
+\graphicspath{{ext}}
+\else
+\usepackage{tikz,tikzscale,pgfplots}
+\usetikzlibrary{external}
+\pgfplotsset{compat=newest} 
+\pgfplotsset{plot coordinates/math parser=false} 
+\fi
+
+\tikzexternalize[prefix=ext]
+\AtEndPreamble{
+  \LetLtxMacro{\oldincludegraphics}{\includegraphics}  
+  \LetLtxMacro{\includegraphics}{\tikzsetnextfilename{}}\oldincludegraphics[]{}}}
+\ifsubmit
+
+\else
+\LetLtxMacro{\oldtodo}{\tikzexternaldisable\oldtodo[]{\fi}\tikzexternalenable}{SE}[DOWHILE]{Do}{doWhile}{\algorithmicdo}[1]{\algorithmicwhile\ #1}
+
+ 
+
+  
+
+\headers{Adaptive quadrature by expansion}{L. af Klinteberg and A.-K. Tornberg}
+\title{Adaptive quadrature by expansion for layer potential evaluation
+  in two dimensions \thanks{This work has been supported by the
+    G\"oran Gustafsson Foundation for Research in Natural Sciences and
+    Medicine, and by the Swedish Research Council under Grant
+    No. 2015-04998.}}
+
+\author{Ludvig af Klinteberg\thanks{Department of Mathematics /
+    Swedish e-Science Research Centre (SeRC), KTH Royal Institute of
+    Technology, 100 44 Stockholm, Sweden ({}{ludvigak@kth.se},
+    {}{akto@kth.se})} \and Anna-Karin Tornberg\footnotemark[2]}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  
+  When solving partial differential equations using boundary integral
+  equation methods, accurate evaluation of singular and nearly
+  singular integrals in layer potentials is crucial. A recent scheme
+  for this is quadrature by expansion (QBX), which solves the problem
+  by locally approximating the potential using a local expansion
+  centered at some distance from the source boundary.
+  
+  In this paper we introduce an extension of the QBX scheme in 2D
+  denoted AQBX -- adaptive quadrature by expansion --- which combines
+  QBX with an algorithm for automated selection of parameters, based
+  on a target error tolerance. A key component in this algorithm is
+  the ability to accurately estimate the numerical errors in the
+  coefficients of the expansion. Combining previous results for flat
+  panels with a procedure for taking the panel shape into account, we
+  derive such error estimates for arbitrarily shaped boundaries in 2D that
+  are discretized using panel-based Gauss-Legendre quadrature.
+  
+  Evaluating our scheme on the Laplace and Helmholtz equations we find
+  that the scheme is able to satisfy a given target tolerance to
+  within an order of magnitude, making it useful for practical
+  applications.
+  
+  This represents a significant simplification over the original QBX
+  algorithm, in which choosing a good set of parameters can be hard.
+\end{abstract}
+
+\begin{keywords}
+  Boundary integral equation, Adaptive, Quadrature, Nearly singular,
+  Error estimate
+\end{keywords}
+
+\begin{AMS}
+  65R20, 65D30, 65D32, 65G99
+\end{AMS}
+
+\section{Introduction}
+
+Integral equation methods is a class of numerical methods that are
+based on the reformulation of an elliptic partial differential
+equation (PDE) as a boundary integral equation. When applicable, this
+solution approach has several attractive features. Among these are:
+high-order discretization methods, well-conditioned linear systems
+after discretization, reduced number of unknowns compared to volume
+methods, and straightforward handling of moving boundaries.
+
+A suitable starting point for our discussion on integral equation
+methods is the representation of the solution $u$ using layer
+potentials, which are evaluated by integrating the PDE's fundamental
+solution $G$ and a layer density ${\sigma}$ over the domain boundary
+${{\partial\Omega}}$. By representing $u$ as a linear combination of the double
+layer potential $D$ and the single layer potential $S$,
+\begin{align}
+  u(z) = D{\sigma}(z) + \alpha S{\sigma}(z)
+  = \int_{{\partial\Omega}} \dpd{G(z,w)}{{{n}}_w} {\sigma}(w) \dif s_w
+  + \alpha\int_{{\partial\Omega}} G(z, w) {\sigma}(w) \dif s_w, \quad z \in \Omega,
+\end{align}
+we get, by considering the limit $z \to {{\partial\Omega}}$, a second kind integral
+equation in ${\sigma}$,
+\begin{align}
+  \left( \frac{1}{2}I + D + \alpha S \right){\sigma}(z) = f(z), \quad z \in {{\partial\Omega}} .
+\end{align}
+This is a generic form of the equations, and we will later define the
+forms for the interior Laplace and the exterior Helmholtz
+equations. Here $f$ is determined by the boundary conditions, and the
+constant $\alpha$ is selected such that the integral equation has a
+unique solution and is well-conditioned \cite{Betcke2011}. Nystr\"om
+discretization of this equation using a suitable quadrature rule
+generates a dense linear system that can be solved rapidly by
+exploiting the fact that the off-diagonal blocks are of low
+rank. Solution methods include the fast multipole method (FMM)
+\cite{Greengard1997} and fast direct methods
+\cite{Greengard2009,Ho2012,Martinsson2005}.
+
+The main difficulty in the procedure outlined above lies in finding a
+quadrature rule that can evaluate the layer potentials $S{\sigma}(z)$ and
+$D{\sigma}(z)$ when the target point $z$ is close to or on the boundary
+${{\partial\Omega}}$. Then the integrals of the layer potentials are nearly
+singular or singular, requiring specialized quadrature methods. For
+two-dimensional (2D) problems efficient such methods are available,
+see the summaries \cite{Hao2014} and \cite{Helsing2015}. Some of the
+methods for two dimensions can be extended to axisymmetric surfaces in
+three dimensions (3D) \cite{Helsing2014}, but when it comes to general
+surfaces in 3D the methods are not as mature as in 2D. We refer to
+\cite{Rahimian2016} for a recent summary of the current state of the
+art.
+
+\subsection{QBX}
+We will in this paper focus on the relatively recent method of
+quadrature by expansion (QBX) \cite{Barnett2014,Klockner2013}. The
+method provides a way of evaluating both singular and nearly singular
+integrals, by representing the layer potential as a local expansion,
+centered at a point some distance $r$ away from the boundary. While
+originally proposed for Helmholtz in 2D, it can be generalized to
+other PDEs and to 3D, and it has been successfully used in several
+applications \cite{AfKlinteberg2016qbx,Askham2016a,Ricketson2016}. A
+strength of QBX is that it uses the same type of local expansions as
+the FMM, which allows the two methods to be combined into a fast
+method for evaluating layer potentials at arbitrary locations. This is
+a topic of ongoing research \cite{Rachh2016}. As with most methods,
+however, QBX solves one problem and introduces another. Here the
+problem solved is that of evaluating layer potentials on or very close
+to the boundary, and the new problem is how to efficiently compute the
+local expansion of the layer potential. In particular, computing the
+expansion coefficients entails evaluating a series of integrals with
+increasing order of near singularity, so one has effectively traded
+one hard problem for several easier problems. Nevertheless, QBX is
+still a competitive method for these problems, especially since it has
+a solid analytical groundwork \cite{Epstein2013}.
+
+One of the difficulties of QBX is that of parameter selection. The
+convergence of the local expansion is governed by the order $p$ at
+which it is truncated, and by the distance $r$ between the boundary
+and the expansion center. The expansion coefficients are computed
+using a quadrature rule for smooth integrands, and for them to be
+accurate it is necessary to upsample the boundary points by some
+factor $\kappa$. These three parameters together affect the two
+competing errors of QBX: the truncation error and the coefficient
+error (often referred to as the quadrature error). The truncation
+error increases with $r$ and decreases with $p$, while the coefficient
+error increases with $p$ and decreases with ${\kappa}$ and $r$ (see
+\cite[Fig. 3]{AfKlinteberg2016qbx} for an example). Together $r$, $p$
+and $\kappa$ form a large parameter space, and how to best set these
+parameters is not clear. Instead, experimentation must be used to
+determine good parameter ranges for a specific application. This is in
+itself not unfeasible, but it would be preferable to reduce the number
+of free parameters.
+
+\subsection{Contribution}
+
+In this paper we propose a scheme for adaptively setting the order $p$
+and upsampling ${\kappa}$ at the time of computation, such that a the
+error is maintained below a target tolerance. The key ingredient for
+this to be successful is the ability to accurately estimate the
+magnitude of the coefficient error, which is the quadrature error in
+the expansion coefficients. Such estimates were derived in
+\cite{AfKlinteberg2016quad} for simple geometries in two dimensions:
+flat Gauss-Legendre panels and the trapezoidal rule on the unit
+circle. Here we extend these estimates, by locally using a polynomial
+to represent the mapping between a flat panel and a panel of general
+shape. This greatly increases the accuracy of the estimates, and
+allows us to build an adaptive QBX scheme based on them. We here
+restrict ourselves to analyzing Gauss-Legendre panel quadrature, but
+the methodology could equally well be applied to e.g. a discretization
+using the trapezoidal rule.
+
+Taking the mapping of the parametrization into account when analyzing
+nearly singular quadrature errors is by itself not new, a discussion
+on nearly singular quadrature errors similar to ours can be found in
+\cite{Barnett2014}. Our main contribution in this regard is the
+construction of an explicit representation of the mapping, which
+we then invert in order to compute an error estimate.
+
+This paper is organized as follows: In \cref{sec:foundations-aqbx} we
+introduce the general structure of our scheme, and derive the details
+for the Laplace double layer potential and the Helmholtz combined
+field potential. In \cref{sec:quadrature-errors} we show how to
+compute the coefficient error estimates necessary for the scheme to be
+useful. In \cref{sec:local-aqbx} we briefly discuss how to combine the
+scheme with a fast method. In \cref{sec:numer-exper} we show a
+selection of numerical results to illustrate the performance of our
+method.
+
+\section{Foundations of AQBX}
+\label{sec:foundations-aqbx}
+
+In this section we begin by introducing the foundations of our method
+using a generic notation, before we give the specific details for the
+Laplace and Helmholtz equations. We start from a given layer potential
+representation,
+\begin{align}
+  u(z) = \int_{{\partial\Omega}} G(z, w) {\sigma}(w) \dif s_w .
+\end{align}
+To evaluate this using AQBX, we first need to split the fundamental
+solution using a suitable addition theorem, 
+
+\begin{align}
+  G(z, w) = \sum_{m=0}^\infty {A}_m^r(w, z_0) \cdot {B}_m^r(z, z_0) ,
+  \label{eq:add_thm_gen}
+\end{align}
+which for a given $r$ is valid for
+\begin{align}
+  |z-z_0| < r \le |w-z_0|.
+\end{align}
+For the specific formulas for Laplace and Helmholtz, see
+\eqref{eq:cauchy_taylor} and \eqref{eq:grafadd}.  We assume that
+\eqref{eq:add_thm_gen} is normalized such that the following holds:
+\begin{align}
+  \abs{{B}_m^r(z-z_0)} =
+  \begin{cases}
+    \le 1, &|z-z_0| \le r,  \\
+    {\mathcal{O}}(1), &|z-z_0| = r.
+  \end{cases}
+\label{eq:normalization}
+\end{align}
+By the last condition we mean that although the only strict
+requirement on $|{B}_m^r|$ is that it is bounded by 1, we prefer it
+to be close to 1 at $|z-z_0| = r$. The addition theorem allows us to
+pick an expansion center $z_0$, determine $r$ as
+\begin{align}
+  r = \min_{w \in {{\partial\Omega}}} |w-z_0|,
+\end{align}
+and evaluate the layer potential as a local expansion in the
+neighborhood of $z_0$,
+\begin{align}
+  u(z) = \sum_{m=0}^\infty {a}_m \cdot {B}_m^r(z, z_0), \quad |z-z_0| \le r,
+  \label{eq:local_exp}
+\end{align}
+where
+\begin{align}
+  {a}_m = \int_{{\partial\Omega}} {A}_m^r(w, z_0) {\sigma}(w) \dif s_w .
+  \label{eq:int_coeff}
+\end{align}
+The fact that \eqref{eq:local_exp} holds also at the equality
+$|z-z_0|=r$ was shown in \cite{Epstein2013} for the Laplace and
+Helmholtz equations, but can be generalized to other kernels,
+e.g. Stokes equations \cite{AfKlinteberg2016qbx}. This is what allows
+us to evaluate the expansion also on ${{\partial\Omega}}$, at the single point
+which is closest to $z_0$.
+
+In a computational scheme the local expansion is truncated at a
+maximum order $p$, and the coefficients, which we now denote
+$\tilde{a}_m$, are computed using a suitable quadrature
+rule. This gives us the QBX approximation of the layer potential,
+\begin{align}
+  u_p(z) = \sum_{m=0}^p \tilde{a}_m \cdot {B}_m^r(z, z_0) .
+  \label{eq:local_exp_p}
+\end{align}
+The error in this approximation can be separated into a truncation
+error $e_T$ and a coefficient error $e_C$ \cite{Epstein2013},
+\begin{align}
+  u(z) - u_p(z) =
+  \underbrace{u(z) - \sum_{m=0}^p {a}_m \cdot {B}_m^r(z, z_0)}_{e_T}
+  + 
+  \underbrace{\sum_{m=0}^p ({a}_m - \tilde{a}_m) \cdot {B}_m^r(z, z_0)}_{e_C} .
+  \label{eq:err_split}
+\end{align}
+
+\subsection{Truncation error}
+
+The truncation error $e_T$ of the scheme arises because we limit the
+local expansion to $p+1$ terms. In our normalized form
+\eqref{eq:normalization} it can be bounded by
+\begin{align}
+  \abs{e_T} = \abs{\sum_{m=p+1}^\infty {a}_m \cdot {B}_m^r(z, z_0)} 
+  \le \sum_{m=p+1}^\infty \abs{{a}_m} .
+\end{align}
+It was shown in \cite{Epstein2013} that the truncation error for
+several kernels behaves like
+\begin{align}
+  e_T \le M(p, r) r^{p+1} \norm{u}_{\mathcal C^{p+1}(|z-z_0|\le r)} .
+\end{align}
+One can in practice observe that the error decays exponentially in $p$
+with a rate that is proportional to $r$,
+\begin{align}
+  e_T \sim (cr)^p,
+  \label{eq:eT_exp}
+\end{align}
+where $c$ is a constant that depends on the local regularity of
+$u$. Finding an a priori estimate for $c$ is hard, since it depends on
+both the local geometry of ${{\partial\Omega}}$ and the regularity of the density
+${\sigma}$ in a nontrivial way. However, since the terms of the local
+expansion decay exponentially, a good estimate for the truncation
+error is
+\begin{align}
+  \abs{e_T} \approx \abs{ {a}_{p+1} \cdot {B}_{p+1}^r(z, z_0) }
+  \le \abs{ {a}_{p+1} } .
+\end{align}
+In practice we only have the coefficients up to ${a}_p$. Therefore,
+we can define a useful (and usually conservative) a posteriori
+estimate as
+\begin{align}
+  \abs{e_T} \approx \abs{ {a}_p \cdot {B}_p^r(z, z_0) }
+  \le \abs{ {a}_p } .
+\end{align}
+
+\subsection{Coefficient error}
+
+The coefficient error $e_C$ in \eqref{eq:err_split} is a result of the
+numerical evaluation of the coefficient integrals \eqref{eq:int_coeff}
+for $m=0,\dots,p$, which for a given boundary ${{\partial\Omega}}$ is evaluated
+using some $n$-point quadrature rule. Assuming that the density ${\sigma}$
+and the boundary ${{\partial\Omega}}$ are well-resolved by that quadrature (which is
+a prerequisite for the underlying Nystr\"om discretization), the main
+source of the error is the near singularity in ${A}_m^r$ when
+evaluated at $z_0$. The order of this near singularity typically grows
+with $m$, and to counter this the density must be upsampled (by
+interpolation) to a grid which is fine enough to resolve
+${A}_m^r$. The amount of upsampling required can be determined
+through ${E_C}(n, m)$, which is an accurate a priori estimate of the
+coefficient error in term $m$ when using $n$ quadrature nodes,
+\begin{align}
+  {E_C}(n, m) \approx \abs{{a}_m - \tilde{a}_m} \ge 
+  \abs{({a}_m - \tilde{a}_m) \cdot {B}_m^r(z, z_0)} .
+\end{align}
+We will in section \ref{sec:quadrature-errors} show how to derive such
+error estimates for the cases of the Laplace and Helmholtz equations.
+
+\begin{remark}[Resolution error]
+  Here we only discuss errors in the coefficients $\tilde{a}_m$ due
+  to near singularities in the integrals
+  \eqref{eq:int_coeff}. However, there is also a lower bound on the
+  accuracy of the coefficients, imposed by how well the underlying
+  grid resolves the boundary ${{\partial\Omega}}$ and the layer density ${\sigma}$. For
+  a given panel, this resolution error could be estimated by analyzing
+  a modal expansion of the grid point coordinates and density values,
+  such as the Legendre polynomial expansion used in
+  \cref{sec:quadrature-errors}. Such an analysis is however beyond the
+  scope of the present paper.
+\end{remark}
+
+\subsection{The AQBX scheme}
+
+Let us now assume that we have a discretization of ${{\partial\Omega}}$
+characterized by $n$, which for a global quadrature denotes the total
+number of points, and for a panel-based quadrature denotes the number
+of points on each panel. Denoting that quadrature ${{\operatorname{Q}}_{n}}$, we define
+a combined interpolation and quadrature operator
+${\operatorname{Q}}_{{\kappa} n}$, which computes the quadrature by first
+upsampling the density to ${\kappa} n$ points (for simplicity we assume
+${\kappa}$ integer). Furthermore, we assume that the error when
+computing a coefficient $a_m$ is well estimated by a function
+${E_C}({\kappa} n, m)$. Then the adaptive algorithm for evaluating
+$u(z)$ in the neighborhood of $z_0$ to a tolerance $\epsilon$ can be
+summarized using \cref{alg:coeff,alg:eval}.
+\begin{algorithm}[H]
+  \caption{Compute expansion coefficients at $z_0$ to tolerance ${\epsilon}$.}
+  \label{alg:coeff}
+  \begin{algorithmic}
+    \Function{Expansion coefficients}{$z_0, {\epsilon}$}
+    \State ${\kappa} \gets 1, \: m \gets 0$
+    \Repeat
+    \While{${E_C}({\kappa} n, m) > {\epsilon}$}
+    \Comment{Check $e_C$ estimate}
+    \State ${\kappa} \gets {\kappa}+1$
+    \Comment{Increase upsampling rate}
+    \EndWhile
+    \State $a_m \gets {\operatorname{Q}}_{\kappa n}[{A}_m^r(\cdot, z_0) {\sigma}(\cdot)]$
+    \Comment{Compute coefficient}
+    \State $m \gets m+1$
+    \Until{$\abs{a_m} < {\epsilon}$}
+    \Comment{Break when $e_T$ estimate below tolerance}
+    \State \Return $\{a_m\}$
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+\begin{algorithm}[H]
+  \caption{Evaluate $u(z)$ to tolerance ${\epsilon}$ using expansion at $z_0$.}
+  \label{alg:eval}
+  \begin{algorithmic}
+    \Function{Evaluate expansion}{$z, z_0, \{a_m\}, {\epsilon}$}
+    \State $u \gets 0, \: m \gets 0$
+    \Repeat
+    \State $\delta_m \gets {a}_m \cdot {B}_m^r(z, z_0)$
+    \Comment{Evaluate $m$th  expansion term}
+    \State $u \gets u + \delta_m$
+    \State $m \gets m+1$
+    \Until{$\abs{\delta_m} < {\epsilon}$}
+    \Comment{Break when $e_T$ estimate below tolerance}
+    \State \Return{$u$}
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+Note that if \cref{alg:coeff} has produced $p+1$
+coefficients, then \cref{alg:eval} is guaranteed to terminate
+within $p+1$ iterations, since $|\delta_p| \le |a_p| < {\epsilon}$. For more
+conservative termination criteria, one can use
+$\max(|a_{m-1}|,|a_m|) < {\epsilon}$ and
+$\max(|\delta_{m-1}|,|\delta_m|) < {\epsilon}$ to take into account any
+even/odd behavior in the expansion. 
+
+\subsection{Specific applications}
+\label{sec:aqbx_examples}
+
+We will now proceed with formulating AQBX for two different
+applications: the Laplace double layer potential and the Helmholtz
+combined field potential.
+
+\subsubsection{Laplace equation}
+\label{sec:laplace-equation}
+
+We first consider the Laplace Dirichlet problem in a domain $\Omega$ bounded by a boundary ${{\partial\Omega}}$,
+\begin{align}
+  \Delta u &= 0, \quad \mbox{in } \Omega, \\
+  u &= g, \quad \mbox{on } {{\partial\Omega}}.
+\end{align}
+The fundamental solution to this PDE is
+\begin{align}
+  \phi(z,w) = \frac{1}{2\pi} \log\abs{z-w} .
+\end{align}
+The interior Dirichlet problem can be represented using the double
+layer potential,
+\begin{align}
+  u(z) = D{\sigma}(z) = \int_{{\partial\Omega}} \dpd{\phi(z,w)}{{{n}}_w} {\sigma}(w) \dif s_w,
+  \label{eq:laplace_dbl_lyr}
+\end{align}
+where ${{n}}_w$ denotes the unit normal. In complex notation this can
+be compactly represented as
+\begin{align}
+  u(z) &= {\operatorname{Re}} v(z), \\
+  v(z) &= \frac{-1}{2\pi} \int_{{\partial\Omega}} \frac{{{n}}_w}{z-w} {\sigma}(w) \dif s_w .
+\end{align}
+On ${{\partial\Omega}}$ the density ${\sigma}$ satisfies the integral equation
+\begin{align}
+  \left( \frac{1}{2}I + D \right) {\sigma} = f .
+  \label{eq:laplace_inteq}
+\end{align}
+It should be noted that this particular layer potential actually has a
+smooth limit on the boundary, so no special quadrature is needed for
+solving the integral equation, unless different parts of the boundary
+are close to each other. Special quadrature is however still needed
+for evaluating the solution close to the boundary, once ${\sigma}$ has
+been computed.
+
+Starting from the Taylor expansion of the Cauchy kernel,
+\begin{align}
+  \frac{-1}{z-w} = \sum_{j=0}^\infty \frac{(z-z_0)^j}{(w-z_0)^{j+1}},
+  \label{eq:cauchy_taylor}
+\end{align}
+it is straightforward to derive the AQBX formulation
+\eqref{eq:add_thm_gen} for $v(z)$,
+\begin{align}
+  {A}_m^r(w, z_0) &=  \frac{r^m {{n}}_w}{2\pi (w-z_0)^{m+1}}, \\
+  {B}_m^r(z, z_0) &= \frac{(z-z_0)^j}{r^m} .
+\end{align}
+Note that, by these definitions together with \eqref{eq:int_coeff},
+the real part of the coefficient ${a}_0$ will simply hold the value
+of the double layer potential evaluated at $z_0$, i.e. 
+${\operatorname{Re}} {a}_0 = u(z_0)$.
+
+\subsubsection{Helmholtz equation}
+\label{sec:helmholtz-equation}
+
+We now consider the Helmholtz Dirichlet problem in an unbounded domain
+$\Omega$ exterior to a boundary ${{\partial\Omega}}$, which for a wavenumber $k$
+is stated as
+\begin{align}
+  \Delta u + k^2 u &= 0, \quad \mbox{in } \Omega,\\
+  u &= f, \quad \mbox{on } {{\partial\Omega}} .
+\end{align}
+The solution must satisfy the Sommerfeld radiation condition for $r = |z|$,
+\begin{align}
+  \label{eq:sommerfeld}
+  \lim_{r \to \infty} r^{1/2}\left( \dpd{u}{r} - i k u \right) = 0 .
+\end{align}
+The fundamental solution is essentially the zeroth-order Hankel
+function of the first kind,
+\begin{align}
+  \label{eq:fundsol}
+  \phi_k(z, w) = \frac{i}{4} {H^{(1)}}_0(k|z-w|) .
+\end{align}
+The solution can be represented using the combined field integral
+representation\footnote{The general form of the representation is
+  $D_k - i\eta S_k$. We have here set $\eta = k/2$, following
+  \cite{Helsing2015}.},
+\begin{align}
+  \label{eq:combfield}
+  u(z) = \int_{{\partial\Omega}} \left(\dpd{\phi_k(z, w)}{n_w} - 
+  \frac{ik}{2} \phi_k(z, w) \right) {\sigma}(w) \dif s_w
+  = \left(D_k{\sigma} - \frac{ik}{2} S_k{\sigma} \right) (z) .
+\end{align}
+The double layer kernel is
+\begin{align}
+  \dpd{\phi_k(z, w)}{n_w}
+  &= \frac{ik}{4} {H^{(1)}}_1(k|z-w|) \frac{(z-w) \cdot n_w}{|z-w|}  \\
+  &= \frac{ik}{4} {H^{(1)}}_1(k|z-w|) |z-w| {\operatorname{Re}} \left[ \frac{n_w}{z-w} \right] .
+    \label{eq:helmholtz_dbl_kern}
+\end{align}
+On the boundary we get the integral equation
+\begin{align}
+  \left( \frac{1}{2}I + D_k - \frac{ik}{2} S_k \right) {\sigma} = f .
+  \label{eq:helmholtz_inteq}
+\end{align}
+
+To formulate AQBX for the combined field representation, we start from
+the Graf addition theorem \cite[\S10.23(ii)]{NIST:DLMF},
+\begin{align}
+  \frac{i}{4} {H^{(1)}}_0(k|z-w|) 
+  &= \sum_{m=-\infty}^\infty 
+    \frac{i}{4} {H^{(1)}}_m(kr_w) e^{-im\theta_w}
+    J_m(kr_z) e^{im\theta_z}, 
+    \quad r_z < r_w .
+    \label{eq:grafadd}
+\end{align}
+Here $(r_w,\theta_w)$ and $(r_z,\theta_z)$ are the polar coordinates
+of $w-z_0$ and $z-z_0$,
+\begin{align}
+  \begin{aligned}
+    r_w &= |w-z_0|, & r_z &= |z-z_0|, \\
+    e^{-im\theta_w} &= \frac{|w-z_0|^m}{(w-z_0)^m}, \quad & e^{im\theta_z} &= \frac{(z-z_0)^m}{|z-z_0|^m}. 
+  \end{aligned} \label{eq:exppot}
+\end{align}
+The Bessel functions $J_m$ decay rapidly with $m$. It however easy to
+experimentally verify that a normalization satisfying
+\eqref{eq:normalization} is obtained by using the first term of the
+power series for $J_m(kr)$ \cite[\S10.4,\S10.8]{NIST:DLMF},
+\begin{align}
+  J_{\pm m}(kr) = (\pm 1)^m \frac{1}{m!} \left( \frac{kr}{2} \right)^m
+  + {\mathcal{O}}\left( \frac{1}{(m+1)!} \left( \frac{kr}{2} \right)^{m+2} \right),
+  \quad m \ge 0.
+\end{align}
+This gives us the AQBX formulation \eqref{eq:add_thm_gen} for the
+combined field representation,
+\begin{align}
+  {A}_0^r(w, z_0) &=                      
+                      \left( {d}_0(w, z_0) - \frac{ik}{2} {s}_0(w, z_0), \:
+                      0 \right),
+                      \label{eq:addA0_helm}\\
+  {B}_0^r(z, z_0) &= 
+                      \left( J_0(kr_z), \: 0 \right)
+                      \label{eq:addB0_helm}.
+\end{align}
+and, for $m>0$,
+\begin{align}
+  {A}_m^r(w, z_0) &= \frac{\sqrt{2}}{m!}  \left( \frac{kr}{2} \right)^{m} 
+                      \left( {d}_m(w, z_0) - \frac{ik}{2} {s}_m(w, z_0), \:
+                      {d}_{-m}(w, z_0) - \frac{ik}{2} {s}_{-m}(w, z_0) \right),
+                      \label{eq:addA_helm}\\
+  {B}_m^r(z, z_0) &= \frac{m!}{\sqrt{2}} \left( \frac{2}{kr} \right)^{m} 
+                      \left( J_m(kr_z) e^{im\theta_z}, \: J_{-m}(kr_z) e^{-im\theta_z} \right)
+                      \label{eq:addB_helm}.
+\end{align}
+Here ${s}_m$ is an immediate result of \eqref{eq:grafadd},
+\begin{align}
+  {s}_m(w, z_0) &= \frac{i}{4} {H^{(1)}}_m(kr_w) e^{-im\theta_w},
+                     \label{eq:addAS}
+\end{align}
+while ${d}_m$ is obtained by differentiation of \eqref{eq:addAS}. A
+compact form for ${d}_m$ was derived in \cite{Barnett2014},
+\begin{align}
+  {d}_m(w, z_0) &= \frac{ik}{8} \left(
+                     {H^{(1)}}_{m-1}(kr_w) e^{-i(m-1)\theta_w} {\bar{n}}_w
+                     -{H^{(1)}}_{m+1}(kr_w) e^{-i(m+1)\theta_w} n_w
+                     \right) .
+                     \label{eq:addAD}
+\end{align}
+We again note that the coefficient $a_0$ \eqref{eq:int_coeff} will
+hold the value of the potential at $z_0$, since (trivially)
+${s}_0 = \phi_k$ in \eqref{eq:fundsol} and (through
+\eqref{eq:helmholtz_dbl_kern})
+\begin{equation}
+    {d}_0(w, z_0) =
+    -\frac{ik}{4} {H^{(1)}}_{1}(kr_w) {\operatorname{Re}} \left[
+      e^{-i\theta_w} n_w
+    \right] 
+    = \dpd{\phi_k(z_0, w)}{n_w} .
+  \label{eq:addADzero}
+\end{equation}
+
+\section{Coefficient errors}
+\label{sec:quadrature-errors}
+
+In this section we derive a central piece of AQBX: the coefficient
+error estimate ${E_C}$ required in \cref{alg:coeff}. We will
+consider the layer potentials of section \ref{sec:aqbx_examples}
+combined with a panel-based quadrature, where the boundary curve
+subdivided into smaller segments, each of which is discretized using
+an $n$-point Gauss-Legendre quadrature. This is sometimes referred to
+as a composite Gauss-Legendre quadrature.
+
+We begin by considering the error in the contribution to a coefficient
+from a single panel; the total error can then be computed as the sum
+of errors from all adjacent panels. For this, let $\Gamma$ be an open
+curve (i.e. a panel) parametrized by an analytic function
+${\gamma}(t) \in \mathbb{C}$, $t\in[-1,1]$, with the normal defined as
+$n(t)=i{\gamma}'(t) / |{\gamma}'(t)|$. For simplicity we denote by
+${\sigma}(t)$ the pullback of ${\sigma}$ under $\gamma$, i.e.
+${{\sigma}}(t) = {\sigma}({\gamma}(t))$.
+
+\subsection{Laplace coefficient error}
+Beginning with QBX for the Laplace double layer potential
+(sec. \ref{sec:laplace-equation}), the expansion coefficients are
+computed as
+\begin{align}
+  {a}_m 
+  &= \frac{r^m}{2\pi} \int_\Gamma \frac{{\sigma}(w) n_w}{(w-z_0)^{m+1}} \dif s_w \label{eq:dbl_lyr_coef} \\
+  &= \frac{ir^m}{2\pi} \int_{-1}^1 \frac{{{\sigma}}(t)}{({\gamma}(t)-z_0)^{m+1}} {\gamma}'(t) \dif t .
+    \label{eq:dbl_lyr_coef_t}
+\end{align}
+The coefficient errors are introduced when this integral is evaluated
+using a discrete quadrature rule. In a boundary integral equation
+context, we assume a panel $\Gamma$ such that ${\gamma}$ and
+${{\sigma}}$ are well-resolved by an $n$-point Gauss-Legendre
+quadrature rule. We will here focus on the standard choice
+$n=16$. Denoting by ${\operatorname{I}}$ the integral over $[-1, 1]$, and by
+${{\operatorname{Q}}_{n}}$ the Gauss-Legendre approximation of that integral, the
+quadrature error is defined as
+\begin{align}
+  {\operatorname{R}_{n}} = {\operatorname{I}} - {{\operatorname{Q}}_{n}}.
+  \label{eq:oprem}
+\end{align}
+If the above assumptions on the resolution hold, then we can expect
+the quadrature error to be small for the integrand
+\eqref{eq:dbl_lyr_coef_t}, provided that $z_0$ is far away from
+$\Gamma$. If on the other hand $z_0$ is close to $\Gamma$, then the
+quadrature error will be dominated by the nearly singular quadrature
+error that arises when the integrand is evaluated close to its
+pole.
+
+To estimate nearly singular quadrature errors, we can use the results and methods of \cite{AfKlinteberg2016quad}, which rely on contour integration and calculus of residues for deriving accurate estimates. The main result which we want to use is the following:
+\begin{lemma}[Adapted from \cite{AfKlinteberg2016quad}]
+  Let $f(t)$ be a meromorphic function which is analytic on $[-1, 1]$
+  and has pole $t_0 \in \mathbb{C}$ of order $m+1$ lying close to that
+  interval. If $f$ is integrated on $[-1,1]$ using the $n$-point
+  Gauss-Legendre rule, then the quadrature error \eqref{eq:oprem} is
+  well approximated by
+  \begin{align}
+    {\operatorname{R}_{n}}[f] \approx -{\operatorname{Res}}\left[ f(t) k_n(t), t_0 \right] =     -\frac{1}{m!} \lim_{t \to t_0} \dod[m]{}{t} \left( (t-t_0)^{m+1}       f(t) k_n(t) \right),
+    \label{eq:lemma}
+  \end{align}
+  where $k_n$ is the characteristic remainder function, and can be   approximated as
+  \begin{align}
+    k_n(t) \approx \frac{2\pi}{(t+\sqrt{t^2-1})^{2n+1}} .
+    \label{eq:kn}
+  \end{align}
+  Moreover, if $f(t)k_n(t) \to 0$ as $|t|\to\infty$, then the error in
+  the approximation \eqref{eq:lemma} goes to zero in the limit
+  $n\to\infty$.
+  \label{lem:quad_err}
+\end{lemma}
+\begin{remark}
+  When evaluating $k_n(t)$ numerically, care must be taken with
+  respect to the branch cut of the square root. The function is
+  however doubly symmetric in the $t$-plane, so a safe way of
+  evaluating it is to first transform $t$ to the first quadrant,
+  i.e. $k_n(t) \to k_n(t^*)$, where $t^* = |{\operatorname{Re}} t| + i|{\operatorname{Im}} t|$.
+\end{remark}
+
+The integral \eqref{eq:dbl_lyr_coef} clearly has a pole of order $m+1$
+at $z_0$. In parametrized form \eqref{eq:dbl_lyr_coef_t} the pole
+instead lies at the point $t_0 \in \mathbb C$, such that
+\begin{align}
+  {\gamma}(t_0) - z_0 = 0.
+  \label{eq:t0_def}
+\end{align}
+Note that evaluating ${\gamma}(t_0)$ corresponds to evaluating an
+analytic continuation of $\gamma(t)$ in some neighborhood of $[-1,1]$.
+Denoting by $\tilde a_m$ the approximation of $a_m$ (as defined in
+\eqref{eq:dbl_lyr_coef_t}), and also assuming that there exists an
+analytic continuation of ${{\sigma}}$, then we have from Lemma
+\ref{lem:quad_err} that
+\begin{align}
+  {a}_m - \tilde {a}_m 
+  = {\operatorname{R}_{n}}\left[ \frac{ir^m {{\sigma}} {\gamma}'}{2\pi ({\gamma}-z_0)^{m+1}} \right]
+  \approx
+  -\frac{ir^m}{2\pi m!} \lim_{t \to t_0} \dod[m]{}{t} \left(
+  (t-t_0)^{m+1} \frac{{{\sigma}}(t) {\gamma}'(t)}{({\gamma}(t)-z_0)^{m+1}} k_n(t) 
+  \right).
+  \label{eq:laplace_coeff_err}
+\end{align}
+To simplify this we first assume that $k_n$ varies much more rapidly
+than the other factors in the differentiation, such that a good
+approximation is obtained by only considering the term with the $m$th
+derivative of $k_n$. This can be motivated by our assumptions on
+resolution. Second, we note that since $z_0={\gamma}(t_0)$,
+\begin{align}
+  \lim_{t \to t_0} \frac{(t-t_0)^{m+1}}{(\gamma(t) - z_0)^{m+1}} =   \frac{1}{(\gamma'(t_0))^{m+1}} .
+\end{align}
+Thus a coefficient error estimate
+${E_C}(n, m)\approx|{a}_m-\tilde{a}_m|$ is given by
+\begin{align}
+  {E_C}(n, m) =
+  \frac{r^m \abs{{{\sigma}}(t_0)}}
+  {2\pi m! \abs{\gamma'(t_0)}^{m}}
+  \abs{k_n^{(m)}(t_0)}.
+  \label{eq:am_err}
+\end{align}
+The derivatives of $k_n$ can (at least for small $m$) be derived
+analytically from \eqref{eq:kn}, or, as shown in
+\cite{AfKlinteberg2016quad}, approximated as
+\begin{align}
+  k_n^{(m)}(t) \approx k_n(t) \left( -\frac{2n+1}{\sqrt{t^2-1}}   \right)^m .
+  \label{eq:knm}
+\end{align}
+The estimate \eqref{eq:am_err} using \eqref{eq:knm} holds well in the
+limit $n \to \infty$, but will lose accuracy with increasing $m$ for a
+fixed $n$. We have in practice found that it starts losing its
+reliability around $m > n/2$, so that it then is safer to trigger an
+upsampling in \cref{alg:coeff}, instead of continuing to rely
+on the estimate.
+
+Though the above derivation is rather straightforward, some more work
+is required if we want to evaluate \eqref{eq:am_err} in practice,
+since that requires finding $t_0$ and being able to evaluate
+${{\sigma}}(t_0)$ and ${\gamma}(t_0)$. For this, one would ideally like
+to have access to analytic expressions for ${\sigma}$ and ${\gamma}$, but
+what we typically have is instead the values of the functions at the
+quadrature nodes. To be able to evaluate \eqref{eq:am_err} using this
+pointwise data, we first need to construct continuations of ${\gamma}$
+and ${{\sigma}}$. Then we need to solve \eqref{eq:t0_def} using the
+continuation of ${\gamma}$, in order to find $t_0$ and finally evaluate
+the estimate. This may sound hard, but can actually be done in a
+stable and efficient way using polynomial extrapolation.
+
+Beginning with the continuation of ${\gamma}$, let $t_i$ and $w_i$,
+$i=1 \dots n$, be the nodes and weights of the n-point Gauss-Legendre
+quadrature. We can then let ${\operatorname{P}}_n[\gamma](t)$ be the polynomial of
+degree $n-1$ that interpolates $\gamma(t)$ at the nodes $t_i$. The
+distribution of $t_i$ ensures that we can form such a high-degree
+polynomial ($n=16$) without being troubled by the ill-conditioning
+known as Runge's phenomenon. We use as our basis the Legendre
+polynomials $P_\ell(t)$,
+\begin{align}
+  {\operatorname{P}}_n[\gamma](t) = \sum_{\ell=0}^{n-1} \hat\gamma_\ell P_\ell(t), 
+\end{align}
+which through their orthogonality allow us to compute the
+coefficients $\hat\gamma_\ell$ in an efficient and well-conditioned way,
+\begin{align}
+  \hat\gamma_\ell = \frac{2\ell+1}{2} \sum_{i=1}^n P_\ell(t_i) w_i \gamma(t_i),
+  \quad
+  \ell=0, \dots, n-1 .
+\end{align}
+To further improve conditioning in our method, we assume that $\Gamma$
+has endpoints at $-1$ and $1$; this can be achieved for any open curve
+by first applying a simple scaling and rotation to both $\Gamma$ and
+$z_0$. Letting the interpolant ${\operatorname{P}}_n[\gamma](t)$ be the analytic
+continuation of $\gamma(t)$, we can now find $t_0$ in
+\eqref{eq:t0_def} by instead solving
+\begin{align}
+  {\operatorname{P}}_n[\gamma](t_0) = z_0 .
+  \label{eq:t0_eq}
+\end{align}
+This does, for the purposes of error estimation, work very well in the
+near neighborhood of $\Gamma$, see example in
+\cref{fig:grid_mapping}. Equation \eqref{eq:t0_eq} can be solved
+efficiently using Newton's method, but the choice of starting guess
+can be important, especially near concave regions of the curve
+(e.g. below the curve of \cref{fig:grid_mapping}). In such regions the
+inverse mapping $t_0 = \gamma^{-1}(z_0)$ is no longer single-valued,
+and for our estimate to be accurate we want the solution $t_0$ that
+predicts the largest error, when the estimate is evaluated at that
+point. This ``worst solution'' can often be found by solving with
+$t_0 = \pm 1$ as starting guesses and comparing the results; this
+strategy was used for the results shown to the right in
+\cref{fig:panel_err}. As an alternative, one can use $t_0=z_0$ as as
+starting guess (given the above assumptions on the endpoints of
+$\Gamma$). This simpler strategy works well for practical purposes,
+and is what we use throughout the remainder of this paper.
+
+\begin{figure}[htbp]
+  \centering
+  
+
+  \setlength\fwidth{0.4\textwidth}
+  \begin{tikzpicture}
+    
+
+    \path
+    ([shift={(-5\pgflinewidth,-5\pgflinewidth)}]current bounding box.south west)
+    ([shift={( 5\pgflinewidth, 1em+5\pgflinewidth)}]current bounding box.north east);
+  \end{tikzpicture}
+  \hspace{2em}  
+  \setlength\fwidth{0.5\textwidth}
+  \begin{tikzpicture}
+    
+
+  \end{tikzpicture}
+
+  \caption{Illustration of how the analytic continuation of $\gamma$
+    maps the vicinity of $[-1,1]$ to the space surrounding
+    $\Gamma$. Here $\Gamma$ is a segment of the starfish domain seen
+    in \cref{fig:dbl_lyr_err}. Polynomial interpolation of
+    $\gamma$ on a 16-point panel gives a locally very accurate
+    approximation of the continuation:
+    $\abs{\gamma - {\operatorname{P}}_n[\gamma]} < 10^{-7}$ on the shown grid.}
+  \label{fig:grid_mapping}
+\end{figure}
+\begin{figure}[htbp]
+  \centering
+  
+  \includegraphics[width=.45\textwidth]{single_panel_err_1}
+  \hspace{2em}
+  \includegraphics[width=.45\textwidth]{single_panel_err_2}
+  \caption{Quadrature errors when evaluating the integral
+    \eqref{eq:dbl_lyr_coef_t} for $m=0$ and ${\sigma}=1$ on a flat and a
+    curved panel. These panels correspond to those shown in 
+    \cref{fig:grid_mapping}.  Colored fields are actual error levels,
+    contour lines are computed using the error estimate
+    \eqref{eq:am_err} with $t_0$ determined by inverting
+    ${\operatorname{P}}_n[\gamma](t)$. The ellipses to the left have foci in
+    $\pm 1$, and are also known as Bernstein ellipses.}
+  \label{fig:panel_err}
+\end{figure}
+
+Once $t_0$ is found, we are able to evaluate the coefficient error
+estimate as given in \eqref{eq:am_err}. The value of ${\gamma}'(t_0)$
+can be found by differentiation of the interpolant,
+\begin{align}
+  {\gamma}'(t_0) = P_n'[\gamma](t_0) .
+\end{align}
+We can also evaluate ${{\sigma}}(t_0)$ through an interpolating polynomial,
+\begin{align}
+  {{\sigma}}(t_0) = P_n[{{\sigma}}](t_0).
+  \label{eq:den_t0_extrap}
+\end{align}
+This works very well if ${\sigma}$ is well-resolved on $\Gamma$, and can
+be used to obtain the fine-scale correspondence between error and
+estimate seen in \cref{fig:dbl_lyr_err}. A less expensive
+alternative is to use the max norm of ${{\sigma}}$ on the
+interval/panel,
+\begin{align}
+  {{\sigma}}(t_0) \approx \| {{\sigma}}(t) \|_{L^\infty(-1, 1)} 
+  = \|   {\sigma}(z) \|_{L^\infty(\Gamma)}.
+  \label{eq:den_t0_max}
+\end{align}
+This works well in practice, and also appears to be slightly more
+robust whenever ${\sigma}$ is not fully resolved on $\Gamma$, especially
+for Helmholtz. We use this approach in the results of section
+\ref{sec:numer-exper}.
+
+The above results can also be used for estimating the nearly singular
+quadrature error when evaluating the double layer potential
+\eqref{eq:laplace_dbl_lyr} near $\Gamma$, and hence to determine when
+AQBX needs to be used. To that end, we simply use the observation that
+$u(z_0) = {\operatorname{Re}} {a}_0$. Denoting by $\tilde u(x)$ the potential
+evaluated using direct quadrature, we thus have from
+\eqref{eq:laplace_coeff_err} that
+\begin{align}
+  \abs{u(z) - \tilde u(x)} \approx
+  \frac{1}{2\pi} \abs{{\operatorname{Im}} \left[{{\sigma}}(t_0) k_n(t_0)\right]} .
+  
+  \label{eq:dbl_lyr_err}
+\end{align}
+This estimate, when evaluated using the above procedure, is very
+accurate. As an example, in  \cref{fig:dbl_lyr_err}, we consider
+the Laplace Dirichlet problem in a starfish domain. The density is
+computed by solving \eqref{eq:laplace_inteq} using the Nystr\"om
+method and a right-hand side given by a collection of point sources
+(marked by + in the figure). The solution is then evaluated inside the
+domain directly using the composite Gauss-Legendre quadrature, and
+compared to the reference solution given by the boundary
+condition. Comparing these results to those in
+\cite[fig. 7]{AfKlinteberg2016quad}, which used a flat panel
+approximation, shows the importance of taking into the account the
+inverse mapping of the target point.
+
+\begin{figure}[htbp]
+  \centering
+  
+  \includegraphics[width=.4\textwidth]{double_lyr_err}
+  \includegraphics[width=.59\textwidth]{double_lyr_err_zoom}
+  \caption{Error curves when evaluating the Laplace double layer
+    potential directly using 27 panels of equal arc length, with 16
+    points on each panel. Colored fields represent the error compared
+    to the exact solution, contour lines are computed using the
+    estimate \eqref{eq:dbl_lyr_err} with \eqref{eq:den_t0_extrap}, and
+    coincide almost perfectly with the actual error.}
+  \label{fig:dbl_lyr_err}
+\end{figure}
+
+\subsection{Helmholtz coefficient error}
+
+We now turn to AQBX for the Helmholtz combined field potential
+(sec. \ref{sec:helmholtz-equation}). When evaluating the expansion
+coefficients, the Hankel functions in the integrands have a
+singularity as $r_w \to 0$, which to leading order behaves like
+\cite[\S10.4,\S10.8]{NIST:DLMF}
+\begin{align}
+  {H^{(1)}}_{\pm l}(kr_w) = -(\pm 1)^l \frac{2^l(l-1)!}{\pi}(kr_w)^{-l} 
+  + {\mathcal{O}}\left((kr_w)^{-(l-2)}\right).
+  \label{eq:hankfk_exp}
+\end{align}
+The quadrature error due to near singularity is dominated by that from
+the highest-order pole, so for the purposes of error estimation it is
+suitable to only keep the highest-order Hankel function in the
+expression for \eqref{eq:addA_helm}, and to approximate that Hankel
+function using only the first term of \eqref{eq:hankfk_exp}. We can
+then approximate \eqref{eq:addAS} as
+\begin{align}
+  {s}_m(w, z_0) &\approx 0,
+\end{align}
+and \eqref{eq:addAD} as
+\begin{align}
+  {d}_0(w, z_0) &= -\frac{ik}{4} {H^{(1)}}_1(kr_w) r_w {\operatorname{Re}} \left[ \frac{n_w}{w-z_0} \right]
+  \\
+                   &\approx 
+                     \frac{1}{2\pi} {\operatorname{Re}} \left[ \frac{n_w}{w-z_0}\right],
+\end{align}
+and, for $|m|>0$ and using \eqref{eq:exppot},
+\begin{align}
+  {d}_m(w, z_0) &\approx \frac{k}{8}{H^{(1)}}_{|m|+1}(kr_w) e^{-i(|m|+1)\theta_w}n_w \\
+                   &\approx \frac{k}{8\pi} 2^{|m|+1}|m|! (kr_w)^{-(|m|+1)} e^{-i(|m|+1)\theta_w}n_w \\
+                   &= \frac{2^{|m|}|m|!}{4\pi k^{|m|}} \frac{n_w}{(w-z_0)^{|m|+1}}.
+\end{align}
+Inserted into \eqref{eq:addA_helm}, this gives
+\begin{align}
+  {A}_0^r(w, z_0) &\approx  (1, 0) \frac{1}{2\pi} 
+                      {\operatorname{Re}} \left[ \frac{n_w}{w-z_0}\right],\\
+  {A}_m^r(w, z_0) &\approx 
+                      \sqrt{2} \left(1, 1 \right) \frac{r^{m}}{4\pi}
+                      \frac{n_w}{(w-z_0)^{m+1}}, \quad m>0 .
+\end{align}
+Note that we in the above series of simplifications have removed
+constant factors which are irrelevant to the magnitude of the error
+(i.e. $-1$ and $i$). Estimating the error of these simplified integrands
+on a panel with parametrization ${\gamma}$, it follows that
+\begin{align}
+  \label{eq:helm_coeff_err_zero}
+  |{a}_0-\tilde{a}_0| &\approx \abs{{\operatorname{Im}} {\operatorname{R}_{n}}\left[ 
+                              \frac{{{\sigma}} {\gamma}'}{ 2\pi ({\gamma}-z_0)}
+                              \right]}, \\
+  \label{eq:helm_coeff_err}
+  |{a}_m-\tilde{a}_m| &\approx \abs{{\operatorname{R}_{n}}\left[ \frac{r^m {{\sigma}} {\gamma}'}{2\pi ({\gamma}-z_0)^{m+1}} \right]}, \quad m>0.
+\end{align}
+Note that \eqref{eq:helm_coeff_err_zero} is bounded by
+\eqref{eq:helm_coeff_err} with $m=0$, so it is sufficient to use only
+\eqref{eq:helm_coeff_err}, if we can accept being on the conservative
+side for $m=0$. Also note that the integrand in
+\eqref{eq:helm_coeff_err} is exactly the same as in the error estimate
+for the Laplace double layer potential
+\eqref{eq:laplace_coeff_err}. The conclusion is that, remarkably, the
+coefficient error estimate ${E_C}$ for Helmholtz is identical to that
+previously derived for Laplace \eqref{eq:am_err},
+\begin{align}
+  {E_C}(n, m) =
+  \frac{r^m \abs{{{\sigma}}(t_0)}}
+  {2\pi m! \abs{\gamma'(t_0)}^{m}}
+  \abs{k_n^{(m)}(t_0)}.
+  \label{eq:am_err_helmholtz}
+\end{align}
+This correspondence between Laplace and Helmholtz also holds for the
+quadrature error when evaluating the underlying potential itself. This
+can be seen from \eqref{eq:helm_coeff_err_zero} and the observation
+from \eqref{eq:addADzero} that $a_0=(u(z_0), 0)$,
+\begin{align}
+  \abs{u(x) - \tilde u(x)} &\approx
+  \frac{1}{2\pi} \abs{{\operatorname{Im}} \left[{{\sigma}}(t_0) k_n(t_0)\right]} 
+  \label{eq:helmholtz_err_im} \\
+  &\le \frac{1}{2\pi} \abs{{{\sigma}}(t_0) k_n(t_0)}.
+  \label{eq:helmholtz_err}
+\end{align}
+This estimate has been derived by simplifying the Helmholtz double
+layer kernel and noting that the leading singularity is identical to
+that of the Laplace double layer. However, in experiments we can
+observe that the small-scale oscillations predicted by
+\eqref{eq:helmholtz_err_im} (and which are clearly noticeable in the
+Laplace case) only appear for small wavenumbers, and it is therefore
+generally better to use \eqref{eq:helmholtz_err}. As a demonstration,
+in \cref{fig:helmholtz_err} we repeat the experiment of
+\cref{fig:dbl_lyr_err}, but for the Helmholtz exterior Dirichlet
+problem. We set a number of point sources (marked +) inside a starfish
+domain and solve the integral equation \eqref{eq:helmholtz_inteq}
+using the discretization scheme of \cite{Helsing2015}. The
+correspondence between error and estimate is still very good, though
+not as excellent as in the Laplace case.
+
+It is worth noting that the error estimate \eqref{eq:helmholtz_err} is
+independent of the wavenumber $k$. This might come as a surprise, as
+one usually needs to increase the grid resolution with increasing
+wavenumber. However, here we only take into account the nearly
+singular quadrature error, under the assumption that far-field
+interactions are well-resolved. The result simply reflects the fact
+that the singularity in the kernel is independent of $k$.
+
+\begin{figure}[htbp]
+  \centering
+  
+  \includegraphics[width=.42\textwidth]{helmholtz_err}
+  \includegraphics[width=.57\textwidth]{helmholtz_err_zoom}
+  \caption{Error curves when evaluating the Helmholtz combined field
+    potential directly using 60 panels of equal arc length, with 16
+    points on each panel. The wavenumber is set to $k=4/h$, $h$ being
+    the length of the panels. Colored fields represent the error
+    compared to the exact solution, contour lines are computed using
+    the estimate \eqref{eq:helmholtz_err} with
+    \eqref{eq:den_t0_extrap}.  }
+  \label{fig:helmholtz_err}
+\end{figure}
+
+\section{Local AQBX}
+\label{sec:local-aqbx}
+
+Since QBX is a special quadrature scheme for target points that are
+close to or on the boundary ${{\partial\Omega}}$, it makes sense to only use QBX
+for those parts of the boundary that are close to a given target
+point. This is known as ``local QBX'' \cite{Rachh2015a} (as opposed to
+``global QBX''), and can be particularly straightforward to combine
+with a fast method. For panel-based quadrature on a simple curve this
+is easy to implement; only the panels that are near a given expansion
+center are used in the local expansion. Selecting panels to include
+can be done using an error estimate of the layer potential, such as
+\eqref{eq:dbl_lyr_err} in combination with a tolerance, or by simply
+including a fixed number of neighboring panels (this works well if all
+panels are of equal length). When evaluating the potential, the
+contribution from the near panels is computed through the local
+expansion, while the contribution from the remaining panels is
+computed directly using the underlying Gauss-Legendre quadrature.
+
+Let the boundary be composed of a set of panels $\Gamma_i$,
+\begin{align}
+  {{\partial\Omega}} = \bigcup_i \Gamma_i .
+\end{align}
+We can then denote by ${{\mathcal N}}$ the near panels that are included in the
+local expansion, and by ${{\mathcal F}}$ the far panels that are evaluated
+directly. If we write the layer potential as
+\begin{align}
+  u^{{\partial\Omega}}(z) = \int_{{\partial\Omega}} G(z, w) {\sigma}(w) \dif s_w,
+\end{align}
+then the numerical approximation of $u$ using local QBX can be written
+as
+\begin{align}
+  \tilde u^{{\partial\Omega}}(z) = 
+  u_{\text{QBX}}^{{\mathcal N}}(z) + u_{\text{direct}}^{{\mathcal F}}(z) .
+\end{align}
+To combine this with a fast method that directly evaluates the
+interactions between all source points (such as the FMM), one can
+simply subtract the direct contribution from the near panels,
+\begin{align}
+  \tilde u^{{\partial\Omega}}(z) = 
+  u_{\text{fast}}^{{\partial\Omega}}(z) - u_{\text{direct}}^{{\mathcal N}}(z) + u_{\text{QBX}}^{{\mathcal N}}(z) .  
+\end{align}
+The last two terms in this expression can together be viewed as a
+correction term to the direct quadrature. Since this correction only
+has local support, the local QBX scheme is FMM compatible, in the
+sense introduced in \cite{Hao2014}. This ``black box'' way of using
+the fast method could potentially introduce cancellation errors, when
+the direct contribution from the near panels is added and subtracted,
+though we have not observed any such problems in practice. The
+alternative is to modify the FMM to ignore those local contributions
+in the first place, which is non-trivial for complex geometries.
+
+A subtle feature of local QBX is that the width of the segment ${{\mathcal N}}$
+affects the convergence rate of the local expansion. This is due to
+artificially induced endpoint singularities at the interfaces between
+${{\mathcal N}}$ and ${{\mathcal F}}$, and has been discussed to some extent in both
+\cite{Barnett2014} and \cite{Rachh2015a}. The choice of width of
+${{\mathcal N}}$ is therefore a balance; widening ${{\mathcal N}}$ means more points
+contributing to each expansion, while narrowing ${{\mathcal N}}$ gives a slower
+convergence of the expansion. Actually, not only is the convergence
+slower, the exponential convergence of the truncation error
+\eqref{eq:eT_exp} also tends to be less regular. This in turn makes it
+harder for AQBX to correctly determine when to terminate. We have
+found that a good balance is struck by using the five panels that are
+closest to the expansion center.
+
+\section{Numerical experiments}
+\label{sec:numer-exper}
+
+We have implemented the above algorithms in Matlab, and used the FMM
+as implemented in FMMLIB2D \cite{fmmlib2d} for fast far-field
+evaluations. Timings will not be reported here, as our code is a proof
+of concept rather than a production implementation. We will in the
+following numerical experiments only report on the Helmholtz problem,
+as that is the more challenging one. Carrying out the same experiments
+for the Laplace problem just results in similar, though slightly
+better, results.
+
+\begin{figure}[htbp]
+  
+  \centering
+  \includegraphics[width=.3\textwidth]{helmholtz_sol_abs}
+  \hspace{.1\textwidth}
+  \includegraphics[width=.3\textwidth]{helmholtz_sol_real}
+  \caption{Solution to Helmholtz equation given by five point sources
+    located inside a starfish domain. To the left is $|u(z)|$, to the
+    right is ${\operatorname{Re}} u(z)$.}
+  \label{fig:helmholtz_sol}
+\end{figure}
+
+For our experiments we set up the reference problem shown in
+\cref{fig:helmholtz_sol}: The Helmholtz problem in the domain exterior
+to the starfish curve $\gamma(t) = (1+0.3\cos(10 \pi t))e^{2\pi i t}$,
+$t\in[0,2\pi]$, with Dirichlet boundary conditions given by the
+potential from five point sources in the interior domain. We
+discretize the boundary using 100 Gauss-Legendre panels of order 16
+and equal arclength $h$, and choose our wavenumber such that
+${{k}}=4/h$. We position one expansion center at a distance $r$ in the
+normal direction from each point on the boundary, and use as a default
+value $r=h/4$. The density ${\sigma}$ is computed by solving the integral
+equation \eqref{eq:helmholtz_inteq} using the Nystr\"om method of
+\cite{Helsing2015}. We can then evaluate the layer potential using
+AQBX, and compare the result to the exact solution given by the
+potential from the five point sources. The error in AQBX has in our
+tests always been largest when evaluating the layer potential on the
+boundary (where the integral is singular), so we mainly report the
+errors as measured there. \Cref{fig:error} shows the error along the
+entire boundary when evaluating using AQBX, and also illustrates how
+the algorithm works. One can clearly see how the magnitude of the
+coefficients $a_m$ provides a good overestimate of the truncation
+error, while the coefficient error is closely tracked by the estimate
+${E_C}$.
+\begin{figure}[htbp]
+  
+  \centering
+  \tikzset{font=\footnotesize} 
+  \tikzset{mark size=1/2}
+  \includegraphics[width=.38\textwidth, height=.41\textwidth]{err_ongrid}
+  \tikzset{mark size=2}
+  \includegraphics[width=.6\textwidth, height=.4\textwidth]{p_conv}
+  \caption{Results when evaluating the solution to Helmholtz equation
+    using AQBX with tolerance set to $10^{-10}$, marked as thick black
+    line. \emph{Left:} Distribution of error along ${{\partial\Omega}}$, which
+    shows that the error stays close to the tolerance, though it is
+    not strictly met. \emph{Right:} Example showing the behavior of
+    AQBX at a single expansion center, when evaluating at the closest
+    boundary point. The error decays exponentially with expansion
+    order, at the same rate as the coefficients $a_m$.  At the same
+    time the coefficient error $|a_m - \tilde a_m|$ is growing, but is
+    well estimated by the estimate ${E_C}(m)$ \eqref{eq:helm_coeff_err}.
+    Note the jump in coefficient error between $m=3$ and $m=4$, where
+    the grid is upsampled to maintain the error below tolerance.}
+  \label{fig:error}
+\end{figure}
+\Cref{fig:corrected_field} shows example results from when AQBX is
+used for evaluating the potential in the domain, where the integral is
+nearly singular. It can be seen that AQBX is only activated at the
+points where it is needed, and that the potential is then evaluated to
+the desired accuracy at those points.
+\begin{figure}[htbp]
+  
+  \centering
+  \begin{minipage}{0.28\textwidth}
+      \includegraphics[width=\textwidth]{qbx_field_4}
+  \end{minipage}
+  \begin{minipage}{0.28\linewidth}
+      \includegraphics[width=\textwidth]{qbx_field_8}
+  \end{minipage}
+  \begin{minipage}{0.41\linewidth}
+      \includegraphics[width=\textwidth]{qbx_field_12_cbar}
+  \end{minipage}
+  \caption{Errors when evaluating the potential of
+    \cref{fig:helmholtz_sol}, in the region highlighted in
+    \cref{fig:helmholtz_err}. The AQBX tolerance is set to $10^{-4}$,
+    $10^{-6}$ and $10^{-12}$, from left to right, and the region where
+    AQBX is activated is determined using the error estimate for the
+    potential \eqref{eq:helmholtz_err}.}
+  \label{fig:corrected_field}
+\end{figure}
+
+We believe that the main benefit of using AQBX rather than a direct
+QBX implementation is that the parameter choice is greatly simplified;
+given an expansion distance $r$ and a tolerance ${\epsilon}$, the upsampling
+rate ${\kappa}$ and expansion order $p$ are set on the fly as needed at
+each expansion center. A second benefit is that setting ${\kappa}$ and
+$p$ on the fly can save some work, compared to using fixed values
+everywhere. In an attempt to quantify this, we now introduce a measure
+of the work (${{W}}$) needed to form a local expansion, in terms of
+source evaluations per original source point. If direct QBX is used
+with order $p$ and a fixed upsampling rate ${\kappa}$, then the work is
+given by
+\begin{align}
+    {{W}}_{\text{QBX}} &= p {\kappa}.
+\end{align}
+If AQBX is used to compute $p$ coefficients, with upsampling rate
+${\kappa}_m$ used to evaluate the $m$th coefficient, then the work is
+given by
+\begin{align}
+  {{W}}_{\text{AQBX}} &= \sum_{m=1}^p {\kappa}_m .
+\end{align}
+As a comparison, in \cref{tab:tol_work,tab:rh_work} we measure the
+work when computing all expansion coefficients in our reference
+problem using AQBX, and compare that to the work needed if $p$ and
+${\kappa}$ are fixed everywhere to the minimum values required to
+achieve the same accuracy as AQBX. These fixed values are tuned by
+hand to the optimal values for this specific problems, yet our
+algorithm gives a slight speedup in our definition of work. More
+importantly, our algorithm is in most cases able to keep the error at
+the desired order of magnitude without any manual intervention, while
+hand-tuning parameters is strictly unfeasible in real applications.
+
+Our measure of work does not take into account the extra effort needed
+to evaluate the estimate of the AQBX scheme. The reported speedup
+should therefore be viewed as an upper limit, and as an indicator that
+automatic parameter selection does not necessarily have to be more
+expensive than using fixed parameters set to optimal values. To
+minimize the overhead of the scheme one can evaluate the error
+estimates \cref{eq:am_err,eq:am_err_helmholtz} recursively, and the
+multiple levels of upsampling can for each panel be computed and
+reused as needed using a caching algorithm.
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{r|r|r|r|r|r}
+    \hline
+    Tol. & Eval. error & Exp. order $p$ & Upsamp. rate ${\kappa}$ & Work ${{W}}$ &Speedup (avg)\\
+    ${\epsilon}$ & $\norm{u_p - u}_{\infty}$ & avg (opt) & avg (opt) & avg (opt) & ${{W}}_{\text{AQBX}} / {{W}}_{\text{QBX}}$  \\
+    \hline
+     $10^{-4~}$ & $1.4\cdot 10^{-3~}$  & ~5.4  (~~3) & 1.0~ (~~2)  & ~5.5 (~~6)  &  1.0 \\
+     $10^{-6~}$ & $2.0\cdot 10^{-6~}$  & ~7.5  (~~5) & 1.4~ (~~2)  & 10.2 (~10)  &  1.0 \\
+     $10^{-8~}$ & $1.9\cdot 10^{-8~}$  & ~9.2  (~~7) & 1.8~ (~~3)  & 16.5 (~21)  &  1.3 \\
+     $10^{-10}$ & $2.4\cdot 10^{-10}$  & 10.9  (~~9) & 2.2~ (~~3)  & 24.0 (~27)  &  1.1 \\
+     $10^{-12}$ & $3.7\cdot 10^{-12}$  & 12.7  (~11) & 2.5~ (~~4)  & 32.3 (~44)  &  1.4 \\
+    \hline
+  \end{tabular}
+  \caption{Results for varying tolerance and $r/h=1/4$, comparing AQBX and direct QBX on our reference problem. Error is measured on ${{\partial\Omega}}$. Reported parameters are for AQBX an average over all expansion centers (avg), and for direct QBX the optimal fixed values used at all centers (opt).}
+  \label{tab:tol_work}
+\end{table}
+
+\begin{table}[htbp]
+  
+  \centering
+  \begin{tabular}{r|r|r|r|r|r}
+    \hline
+    Dist. & Eval. error & Exp. order $p$ & Upsamp. rate ${\kappa}$ & Work ${{W}}$ &Speedup (avg)\\
+    $r/h$ & $\norm{u_p - u}_{\infty}$ & avg (opt) & avg (opt) & avg (opt) & ${{W}}_{\text{AQBX}} / {{W}}_{\text{QBX}}$  \\
+    \hline
+    0.10 &  $1.5\cdot 10^{-10}$   &   ~8.7  (~~7)  &  3.9~  (~~6) & 34.4 (~42) &  1.2  \\
+    0.25 &  $2.4\cdot 10^{-10}$   &   10.9  (~~9)  &  2.2~  (~~3) & 24.0 (~27) &  1.1 \\
+    0.50 &  $3.9\cdot 10^{-10}$   &   14.0  (~14)  &  1.6~  (~~2) & 22.3 (~38) &  1.3 \\
+    0.75 &  $3.4\cdot 10^{-10}$   &   17.5  (~21)  &  1.5~  (~~2) & 26.9 (~42) &  1.6 \\
+    1.00 &  $1.3\cdot 10^{-9~}$   &   22.4  (~39)  &  1.9~  (~~2) & 43.2 (~78) &  1.8 \\
+    \hline  
+  \end{tabular}
+  \caption{Results for varying $r/h$ and tolerance ${\epsilon}=10^{-10}$, computed in the same way as in \cref{tab:tol_work}.}
+  \label{tab:rh_work}
+\end{table}
+
+\section{Conclusions}
+
+We have in this paper formulated a scheme for adaptive quadrature by
+expansion (AQBX), which allows for the evaluation of singular and
+nearly singular layer potential integrals on a curve discretized using
+composite Gauss-Legendre quadrature. The scheme automatically sets
+parameters in order to satisfy a given tolerance. This is a great
+simplification compared to the original QBX scheme, which has a very
+large parameter space. Given a target tolerance, the only free
+parameter is here the expansion radius $r$. Since the remaining
+parameters are set on the fly, varying $r$ will mainly affect the
+speed of the algorithm. The optimal value for $r$ with respect to
+speed will be implementation-dependent, though values of $W$ in
+\cref{tab:rh_work} suggest that $r/h$ in the range $1/4$--$1/2$ is a
+good choice.
+
+The key component of our scheme is the ability to accurately estimate
+the magnitude of the quadrature errors in the QBX coefficients. To do
+this we have built on the results of \cite{AfKlinteberg2016quad},
+where such estimates were reported for a flat panel. We have extended
+these to curved panels by taking into account the mapping between a
+flat panel and a curved panel. This mapping can be locally constructed
+using only the locations of the quadrature nodes on each panel, and
+therefore requires no additional analytical information. A side
+benefit of our estimates is that the nearly singular quadrature error
+of the underlying layer potential can be accurately estimated, which
+provides an excellent criterion for when to activate special
+quadrature also when other methods are used
+\cite{Helsing2008,Barnett2015}. This could also prove useful for QBX
+schemes where the expansion is formed by multiple layer potential
+evaluations in a neighborhood of the expansion center
+\cite{Askham2016a,Rahimian2016}.
+
+The focus on a target accuracy is, in our experience, uncommon in the
+context of singular and nearly singular quadrature. We do however
+believe that this is important if integral equation methods are to be
+used in large-scale simulations, where the focus is on achieving a
+target accuracy at the lowest possible computational cost.
+
+While several excellent special quadrature methods exist in two
+dimensions, methods in three dimensions have not yet reached the same
+maturity.  The QBX method has been successfully used on simple
+geometries in 3D \cite{AfKlinteberg2016qbx}, while development for
+more general use is ongoing. If accurate parameter selection is
+important in 2D, it is absolutely essential in 3D, as costs are higher
+and the impact of suboptimal parameter choices more severe.  The
+principles of the present 2D scheme can be extended to three
+dimensions. Estimates for the coefficient errors in 3D were in
+\cite{AfKlinteberg2016quad} developed for the special case of
+spheroidal surfaces. Developing estimates for general surfaces in 3D
+is a topic of ongoing work, and results will be reported at a later
+date.
+
+\section*{Acknowledgments}
+
+The authors wish to thank Prof. Johan Helsing for providing an
+implementation of the singular integration scheme of
+\cite{Helsing2015}.
+
+\bibliography{library}
+\bibliographystyle{siamplain_mod}
+
+\end{document}
+

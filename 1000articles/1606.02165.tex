@@ -1,0 +1,1175 @@
+\documentclass{siamltex1213}
+
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}     
+\usepackage{amssymb}     
+\usepackage{esint} 
+\usepackage{pgf}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathmorphing}
+\usetikzlibrary{decorations.pathreplacing}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes}
+\usetikzlibrary{arrows}
+\usetikzlibrary{patterns}
+\usetikzlibrary{fadings}
+\usetikzlibrary{plotmarks}
+\usetikzlibrary{calc}
+\usetikzlibrary{intersections}
+\tikzstyle{every picture}+=[font=\footnotesize]
+\usepackage{paralist}
+
+\usepackage{bbm}
+\usepackage{latexsym}           
+\usepackage{subfigure}			
+\usepackage{enumerate}
+\usepackage{enumitem}
+
+\setlist{noitemsep, topsep=0.8ex, partopsep=0pt
+	, leftmargin=3em}
+\setlist[1]{labelindent=\parindent}
+
+\newlist{axioms}{enumerate}{1}
+\setlist[axioms]{font=\bfseries}
+
+\newlist{alphenum}{enumerate}{1}
+\setlist[alphenum]{label=\textbf{(\alph*)}, leftmargin=4em}
+
+\newlist{alphienum}{enumerate}{1}
+\setlist[alphienum]{label=\textit{(\alph*)}}
+
+\newlist{romanenum}{enumerate}{1}
+\setlist[romanenum]{label=\textit{(\roman*)}}
+
+\newlist{romaninenum}{enumerate*}{1}
+\setlist[romaninenum]{label=\textit{(\roman*)}}
+\usepackage[vlined]{algorithm2e}
+\SetKwIF{If}{ElseIf}{Else}{if}{}{else if}{else}{endif}
+\SetKwFor{For}{for}{}{endfor}
+\usepackage[noabbrev, capitalise]{cleveref}
+\usepackage{tabu}
+\tabulinesep=0.5ex
+\crefname{equation}{\unskip}{\unskip}
+\creflabelformat{equation}{#2(#1)#3}
+        \SetFuncSty{textsc}
+        \SetKwFunction{frun}{Run}
+        \SetKwHangingKw{arun}{\frun}
+        \SetKwFunction{fset}{Set}
+        \SetKwHangingKw{aset}{\fset}
+        \SetKwFunction{fselect}{Select}
+        \SetKwHangingKw{aselect}{\fselect}
+        \SetKwFunction{fcompute}{Compute}
+        \SetKwHangingKw{acompute}{\fcompute}
+        \SetKwFunction{fsolve}{Solve}
+        \SetKwHangingKw{asolve}{\fsolve}
+        \SetKwFunction{festimate}{Estimate}
+        \SetKwHangingKw{aestimate}{\festimate}
+        \SetKwFunction{fmark}{Mark}
+        \SetKwHangingKw{amark}{\fmark}
+        \SetKwFunction{frefine}{Refine}
+        \SetKwHangingKw{arefine}{\frefine}
+        \SetKwFunction{compute}{Compute}
+        \SetKwFunction{set}{Set}
+\newtheorem{remark}{Remark}
+
+ 
+	     
+ 
+
+ 
+
+ 
+ 
+ 
+ 
+
+ 
+ 
+ 
+
+\allowdisplaybreaks[0] 
+			
+			
+			
+
+\newenvironment{algof}{\renewenvironment{algocf}[1][h]{}{}\algorithm}   {\endalgorithm}
+   
+   
+
+\title{Axioms of adaptivity for separate marking}
+\author{C.~Carstensen\footnotemark[1] \footnotemark[2] \and H.~Rabus\footnotemark[1]}
+\begin{document}
+\maketitle
+
+\footnotetext[1]{Department of Mathematics, Humboldt-Universit\"at zu Berlin, Unter den Linden 6,
+        10099 Berlin, Germany.   Email cc@math.hu-berlin.de and rabus@math.hu-berlin.de
+}
+\footnotetext[2]{The work of the first author is partly supported by DFG SPP 1749 \textit{Reliable Simulation Techniques in Solid Mechanics -- Development of Non-standard Discretization Methods, Mechanical and Mathematical Analysis}}
+	
+
+\pagestyle{myheadings}
+\thispagestyle{plain}
+\markboth{C.~Carstensen and H.~Rabus}{Axioms of adaptivity for separate marking}
+
+\begin{abstract}
+Mixed finite element methods with flux errors in $H(\operatorname{div})$-norms and div-least-squares 
+finite element methods require a separate marking strategy in obligatory adaptive mesh-refining.
+The refinement indicator $\sigma^2({\mathcal{T}},K)=\eta^2({\mathcal{T}},K)+\mu^2(K)$ of a finite 
+element domain $K$ in an admissible triangulation ${\mathcal{T}}$ consists of some 
+residual-based error estimator $\eta({\mathcal{T}},K)$ with some reduction property under local 
+mesh-refining and some data approximation error $\mu(K)$. Separate marking means either D\"orfler
+marking if $\mu^2({\mathcal{T}}) \leq \kappa \eta^2({\mathcal{T}})$ or otherwise an optimal data approximation algorithm runs with
+controlled accuracy as established in \cite{CR09, safem2015}. 
+
+The axioms are abstract and sufficient conditions on the estimators $\eta({\mathcal{T}},K)$ and data
+approximation errors $\mu(K)$ for optimal asymptotic convergence rates. The enfolded set of axioms simplifies \cite{CFP14} for collective marking,
+treats separate marking established for the first time in an abstract framework, generalizes \cite{CCP-lsfem}
+for least-squares schemes, and extends \cite{CR09} to the mixed FEM with flux error control in $H(\operatorname{div})$.
+\end{abstract}
+\begin{keywords}
+	adaptivity, finite element method, nonstandard finite element method,  
+mixed finite element method, optimal convergence, 
+least-squares finite element method
+\end{keywords}
+
+\section{Introduction}
+The convergence analysis of adaptive finite element methods ({\textsc{afem}s\xspace}) with collective marking for some total error estimator (called {\textsc{cafem}\xspace} below) is reformulated in an abstract setting in \cite{CFP14}. Therein four axioms describe elementary properties of the total error estimator that are sufficient for optimal convergence rates. 
+Standard adaptive schemes are based on a total error estimator and collective marking on each level outlined in pseudo code as follows. 
+\medskip
+
+\begin{minipage}{0.9\textwidth}
+	\textbf{CAFEM$(\theta, {\mathcal T_{0}})$}
+	\\
+	\input{algCAfem}
+\end{minipage}
+
+This paper simplifies the axioms from \cite{CFP14},  also works without the concept of nonlinear approximation classes \cite{BDD04,Stev07,CKNS07} and so avoids  any notion of efficiency.
+The recent comprehensive  a~posteriori error analysis in \cite{ccdpas2015} provides  
+an efficient and reliable  control in natural norms: the error in the flux in $H(\operatorname{div},\Omega)$ 
+and the error in the displacements in $L^2(\Omega)$. 
+The focus of this paper is on separate marking ({\textsc{safem}s\xspace}), a modification of the standard {\textsc{afem}\xspace}: D\"orfler marking is applied if the estimated error dominates the data approximation error, while an optimal data approximation is performed otherwise --- outlined in pseudo code as follows.
+\medskip
+
+\begin{minipage}{0.9\textwidth}
+	\textbf{SAFEM$(\theta_A, \kappa, \rho_B, {\mathcal T_{0}})$}
+	\\
+	\input{algSAfem}
+\end{minipage}
+
+The algorithm {\textsc{safem}\xspace} combines ideas from \cite{mfemBeckerMao08,CR09,safem2015} and distinguishes two Cases (A) and (B), where the refinement is with respect to the dominant refinement indication $\eta_\ell^2$ or $\mu_\ell^2$. The refinement in Case (B) depends on the data approximation error and is independent of the discrete solution. This allows for any optimal algorithm for data approximation with respect to the error functional $\mu^2:K \rightarrow \mathbb R$ for $K\subseteq \Omega\subseteq \mathbb R^n$, i.e.\ the output ${\mathcal T_{\operatorname}}{Tol}=\texttt{appx}(\operatorname{Tol}, \mu(K):K\in{\mathcal T_{0}})$ is expected to satisfy
+\begin{align*}
+	\mu^2({\mathcal T_{\operatorname}}{Tol})&\leq \operatorname{Tol},\\
+	{\left\lvert {{\mathcal T_{\operatorname}}{Tol}} \right\rvert} - {\left\lvert {{\mathcal T_{0}}} \right\rvert} &\leq {\ensuremath{\Lambda_{\mathrm{5}}}} \operatorname{Tol}^{-1/s}.
+\end{align*}
+The analysis for {\textsc{afem}s\xspace} based on collective marking as in \cite{CFP14} is included when $\sigma^2({\mathcal{T}},\bullet)=\eta^2({\mathcal{T}},\bullet)+\mu^2({\mathcal{T}},\bullet)$ replaces $\eta^2({\mathcal{T}},\bullet)$ in Case (A) and the refinement indicator in Case (B) vanishes.
+
+Optimal convergence rates for the estimators follow from  axioms (A1)-(A4) 
+generalized from \cite{CFP14} and (B1)-(B2) for optimal  data approximation with quasimonotonicity (QM). 
+The subroutine  \texttt{appx}  in {\textsc{safem}\xspace} can be realized by some D\"orfler marking (similar to the algorithm in \cite{mfemBeckerMao08}) or by the algorithm {{\scshape Approx}\xspace}  from \cite{BDD04,BD04}  (applied in \cite{CR09,safem2015}). The flexibility in the data reduction allows
+applications of {\textsc{safem}\xspace} to  problems with data approximation terms that do \textit{not} satisfy an
+estimator reduction property but quasimonotonicity.  Two model examples illustrate this in the present paper: mixed {\textsc{fem}\xspace} with flux error estimation in $H(\operatorname{div})$ rather then $L^2(\Omega)$ \cite{CR09} and a least-squares {\textsc{fem}\xspace} problem from \cite{CCP-lsfem}. Further applications of the present version of the axioms on {\textsc{safem}\xspace} shall
+appear in the near future \cite{lsfemBC,BCStarke}.
+
+The remaining parts of this paper are organised as follows. Section \ref{sec:axioms} presents more details on {\textsc{safem}\xspace} and guides the reader through the conditions in (A1)-(A4) and (B1)-(B2) for the refinement indicators $\eta$ and $\mu$ and asserts the optimal convergence rate of {\textsc{safem}\xspace} in \cref{thm:safem}. 
+A collection of remarks follows in Section \ref{sec:remarks} before Section \ref{sec:optimality} presents the proofs. Sections \ref{s:applmfem}-\ref{s:appllsfem} contain the verification of the axioms for two examples, where separate marking is obligatory for optimal adaptive mesh-refinement.
+The main novel contribution in Section \ref{s:applmfem} is the proof of a discrete version  (A3) of \cite{ccdpas2015}.
+
+The notation $A \lesssim B$ abbreviates $A \leq CB$ for some positive generic constant $C$, which depends only on the initial triangulation ${\mathcal T_{0}}$ and on the universal constants in the axioms; while $A\approx B$ abbreviates $A\lesssim B \lesssim A$.
+Throughout this paper standard notation of Lebesgue and Sobolev spaces and their norms applies. The modulus sign 
+$|\bullet|$ denotes the Euclidean length as well as the counting measure, e.g., $|\mathcal{M}|$ is the cardinality of 
+$\mathcal{M}$ and equals the number of elements
+in a triangulation $\mathcal{M}$ (or a subset thereof). 
+
+\section{Axioms and results}\label{sec:axioms}
+The axioms concern general conditions of the estimators $\eta$ and $\mu$,
+which play different roles in the adaptive algorithm,  and are based on the set ${\mathbb T}$ 
+of admissible triangulations. 
+
+\subsection{Partitions and admissible triangulations}
+Let ${\mathcal T_{0}}$ be a regular triangulation of the domain $\Omega$ into (tagged) $n$-simplices in $\mathbb R^n$. 
+Any refinement ${\mathcal{P}}$ from ${\mathcal T_{0}}$ by the newest vertex bisection (NVB) of \cref{fig:refine} is called partition, written ${\mathcal{P}}\in{\mathbb P\left({{\mathcal T_{0}}}\right)}=:{\mathbb P}$. A partition ${\mathcal{P}} \in {\mathbb P}$, which is a regular triangulation in the sense of Ciarlet, is called admissible, written ${\mathcal{P}}\in {\mathbb T\left({{\mathcal T_{0}}}\right)}=:{\mathbb T}$.
+
+The input of the underlying refinement procedure 
+${\mathcal T_{{\text{out}}}}:=\textsc{Refine}({\mathcal T_{{\text{in}}}},{\mathcal{M}})$ is an admissible triangulation  ${\mathcal T_{{\text{in}}}}\in {\mathbb T}$ and some subset
+${\mathcal{M}}\subseteq{\mathcal T_{{\text{in}}}}$  thereof; the output ${\mathcal T_{{\text{out}}}}$ is an admissible triangulation and a one-level refinement of ${\mathcal T_{{\text{in}}}}$ with 
+${\mathcal{M}}\subset{\mathcal T_{{\text{in}}}}\setminus{\mathcal T_{{\text{out}}}}$ of quasi-minimal cardinality. Conversely, the procedure $\textsc{Refine}$ specifies 
+the NVB with completion (to avoid hanging nodes etc.) and more details may be found in \cite{Stev08}. NVB is assumed throughout this paper. In particular, given ${\mathcal{T}},{\mathcal{T}}'\in{\mathbb T}$, their overlay ${\mathcal{T}}\oplus{\mathcal{T}}' \in {\mathbb T\left({\mathcal{T}}\right)} \cap {\mathbb T\left({{\mathcal{T}}'}\right)}$ is the smallest common 
+refinement of ${\mathcal{T}}$ and ${\mathcal{T}}'$.
+
+\begin{figure}
+	\begin{center}
+	\includegraphics{images/refine.eps}
+	\end{center}
+		\caption{Possible refinements of a triangle depending on the set of marked edges by NVB. Refinement edges are marked red, while marked edges are colored in blue.}
+	\label{fig:refine}
+\end{figure}
+
+\subsection{Estimators and distance}\label{ssec:estDist}
+The axioms are defined in terms of $\eta$ and $\mu$ plus a global distance $\delta$. For any admissible triangulation ${\mathcal{T}}\in{\mathbb T}$ and any element domain $K\in{\mathcal{T}}$  let $\eta({\mathcal{T}},K)$ and $\mu(K)$ be a non-negative real number with squares $\eta^2({\mathcal{T}},K)$ and $\mu^2(K)$ and  their sums 
+\begin{align}\label{eq:def_estim}
+\eta^2({\mathcal{T}},{\mathcal{M}})&:=\sum_{K\in{\mathcal{M}}}\eta^2({\mathcal{T}},K), \qquad \mu^2({\mathcal{M}}):=\sum_{K\in {\mathcal{M}}}\mu^2( K) \qquad 
+\text{for any }  {\mathcal{M}}\subseteq {\mathcal{T}}.
+\end{align}
+The distance $\delta({\mathcal{T}},{\hat{\mathcal{T}}})$ of ${\mathcal{T}}\in{\mathbb T}$ and its refinement ${\hat{\mathcal{T}}}\in{\mathbb T}({\mathcal{T}})$ is a non-negative real.  
+The estimators are utilized in the adaptive algorithm and are linked with the distance function in the axioms
+below. The output of the adaptive algorithm is a sequence ${\mathcal{T}}_0,{\mathcal{T}}_1,{\mathcal{T}}_2,\dots$ of successive
+refinements that start with ${\mathcal{T}}_0$ and give rise to the abbreviations (with a subindex $\ell$
+to refer to the triangulation as part of the output of {\textsc{safem}\xspace})
+\[
+\eta_\ell(K):=\eta({\mathcal{T}}_\ell,K)\quad\text{for }K\in{\mathcal{T}}_\ell\quad\mbox{and}\quad \eta_\ell:=\eta({\mathcal{T}}_\ell,{\mathcal{T}}_\ell).
+\]
+The sum $\sigma^2:=\eta^2+\mu^2$ and their local variants are frequently utilized throughout this paper with $\sigma^2_\ell:=\eta^2_\ell+\mu^2_\ell$ for $\mu_\ell^2:=\mu^2({\mathcal T_{\ell}}):=\sum_{K\in {\mathcal T_{\ell}}} \mu^2(K)$.
+
+\subsection{Adaptive algorithm} 
+In some more details, {\textsc{safem}\xspace} calls \textsc{Select} and \textsc{Refine} to realize the D\"orfler marking in Case (A) from the introduction; more details on \texttt{appx} in Case (B) follow in Subsection \ref{sec:optApprox}.
+\medskip
+
+\centerline{\begin{minipage}{0.9\textwidth}
+	\textbf{SAFEM$(\theta_A, \kappa, \rho_B, {\mathcal T_{0}})$}
+	\\
+	\input{algAfem}
+\end{minipage}}
+The selection of ${\mathcal M_{\ell}}$ with almost minimal cardinality means that ${\left\lvert {{\mathcal M_{\ell}}} \right\rvert} \lesssim {\left\lvert {{\mathcal M_{\ell}} ^\star} \right\rvert}$, where ${\mathcal M_{\ell}} ^\star$ denotes some set of minimal cardinality with \cref{sAfem:eq:bulkA}. The point is that this can be realised in linear CPU time \cite{Stev07}.
+
+\subsection{Axioms}
+The universal positive constants ${\ensuremath{\Lambda_{\mathrm{ref}}}}$, ${\ensuremath{\Lambda_{\mathrm{1}}}}$, ${\ensuremath{\Lambda_{\mathrm{2}}}}$, ${\ensuremath{\Lambda_{\mathrm{3}}}}$,  ${\ensuremath{\Lambda_{\mathrm{4}}}}$, ${\ensuremath{\Lambda_{\mathrm{6}}}}$, and 
+ ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}\geq 0$ as well as  $0<\rho_2<1$ in the axioms (A1)-(A4), (B2), and (QM) 
+below solely depend on ${\mathbb T}$ (whence merely on ${\mathcal T_{0}}$); the parameters 
+ $s>0$  and  ${\ensuremath{\Lambda_{\mathrm{5}}}}$ in (B1)  also depend on the algorithm \texttt{appx} and the optimal data 
+ approximation rate.
+ 
+The axioms 
+(A1)-(A3) and (B2) concern an arbitrary triangulation $ {\mathcal{T}} \in {\mathbb T}$ and any refinement 
+${\hat{\mathcal{T}}} \in {\mathbb T\left({\mathcal{T}}\right)}$ of it, while (A4) solely concerns the outcome of {\textsc{safem}\xspace}. Recall the sum conventions for $\eta({\mathcal{T}}, {\mathcal{M}})$ and $\mu({\mathcal{T}})$ in Subsection~\ref{ssec:estDist}.
+
+\begin{axioms}
+\item[(A1)]Stability. $\forall {\mathcal{T}} \in {\mathbb T} \, \forall {\hat{\mathcal{T}}} \in {\mathbb T\left({\mathcal{T}}\right)}$
+	\begin{equation}\label{eq:A1}\tag{A1}
+		{\left\lvert {\eta({\hat{\mathcal{T}}},{\mathcal{T}} \cap {\hat{\mathcal{T}}}) - \eta({\mathcal{T}},{\mathcal{T}} \cap {\hat{\mathcal{T}}})} \right\rvert} \leq {\ensuremath{\Lambda_{\mathrm{1}}}} \delta({\mathcal{T}},{\hat{\mathcal{T}}}).
+	\end{equation}
+\item[(A2)] Reduction. $\forall {\mathcal{T}} \in {\mathbb T}\, \forall {\hat{\mathcal{T}}} \in {\mathbb T\left({\mathcal{T}}\right)}$
+	\begin{equation}\label{eq:A2}\tag{A2}
+		\eta({\hat{\mathcal{T}}}, {\hat{\mathcal{T}}} \setminus {\mathcal{T}}) \leq \rho_{2}\eta({\mathcal{T}}, {\mathcal{T}} \setminus {\hat{\mathcal{T}}}) + {\ensuremath{\Lambda_{\mathrm{2}}}} \delta({\mathcal{T}},{\hat{\mathcal{T}}}).
+	\end{equation}
+\item[(A3)] Discrete Reliability.
+	$\forall {\mathcal{T}} \in {\mathbb T} \,\forall {\hat{\mathcal{T}}} \in {\mathbb T\left({\mathcal{T}}\right)}\, \exists \mathcal R({\mathcal{T}}, {\hat{\mathcal{T}}}) \subseteq {\mathcal{T}}$ with ${\mathcal{T}} \setminus {\hat{\mathcal{T}}} \subseteq \mathcal R({\mathcal{T}}, {\hat{\mathcal{T}}})$,
+	\begin{align}\label{eq:A3}\tag{A3}
+		\begin{aligned}
+		{\left\lvert { \mathcal R({\mathcal{T}}, {\hat{\mathcal{T}}})} \right\rvert} &\leq {\ensuremath{\Lambda_{\mathrm{ref}}}} {\left\lvert {{\mathcal{T}} \setminus {\hat{\mathcal{T}}}} \right\rvert} \text{ and }\\
+		\delta^2({\mathcal{T}}, {\hat{\mathcal{T}}}) &\leq {\ensuremath{\Lambda_{\mathrm{3}}}} \left( \eta^2({\mathcal{T}},\mathcal R({\mathcal{T}},{\hat{\mathcal{T}}})) + \mu^2({\mathcal{T}}) \right) + 
+		{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} \eta^2({\hat{\mathcal{T}}}). 
+	\end{aligned}
+	\end{align}
+\item[(A4)] Quasiorthogonality of discrete solutions.
+	$\forall \ell \in {\mathbb{N}_0}$
+		\begin{equation}\label{eq:A4}
+			\sum_{k=\ell}^{\infty} \delta^2({\mathcal T_{k}}, {\mathcal T_{{k+1}}})
+			\leq {\ensuremath{\Lambda_{\mathrm{4}}}} \sigma_{\ell}^2.\tag{A4}
+		\end{equation}
+		\end{axioms}
+\begin{axioms}
+\item[(B1)] Rate $s$ data approximation.
+	 $\forall \operatorname{Tol}>0$, ${\mathcal T_{\operatorname}}{Tol} := \texttt{appx}(\operatorname{Tol},\mu(K):K\in{\mathcal T_{0}}) \in {\mathbb T}$  
+	 satisfies
+	\begin{equation}\label{eq:B}\tag{B1}
+		{\left\lvert {{\mathcal T_{\operatorname}}{Tol}} \right\rvert}-{\left\lvert {{\mathcal T_{0}}} \right\rvert} \leq {\ensuremath{\Lambda_{\mathrm{5}}}} \operatorname{Tol}^{-1/(2s)} \quad \text{and} \quad  \mu^2({\mathcal T_{\operatorname}}{Tol}) \leq \operatorname{Tol}.
+		\end{equation}
+	\item[(B2)] Quasimonotonicity of $\mu$. $\forall {\mathcal{T}} \in {\mathbb T}$ $\forall \hat {\mathcal{T}} \in {\mathbb T\left({\mathcal{T}}\right)}$\quad
+ $\mu(\hat {\mathcal{T}}) \leq {\ensuremath{\Lambda_{\mathrm{6}}}} \mu({\mathcal{T}})$.
+\end{axioms}
+
+Theorem~\ref{thm:qmono}  below asserts that the aforementioned axioms imply
+quasimonotonicity of $\sigma$ for small values of  ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} $, while this axiom 
+(QM) stands on its own in the example of Section~\ref{s:appllsfem}.
+ 
+\begin{axioms}
+\item[(QM)] Quasimonotonicity of $\sigma$. $\forall {\mathcal{T}} \in {\mathbb T}$ $\forall {\hat{\mathcal{T}}} \in {\mathbb T\left({\mathcal{T}}\right)}$\quad
+ $ \sigma({\hat{\mathcal{T}}}) \leq {\ensuremath{\Lambda_{\mathrm{7}}}} \sigma({\mathcal{T}})$.
+\end{axioms}
+
+\subsection{Optimal convergence rates}
+The axioms\hspace{0.5mm}(A1)-(A4),\hspace{0.5mm}(B1)-(B2),\hspace{0.5mm}and\hspace{0.5mm}(QM) ensure 
+quasioptimality of {\textsc{safem}\xspace} for sufficiently small
+parameters $\theta_A$ and $\kappa$ as stated in \cref{thm:safem} below. Recall that $\sigma^2:=\eta^2+\mu^2$ and set
+\[
+\sigma^2({\mathcal{T}})\equiv \sigma({\mathcal{T}})^2:=\sigma^2({\mathcal{T}},{\mathcal{T}}):=\sum_{K\in{\mathcal{T}}} \sigma^2({\mathcal{T}},K)
+\text{ for ${\mathcal{T}}\in{\mathbb T}$ and }
+\sigma_\ell:=\sigma({\mathcal{T}}_\ell).
+\]
+For any $N\in{\mathbb{N}_0}$, the comparison with the optimal rates concern the optimal 
+value 
+\[
+\min\sigma({\mathbb T\left({N}\right)}):=\min\{\sigma({\mathcal{T}}):{\mathcal{T}}\in{\mathbb T\left({N}\right)}\}
+\] 
+of all admissible triangulations 
+\[
+{\mathbb T}(N):=\{{\mathcal{T}}\in{\mathbb T}: |{\mathcal{T}}|\le |{\mathcal{T}}_0|+N\}
+\]
+of cardinality $|{\mathcal{T}}| \le |{\mathcal{T}}_0|+N$  
+with at most $N$ extra cells.
+
+\begin{theorem}[Quasioptimality]\label{thm:safem}
+Suppose (A1)-(A4) and (B1)-(B2).	
+\begin{inparaenum}[(a)]
+\item
+The strict inequality $({\ensuremath{\Lambda_{\mathrm{1}}}}^2+{\ensuremath{\Lambda_{\mathrm{2}}}}^2){\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} < 1$ implies (QM) 
+with ${\ensuremath{\Lambda_{\mathrm{7}}}}$ depending on ${\ensuremath{\Lambda_{\mathrm{1}}}}$, ${\ensuremath{\Lambda_{\mathrm{2}}}}$, ${\ensuremath{\Lambda_{\mathrm{3}}}}$, ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}$, and ${\ensuremath{\Lambda_{\mathrm{6}}}}$. 
+\item The axiom (QM) leads to the existence of some $\kappa_0>0$,   which is $+\infty$ if
+${\ensuremath{\Lambda_{\mathrm{6}}}}=1$, such that any choice of $\kappa$, $\theta_A$, and $\rho_B$ with 
+\[
+0<\kappa<\kappa_1:=\min\left\lbrace\kappa_0, {\ensuremath{\Lambda_{\mathrm{1}}}}^{-2}{\ensuremath{\Lambda_{\mathrm{3}}}}^{-1} \right\rbrace,\quad 
+0<\theta_A<\theta_0:= (1-\kappa {\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}})  /(1+{\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}),
+\] and  $0<\rho_B<1$ implies the following. 
+The output  $({\mathcal T_{\ell}})_{\ell \in \mathbb N_0}$ and $(\sigma_\ell)_{\ell \in \mathbb N_0}$ of {\textsc{safem}\xspace}  satisfy the equivalence 
+\begin{align}\label{eq:optim}
+		{\ensuremath{\Lambda_{\mathrm{5}}}}^s+ \sup_{\ell \in {\mathbb{N}_0}}\left(1+{\left\lvert {{\mathcal T_{\ell}}} \right\rvert} - {\left\lvert {{\mathcal T_{0}}} \right\rvert}\right)^{s}  \sigma_\ell 
+		\approx {\ensuremath{\Lambda_{\mathrm{5}}}}^s+\sup_{N\in {\mathbb{N}_0}} (1+N)^s \min \sigma({\mathbb T\left({N}\right)}).
+\end{align}
+\end{inparaenum}
+\end{theorem}
+
+In particular, the left-hand side of the equivalence \cref{eq:optim} is smaller than infinity if the  
+right-hand is and vice versa. The quotient 
+is bounded below and from above by the equivalence constants, which depend on 
+${\ensuremath{\Lambda_{\mathrm{ref}}}}$, ${\ensuremath{\Lambda_{\mathrm{1}}}}$, ${\ensuremath{\Lambda_{\mathrm{2}}}}$, ${\ensuremath{\Lambda_{\mathrm{3}}}}$, ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}$, ${\ensuremath{\Lambda_{\mathrm{4}}}}$, ${\ensuremath{\Lambda_{\mathrm{6}}}}$, $\rho_B$, $\rho_2$,  
+$\theta_A$, $\kappa$, and $s$ but not on $\Lambda_5$.
+
+The (possibly unknown) parameter $s$ is not utilized in {\textsc{safem}\xspace}.
+The axioms (B1)-(B2) specify {\em sufficient} conditions for optimal 
+convergence, where the parameter 
+$s>0$ is arbitrary and may refer to a related  nonlinear approximation class. 
+
+	\section{Remarks}\label{sec:remarks}
+	\subsection{Weak form of (A4)}
+	The axiom (A4) can be a weakened with some parameter $\varepsilon>0$, which vanishes in 
+	(A4)$\equiv$(A4$_0$).
+	\begin{axioms}
+		\item[(A4$_\varepsilon$)] Quasiorthogonality with $\varepsilon>0$.
+		$\exists 
+		\varepsilon>0$ $\exists 0<{\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}}<\infty \, \forall \ell,m \in {\mathbb{N}_0}$
+			\begin{equation}\label{eq:A4e}
+				\sum_{k=\ell}^{\ell+m} \delta^2_{k, k+1} \leq {\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}} \sigma_{\ell}^2  + \varepsilon \sum_{k=\ell}^{\ell+m} \sigma_{k}^2  \tag{A4$_\varepsilon$}.
+			\end{equation}
+		\end{axioms}
+
+	The axiom (A4$_\varepsilon$) implies (A4$_{\varepsilon'}$) for all $0\leq\varepsilon<\varepsilon'$ 
+	with the same constant ${\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}}={\ensuremath{\Lambda_{\mathrm{4}(\varepsilon')}}}$, and (A4) is (A4$_0$), i.e.\  (A4$_\varepsilon$) for $\varepsilon=0$). Conversely, as $\varepsilon \searrow 0$ it may be expected 
+	that ${\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}} \rightarrow \infty$. In the presence of (A1)-(A2), this is not the case.  In fact, (A1)-(A2) 
+	and (A4$_\varepsilon$) imply (A4) for sufficiently small $\varepsilon>0$.
+
+	\begin{theorem}[(A4$_\varepsilon$)$\Rightarrow$(A4)]\label{thm:A4eA4} Let $\theta_A$ be the parameter of {\textsc{safem}\xspace} and $0<\rho_{12}<1$  the reduction factor for the total error estimator with constant $0<{\ensuremath{\Lambda_{\mathrm{12}}}}<\infty$ in \cref{thm:contraction} below and let
+		$0\leq\varepsilon< (1-\rho_{12})/{\ensuremath{\Lambda_{\mathrm{12}}}}$.
+		Then (A1)-(A2) and (A4$_\varepsilon$) imply (A4)
+		with ${\ensuremath{\Lambda_{\mathrm{4}}}}:={\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}}+\varepsilon (1+{\ensuremath{\Lambda_{\mathrm{12}}}} {\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}})/(1-\rho_{12}-\varepsilon {\ensuremath{\Lambda_{\mathrm{12}}}})$.
+	\end{theorem}
+
+	This has first been observed  in \cite{CFP14} for {\textsc{cafem}\xspace} and is proved in 
+	Subsection~\ref{ssec:conv} for completeness and applied below in \cref{thm:mfemA3}. 
+
+	\subsection{Quasimonotonicity}\label{ssec:remQM} 
+	The axiom (B2) explicitly ensures the 
+	quasimonotonicity of $\mu$ and (QM) follows 
+	with  ${\ensuremath{\Lambda_{\mathrm{7}}}}:=\sqrt{{\ensuremath{\Lambda_{\mathrm{6}}}}^2+{\ensuremath{\Lambda_{\mathrm{8}}}}^2}$
+	from the subsequent theorem: ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} < 1/({\ensuremath{\Lambda_{\mathrm{1}}}}^2+{\ensuremath{\Lambda_{\mathrm{2}}}}^2)$ is sufficient for  (QM). 
+
+	\begin{theorem}[Quasimonotonicity] \label{thm:qmono}
+			Suppose (A1)-(A3) and  $\widehat M:=({\ensuremath{\Lambda_{\mathrm{1}}}}^2+{\ensuremath{\Lambda_{\mathrm{2}}}}^2){\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}$ $<1$. Set $M:=({\ensuremath{\Lambda_{\mathrm{1}}}}^2+{\ensuremath{\Lambda_{\mathrm{2}}}}^2){\ensuremath{\Lambda_{\mathrm{3}}}}$ and
+			\begin{align*}
+			{\ensuremath{\Lambda_{\mathrm{8}}}}:&=\frac{1+M(1-{\ensuremath{\widehat{M}}})+{\ensuremath{\widehat{M}}} +2 \sqrt{M (1-{\ensuremath{\widehat{M}}})+{\ensuremath{\widehat{M}}}}}{(1-{\ensuremath{\widehat{M}}})^2}.
+	\end{align*}
+	Then, any ${\mathcal{T}} \in {\mathbb T}$ and ${\hat{\mathcal{T}}} \in {\mathbb T\left({\mathcal{T}}\right)}$ satisfy 
+	\begin{align}\label{eq:qmono}
+			\eta({\hat{\mathcal{T}}}) &\leq {\ensuremath{\Lambda_{\mathrm{8}}}} \sigma({\mathcal{T}}). 
+	\end{align}
+	\end{theorem}
+\textit{Proof.}
+		Given $	\lambda:=(\sqrt{M+{\ensuremath{\widehat{M}}}-M {\ensuremath{\widehat{M}}}}-{\ensuremath{\widehat{M}}})/(M+{\ensuremath{\widehat{M}}})<1/{\ensuremath{\widehat{M}}}-1$,
+	recall the following implication of the axioms \eqref{eq:A1}-\eqref{eq:A3}, namely
+	\begin{align*}
+		\eta^2({\hat{\mathcal{T}}},{\hat{\mathcal{T}}} \cap {\mathcal{T}})&\leq (1+1/\lambda) \eta^2({\mathcal{T}},{\hat{\mathcal{T}}} \cap {\mathcal{T}}) + (1+\lambda){\ensuremath{\Lambda_{\mathrm{1}}}}^2 \delta^2({\mathcal{T}},{\hat{\mathcal{T}}}),
+		\\
+		\eta^2({\hat{\mathcal{T}}},{\hat{\mathcal{T}}} \setminus{\mathcal{T}})) & \leq (1+1/\lambda)\rho_{2}^2 \eta^2({\mathcal{T}}, {\mathcal{T}} \setminus {\hat{\mathcal{T}}}) +(1+\lambda) {\ensuremath{\Lambda_{\mathrm{2}}}}^2\delta^2({\mathcal{T}},{\hat{\mathcal{T}}}), 
+		\\
+	\delta^2({\mathcal{T}},{\hat{\mathcal{T}}}) &\leq {\ensuremath{\Lambda_{\mathrm{3}}}} \sigma^2({\mathcal{T}}) + {\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} \eta^2({\hat{\mathcal{T}}}).
+	\end{align*}
+	Those inequalities plus the split 
+	$\eta^2({\hat{\mathcal{T}}})= \eta^2({\hat{\mathcal{T}}},{\hat{\mathcal{T}}} \cap {\mathcal{T}}) + \eta^2({\hat{\mathcal{T}}},{\hat{\mathcal{T}}} \setminus {\mathcal{T}}))$
+	 verify
+	\begin{align*}
+		\eta^2({\hat{\mathcal{T}}}) &\leq  (1+1/\lambda)\eta^2({\mathcal{T}}) + (1+\lambda)({\ensuremath{\Lambda_{\mathrm{1}}}}^2+{\ensuremath{\Lambda_{\mathrm{2}}}}^2)\left({\ensuremath{\Lambda_{\mathrm{3}}}} \sigma^2({\mathcal{T}})+{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} \eta^2({\hat{\mathcal{T}}})\right).\qquad \endproof
+		\end{align*}
+	
+
+\subsection{Optimal data approximation with {{\scshape Approx}\xspace}}\label{sec:optApprox}
+Case (B) of {\textsc{safem}\xspace} runs a data approximation algorithm \texttt{appx}($\operatorname{Tol}, \mu(K):K \in {\mathcal T_{0}}$) 
+with output in ${\mathbb T}$. The  data approximation algorithm   {{\scshape Approx}\xspace}  \cite{BDD04,BD04} is based on the refinement of partitions and has been  established for separate marking algorithms   in \cite{CR09,safem2015} and is one possible realisation of \texttt{appx} in {\textsc{safem}\xspace}. 
+
+Let $\hat {\mathcal{P}}$ be some NVB refinement of ${\mathcal{P}} \in {\mathbb P}$.  Let $K\in {\mathcal{P}}$ and $\hat {\mathcal{P}} \in {\mathbb P\left({\mathcal{P}}\right)}$, then the refinement of $K$ in $\hat {\mathcal{P}}$ 
+is the set $\hat {\mathcal{P}}(K):= \lbrace T \in \hat {\mathcal{P}} \, \vert \, T\subseteq K \rbrace$  in 
+the following.
+
+\begin{axioms}
+\item[(SA)] Sub-additivity. 
+$\exists {\ensuremath{\Lambda_{\mathrm{6}}}}<\infty \, \forall {\mathcal{P}} \in {\mathbb P} \, \forall \hat {\mathcal{P}} \in {\mathbb P\left({\mathcal{P}}\right)} \, \forall {\mathcal{M}} \subseteq {\mathcal{P}}$ 
+	\begin{align}\label{eq:B1}\tag{SA}
+		\mu^2(\hat {\mathcal{P}}({\mathcal{M}})):=\sum_{K \in {\mathcal{M}}} \sum_{T \in \hat {\mathcal{P}}(K)} \mu^2(T) 
+				\leq {\ensuremath{\Lambda_{\mathrm{6}}}} \mu^2({\mathcal{M}}).	
+ 	\end{align}
+\end{axioms}
+Note, that the notation of the data approximation term $\mu$ is a straight forward extension of its definition in \eqref{eq:def_estim} for admissible triangulations to partitions.
+
+The algorithm {{\scshape Approx}\xspace} is outlined in the following with input tolerance 
+$\operatorname{Tol}':= \operatorname{Tol}/{\ensuremath{\Lambda_{\mathrm{6}}}}=\rho_B \mu_\ell / {\ensuremath{\Lambda_{\mathrm{6}}}}$ and the values $\mu(K)$ on the coarse triangulation ${\mathcal T_{0}}$.
+\medskip
+
+\textbf{{{\scshape Approx}\xspace}($\operatorname{Tol}', \mu(K):K\in{\mathcal T_{0}}$)} \\
+\input{algTSA}
+
+\begin{remark}
+	\begin{inparaenum}[(a)]
+	\item Algorithm {{\scshape Approx}\xspace} is based on a modified error functional $\tilde \mu$ initiated by
+$
+	\tilde \mu (K):= \mu(K) \text{ for all } K \in {\mathcal T_{0}}. 
+$
+Given $\tilde \mu(K)$ for a triangle $K=K_1\cup K_2$ bisected  
+into sub-triangles $K_1$ and $K_2$, let 
+\begin{align}	
+	\tilde \mu (K_j):= \frac{\tilde \mu (K)( \mu(K_1)+ \mu(K_2))}{\mu(K) + \tilde \mu (K)}
+	\quad\text{ for } j=1,2 .\label{eq:tmu2}
+\end{align}
+\item 
+Notice that the partitions ${\mathcal{P}}$ in the while-loop in  {{\scshape Approx}\xspace} 
+are not regular in general and the final completion step may be 
+realized with  successive calls of 
+\textsc{Refine}.
+\\
+\item The implementation of {{\scshape Approx}\xspace} may store the partition ${\mathcal{P}}$ and the values
+$\tilde \mu(K)$ for all element domains $K\in{\mathcal{P}}$ at the end of the while loop to keep the successive calls of {{\scshape Approx}\xspace} for various decreasing tolerances $\operatorname{Tol}'$ efficient.
+\end{inparaenum}
+\end{remark}
+
+\medskip
+
+\begin{theorem}[\cite{BD04,BDD04}]\label{thm:optimalityofApprox}
+(SA) in  {{\scshape Approx}\xspace} implies  (B1)-(B2) with rate-s-optimality in the sense that
+\begin{equation}\label{eqdefM(s,mu)}
+M(s,\mu):=\sup_{N\in {\mathbb{N}_0}} (1+N)^s \min \mu({\mathbb T\left({N}\right)}) \approx {\ensuremath{\Lambda_{\mathrm{5}}}}^s
+\end{equation}
+holds for all $s>0$ (and $M(s,\mu)<\infty$ if and only if $ {\ensuremath{\Lambda_{\mathrm{5}}}}<\infty$).
+\end{theorem}
+
+\textit{Proof.}
+This follows from near optimality proven in  \cite[Theorem 6.1]{BD04} and 
+\cite[Lemma 4.4]{BDD04}. 
+\qquad\endproof
+
+\subsection{Collective D\"orfler marking is optimal for ${{\left\lVert {h_{{\ell}}f} \right\rVert_{L^2(\Omega)}}}$}\label{ssec:Doerfler}
+Given $f\in {L^2(\Omega)}$ in the polyhedral domain $\Omega \subseteq \mathbb R^n$ partitioned
+into the regular triangulation ${\mathcal T_{0}}$, set $\eta({\mathcal T_{\ell}},K):={\left\lvert {K} \right\rvert}^{2/n} \vert f \vert_{L^2(K)}$ for all $K \in {\mathcal T_{\ell}}$.
+Let $\eta_\ell=\eta({\mathcal T_{\ell}}, {\mathcal T_{\ell}})$. Then, (A1)-(A4) are satisfied with appropriate weight functions $h_{\mathcal{T}}$ (resp.\ $h_{\hat{\mathcal{T}}}$) of mesh-sizes in ${\mathcal{T}}$ (resp.\ ${\hat{\mathcal{T}}}$)
+\begin{align*}
+	\delta({\mathcal{T}},{\hat{\mathcal{T}}}):= {\left\lVert {(h_{\mathcal{T}}-h_{\hat{\mathcal{T}}})f} \right\rVert_{{L^2(\Omega)}}}.
+\end{align*}
+Hence {\textsc{cafem}\xspace} with collective D\"orfler marking implies optimal data approximation
+for this particular data error term with a mesh-size weight $h_{\mathcal{T}}$.
+This is in agreement with the well-established fact that  first-order conforming and nonconforming finite element methods do not need  a data reduction with {\textsc{safem}\xspace}. 
+
+\section{Proofs} \label{sec:optimality}
+The abbreviation $\delta_{\ell,\ell+1}:=\delta({\mathcal T_{\ell}}, {\mathcal T_{{\ell+1}}})$ applies throughout this section.
+
+\subsection{Estimator reduction}
+The constant ${\ensuremath{\Lambda_{\mathrm{6}}}} \geq 1$ in the following theorem leads to $\kappa_0$ set to $+\infty$ for ${\ensuremath{\Lambda_{\mathrm{6}}}}=1$; 
+$\kappa_0=\infty$ and ${\ensuremath{\Lambda_{\mathrm{6}}}}=1$ hold in all the examples of this paper.
+
+\begin{theorem}[(A12) reduction] \label{thm:contraction}
+Suppose \eqref{eq:A1}-\eqref{eq:A2} and parameters $0<\theta_A\leq 1$, 
+$0<\kappa $,  and $0<\rho_B<1/ {\ensuremath{\Lambda_{\mathrm{6}}}}$ 
+from {\textsc{safem}\xspace}. Any choice of $\gamma$ and $\lambda$ with 
+	\begin{align}
+	&0<\gamma<\rho_2^{-2}-1 \text{ and }0<\lambda 
+	<\min \left\{\left( 1-(1+\gamma)\rho_2^2\right)\frac{\theta_A}{1-\theta_A}, 
+	\kappa (1-\rho_B)\right\} \label{eq:gamma}\\
+		\intertext{lead to constants }
+&0<{\ensuremath{\Lambda_{\mathrm{12}}}}:=(1+1/\lambda){\ensuremath{\Lambda_{\mathrm{1}}}}^2+(1+1/\gamma){\ensuremath{\Lambda_{\mathrm{2}}}}^2<\infty \label{eq:LII},\\
+&0<\rho_A:=(1+\lambda)(1-\theta_A) +(1+\gamma)\rho_{2}^2\theta_A<1, \label{eq:rhoA}\\
+&0<\kappa_0:=(1-\rho_A)/({\ensuremath{\Lambda_{\mathrm{6}}}}-1) \text{ (with $\kappa_0:=+\infty$ if ${\ensuremath{\Lambda_{\mathrm{6}}}}=1$)},\\
+&0<\rho_{12}:=\max \left\lbrace \rho_{A} + \kappa{\ensuremath{\Lambda_{\mathrm{6}}}}, 1+\lambda +\kappa
+ \rho_B\right\rbrace/(1+\kappa)\le 1 .\label{eq:rho}
+	\end{align}
+Moreover, $0<\kappa  <\kappa_0$ implies $\rho_{12}<1$ and
+	\begin{equation}
+		\sigma_{\ell+1}^2 \leq \rho_{12} \sigma_{\ell}^2  + {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell, \ell+1} 
+		\quad \text{for all } \ell\in{\mathbb{N}_0}
+		\tag{A12} \label{eq:A12}
+	\end{equation}
+for 	the output $\sigma_\ell^2$ of {\textsc{safem}\xspace}.
+\end{theorem}
+
+\textit{Proof}
+		For $\gamma$ and $\lambda$ as in \eqref{eq:gamma}, the axioms \eqref{eq:A1}-\eqref{eq:A2} imply 
+		\begin{align*}
+			\eta_{\ell+1}^2({\mathcal T_{{\ell+1}}} \cap {\mathcal T_{\ell}})  &\leq (1+\lambda) \eta_\ell^2({\mathcal T_{{\ell+1}}} \cap {\mathcal T_{\ell}}) + (1+1/\lambda) {\ensuremath{\Lambda_{\mathrm{1}}}}^2 \delta^2_{\ell,\ell+1}, \\ 
+			\eta_{\ell+1}^2({\mathcal T_{{\ell+1}}} \setminus {\mathcal T_{\ell}}) &\leq (1+\gamma)\rho_{2}^2\eta_{\ell}^2({\mathcal T_{\ell}} \setminus {\mathcal T_{{\ell+1}}}) + (1+1/\gamma){\ensuremath{\Lambda_{\mathrm{2}}}}^2 \delta^2_{\ell,\ell+1}. 
+		\end{align*}
+		The sum of those two inequalities leads to
+		\begin{align}\label{eq:A1+A2}
+			\eta_{\ell+1}^2 \leq (1+\lambda) \eta_\ell^2  + ((1+\gamma)\rho_{2}^2-(1+\lambda))\eta_{\ell}^2({\mathcal T_{\ell}} \setminus {\mathcal T_{{\ell+1}}}) +  {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell,\ell+1}.
+		\end{align}
+		The restrictions on $\lambda$ and $\gamma$ ensure $(1+\gamma)\rho_{2}^2<1<1+\lambda $. 
+		Thus, in general,
+		\begin{align*}
+			\eta_{\ell+1}^2\leq (1+\lambda)\eta_\ell^2 + {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell,\ell+1}.
+		\end{align*}
+		In Case (A) on the level $\ell$, when D\"orfler's marking ensures $ \theta_A \eta_\ell^2 \leq \eta_\ell^2({\mathcal T_{\ell}} \setminus {\mathcal T_{{\ell+1}}})$, this and \eqref{eq:A1+A2} leads to an improvement of the last estimate, namely
+		\begin{align*}
+			\eta_{\ell+1}^2 &\leq  \left( (1+\lambda)(1-\theta_A)+ (1+\gamma)\rho_2^2\theta_A \right) \eta_{\ell}^2 + {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell,\ell+1}=\rho_A  \eta_{\ell}^2 + {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell,\ell+1}.
+		\end{align*}
+		The restrictions on $\lambda$ and $\gamma$ reveal $\rho_A <1$. Altogether, let
+		\begin{align} \label{eq:LestRed}
+			{\ensuremath{R_\ell}}&:= \begin{cases}
+			\rho_A & \text{ in Case (A) on level $\ell$},\\
+			1+\lambda & \text{ in Case (B) on level $\ell$}.
+			\end{cases}
+		\end{align}
+		Then, the output of {\textsc{safem}\xspace}  satisfies
+		\begin{align}
+			{\eta_{{\ell+1}}}^2 &\leq {\ensuremath{R_\ell}} {\eta_{{\ell}}}^2 + {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell,\ell+1}
+			\quad \text{for all } \ell\in {\mathbb{N}_0}. \label{eq:estRed}
+		\end{align}
+		In Case (A) on any level $\ell$ with ${\ensuremath{R_\ell}}=\rho_{A}$ from \eqref{eq:rhoA} and ${\ensuremath{\Lambda_{\mathrm{12}}}}$ from \eqref{eq:LII}, it also holds ${\mu_{{\ell+1}}}^2 \leq {\ensuremath{\Lambda_{\mathrm{6}}}}{\mu_{{\ell}}}^2$, and ${\mu_{{\ell}}}^2 \leq \kappa {\eta_{{\ell}}}^2$.
+	Since $\alpha:=({\ensuremath{\Lambda_{\mathrm{6}}}}-\rho_A)/(\kappa+1) >0$, this and \cref{eq:estRed} lead to
+	\begin{align*}
+		\sigma_{\ell+1}^2 &\leq (\rho_{A} +\alpha \kappa )\eta_\ell^2 
+		+ ({\ensuremath{\Lambda_{\mathrm{6}}}}-\alpha) \mu_\ell^2+ {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell, \ell+1}
+		=\frac{\rho_A+\kappa{\ensuremath{\Lambda_{\mathrm{6}}}}}{1+\kappa}\sigma_\ell^2+ {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell, \ell+1}.
+	\end{align*}
+	In Case (B) on the level $\ell$ with ${\ensuremath{R_\ell}}=1+\lambda$, it  holds ${\mu_{{\ell+1}}}^2 \leq 
+	 \rho_B {\mu_{{\ell}}}^2$, and $\kappa {\eta_{{\ell}}}^2<{\mu_{{\ell}}}^2$.
+		Since $\beta:=\kappa(1+\lambda-\rho_B )/(1+\kappa)>0$, 
+		this and \cref{eq:estRed} lead to
+		\[
+			\sigma_{\ell+1}^2 < (1+\lambda-\beta){\eta_{{\ell}}}^2 
+			+ (\rho_B + \beta/\kappa) {\mu_{{\ell}}}^2 + {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell,\ell+1}
+			= \frac{1+\kappa\rho_B +\lambda}{1+\kappa}\sigma_{\ell}^2  
+			+ {\ensuremath{\Lambda_{\mathrm{12}}}} \delta^2_{\ell,\ell+1}.
+	\]
+	This proves the total error estimator reduction \cref{eq:A12} with $\rho_{12}$ from \cref{eq:rho}. \qquad \endproof
+
+\subsection{Convergence}\label{ssec:conv}
+The plain convergence follows from the estimator reduction (A12) plus quasiorthogonality (A4).
+\begin{theorem}\label{th:conv}
+Suppose $0<\theta_A\leq 1$, $0<\kappa$, $0<\rho_B<1$, suppose (A4) and 
+(A12) with constants  $0<\rho_{12}<1$ and $0<{\ensuremath{\Lambda_{\mathrm{12}}}}<\infty$.
+Then ${\ensuremath{\Lambda}}:=(1+{\ensuremath{\Lambda_{\mathrm{12}}}} {\ensuremath{\Lambda_{\mathrm{4}}}})/(1-\rho_{12})$,  $q:=\Lambda/(1+\Lambda)<1$,
+and the output of {\textsc{safem}\xspace} satisfy the following assertions (a)-(c).
+	\begin{alphenum}
+		\item (Plain convergence) $ \forall \ell, m \in {\mathbb{N}_0}$ \quad
+				$\displaystyle \sum_{k=\ell}^{\ell+m} \sigma_k^2 \leq {\ensuremath{\Lambda}} \sigma_\ell^2.$
+		\item (R-linear convergence on each level)  $\forall \ell,m \in {\mathbb{N}_0}$ 
+		\quad	$\displaystyle	\sigma_{\ell+m}^2 \leq \frac{q^m}{1-q} \sigma_\ell^2.$
+	\item (Reciprocal sum) \label{lem:geomRow} $\forall s>0$ $\forall \ell\in \mathbb N$ 
+		\quad 	$\displaystyle	\sum_{k=0}^{\ell-1} \sigma_k^{-1/s} \leq \frac{q^{1/(2s)} \sigma_\ell^{-1/s}}{(1-q)^{1/(2s)}(1-q^{1/(2s)})}.$
+	\end{alphenum}
+\end{theorem}
+ \noindent\textit{Proof of (a).}
+	For all $\ell$, $m \in {\mathbb{N}_0}$, (A12) implies
+	\begin{align}\label{eq:A12imply}
+		\sum_{k=\ell}^{\ell+m} \sigma_k^2 & = \sigma_\ell^2 + \sum_{k=\ell+1}^{\ell+m} \sigma_k^2
+		\leq \sigma_\ell^2 +  \rho_{12}\sum_{k=\ell}^{\ell+m} \sigma_{k}^2  + {\ensuremath{\Lambda_{\mathrm{12}}}} \sum_{k=\ell}^{\ell+m}\delta^2_{k,k+1}.
+		\end{align}
+		This plus (A4) verify
+		\begin{align*}
+		 \left( 1- \rho_{12} \right)\sum_{k=\ell}^{\ell+m} \sigma_k^2& \leq \sigma_\ell^2 + {\ensuremath{\Lambda_{\mathrm{12}}}} {\ensuremath{\Lambda_{\mathrm{4}}}} \sigma_\ell^2 .
+	\end{align*}
+	This proves (a) with the asserted constant ${\ensuremath{\Lambda}}$.
+	\qquad \endproof
+
+	\noindent\textit{Proof of \cref{thm:A4eA4}.} The same argument as in the proof of (a) before show that (A12) and (A4$_\varepsilon$) imply (A4) for small $\varepsilon$. In fact, \cref{eq:A12imply} and (A4$_\varepsilon$) show
+	\begin{align*}
+		(1-\rho_{12})\sum_{k=\ell}^{\ell+m} \sigma_k &\leq \sigma_\ell^2+{\ensuremath{\Lambda_{\mathrm{12}}}} \left({\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}} \sigma_\ell^2 + \varepsilon \sum_{k=\ell}^{\ell+m}\sigma_k \right).
+		\intertext{In other words}
+		\left( 1- \rho_{12} - \varepsilon{\ensuremath{\Lambda_{\mathrm{12}}}} \right)\sum_{k=\ell}^{\ell+m} \sigma_k^2& \leq \left( 1 + {\ensuremath{\Lambda_{\mathrm{12}}}}  {\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}} \right)\sigma_\ell^2.
+	\end{align*}
+	This plus \eqref{eq:A4e} lead to (A4) with ${\ensuremath{\Lambda_{\mathrm{4}}}}:= {\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}} + \varepsilon (1+{\ensuremath{\Lambda_{\mathrm{12}}}}{\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}})/(1-\rho_{12}-\varepsilon{\ensuremath{\Lambda_{\mathrm{12}}}})$
+	\begin{align*}
+		\sum_{k=\ell}^{\ell+m}\delta^2_{k,k+1} &\leq {\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}} \sigma_\ell^2 + \varepsilon\sum_{k=\ell}^{\ell+m} \sigma_k^2 
+		\leq {\ensuremath{\Lambda_{\mathrm{4}}}} \sigma_\ell^2 .
+		\qquad \endproof
+	\end{align*}
+	
+
+	 \noindent\textit{Proof of Theorem \ref{th:conv}.b.}
+	The assertion (a) implies the convergence of the series
+	\begin{align*}
+		\xi_{\ell+1}^2:=\sum_{k=\ell+1}^{\infty} \sigma_k^2 &\leq {\ensuremath{\Lambda}} \sigma_\ell^2<\infty.
+	\end{align*}
+	The addition of ${\ensuremath{\Lambda}} \xi_{\ell+1}^2$ to the previous inequality results in
+	\begin{align}
+		({\ensuremath{\Lambda}} +1)\xi_{\ell+1}^2 &\leq {\ensuremath{\Lambda}} \xi_{\ell}^2, \text{ hence } \xi_{\ell+1}^2\leq q \xi_{\ell}^2. \label{eq:xiContr}
+	\end{align}
+	The successive application of the previous contraction \eqref{eq:xiContr} shows
+		\begin{align*}
+			\sigma_{\ell+m}^2\leq \xi_{\ell+m}^2\leq q^m \xi_{\ell}^2 = q^m \left( \sigma_\ell^2+\xi_{\ell+1}^2 \right)
+			\leq q^m (1+{\ensuremath{\Lambda}}) \sigma_\ell^2. \qquad \endproof
+	\end{align*}
+
+ \noindent\textit{Proof of Theorem \ref{th:conv}.c.} The R-linear convergence of (b) leads to
+  	\begin{align*}
+		\sigma_k^{-1/s} \leq \frac{q^{(\ell-k)/(2s)}}{(1-q)^{1/(2s)}}  \sigma_\ell^{-1/s}\qquad \text{for all } 0\leq k <\ell.
+	\end{align*}
+ 	This proves 
+	\begin{align*}
+		\sum_{k=0}^{\ell-1} \sigma_k^{-1/s} &\leq \frac{\sigma_\ell^{-1/s}}{(1-q)^{1/(2s)}} \sum_{k=0}^{\ell-1}\left(q^{1/(2s)}\right)^{\ell-k} \leq \frac{\sigma_\ell^{-1/s} q^{1/(2s)}}{(1-q)^{1/(2s)}(1-q^{1/(2s)})}.\qquad \endproof
+	\end{align*}
+	
+\begin{lemma}[Comparison]\label{lem:competition} 
+Suppose \eqref{eq:A1}-\eqref{eq:A4}, (B1)-(B2) with $0<s<\infty$, (QM),
+		$0<q<1$ from Theorem \ref{th:conv}.b, and let $0<\xi<1$ and $0<\nu<\infty$; let 
+		\begin{equation} \label{eqdefM(s,sigma)}
+			M:=M(s,\sigma):= \sup_{N\in {\mathbb{N}_0}}(N+1)^s \min \sigma({\mathbb T\left({N}\right)})<\infty,
+		\end{equation}
+		similar to the definition of $M(s,\mu)$ in \eqref{eqdefM(s,mu)}.
+ 		Then for any level $\ell \in {\mathbb{N}_0}$ of {\textsc{safem}\xspace} with a triangulation ${\mathcal T_{\ell}}$,  
+	there exists a refinement ${\hat{\mathcal{T}}_{\ell}} \in {\mathbb T\left({{\mathcal T_{\ell}}}\right)}$ with (a)-(c).
+	\begin{alphenum}
+		\item $\displaystyle \sigma ({\hat{\mathcal{T}}_{\ell}}) \leq \xi \sigma_\ell$;
+		\item $\displaystyle\sqrt{1-q}\xi \, \sigma_\ell \,  
+		{\left\lvert {{\mathcal T_{\ell}} \setminus {\hat{\mathcal{T}}_{\ell}}} \right\rvert}^s \leq {\ensuremath{\Lambda_{\mathrm{7}}}} M$;
+		\item 
+			$ \left( 1 -\xi^2(1+\nu+ (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}})\right){\eta_{{\ell}}}^2$  \\
+			\phantom{xx} $\leq  
+			\left(1+( 1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}\right) \eta^2_\ell(\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}}))$
+			\\
+			\phantom{xxxx} $+ \left((1+\nu)\xi^2 + (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2({\ensuremath{\Lambda_{\mathrm{3}}}}+{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}\xi^2) \right)\mu^2_\ell .$
+
+	\end{alphenum}
+\end{lemma}
+
+\textit{Proof.}
+Two pathological situations are excluded in the beginning of the proof. 
+First, if  $\sigma_\ell=0$, then ${\hat{\mathcal{T}}_{\ell}}={\mathcal T_{\ell}}$ satisfies the assumptions (a)-(c).
+Second, Theorem \ref{th:conv} guarantees convergence of some sequence of triangulations and (QM) 
+implies that this holds for uniform refinements as well. Hence there exists a refinement 
+${\hat{\mathcal{T}}_{\ell}}$ of ${\mathcal T_{\ell}}$ with (a) and ${\hat{\mathcal{T}}_{\ell}}\cap{\mathcal T_{\ell}}=\emptyset$. The latter implies (c)
+even in case  $M\equiv M(s,\sigma)=\infty$ when (b) is obvious. 
+
+Throughout the remaining parts of the proof, it is therefore assumed that $M<\infty$ and 
+$\sigma_\ell>0$. Then (QM)  implies $0<\sigma_{0}\leq M<\infty$.
+
+	\textit{1. Setup.}
+	Let $N_\ell \in {\mathbb{N}_0}$ be minimal with 
+	\begin{align}\label{eq:Nell_min}
+		(N_\ell+1)^{-s} \leq \frac{\xi \sqrt{1-q}}{{\ensuremath{\Lambda_{\mathrm{7}}}} M}\, \sigma_\ell.
+	\end{align}
+	The quasimonotonicity (QM) followed by the definition of 
+	 $M:=M(s,\sigma)<\infty$ in \eqref{eqdefM(s,sigma)} and $0<q<1,0<\xi<1$ lead to
+	\begin{align*}
+		\frac{\xi\sqrt{1-q}}{\ensuremath{\Lambda_{\mathrm{7}}}} \sigma_{\ell} \leq \xi \sqrt{1-q} \, \sigma_0 \leq \xi \sqrt{1-q} M < M.	
+	\end{align*}
+	Hence, $(N_\ell+1)^{-s}<1$ and so $N_\ell\geq 1$.
+		Since $N_\ell \in \mathbb N$ is minimal with \eqref{eq:Nell_min},
+	\begin{align}\notag 
+		0<(N_\ell+1)^{-s}\leq& \frac{\xi\sqrt{1-q}}{{\ensuremath{\Lambda_{\mathrm{7}}}} M} \sigma_\ell < N_\ell^{-s}.\\
+		\intertext{This implies}\label{eq:invNMinimal}
+		N_\ell^s < &\frac{{\ensuremath{\Lambda_{\mathrm{7}}}} M}{\xi\sqrt{1-q}} \sigma_\ell^{-1}.
+	\end{align}
+	
+	\textit{2. Design of ${\hat{\mathcal{T}}_{\ell}}$.}
+	The definition of $M<\infty$  yields the existence of some optimal ${\tilde{\mathcal{T}}_{\ell}} \in {\mathbb T\left({N_\ell}\right)}$ with 
+	\begin{align} \label{eq:lowM}
+		\left( N_\ell+1 \right)^s \sigma({\tilde{\mathcal{T}}_{\ell}}) \leq M.
+	\end{align}
+	The overlay triangulation ${\hat{\mathcal{T}}_{\ell}}:= {\mathcal T_{\ell}} \oplus {\tilde{\mathcal{T}}_{\ell}}$ \cite{CKNS07,Stev07} satisfies
+	\begin{align}\label{eq:overlay}
+		{\left\lvert {{\hat{\mathcal{T}}_{\ell}}} \right\rvert} + {\left\lvert {{\mathcal T_{0}}} \right\rvert} \leq {\left\lvert {{\mathcal T_{\ell}}} \right\rvert} + {\left\lvert {{\tilde{\mathcal{T}}_{\ell}}} \right\rvert}.
+	\end{align}
+
+	\textit{3. Proof of (a).} The quasimonotonicity (QM) followed by \eqref{eq:lowM} and \eqref{eq:Nell_min} shows
+	\begin{align*}
+		\sigma({\hat{\mathcal{T}}_{\ell}}) \leq {\ensuremath{\Lambda_{\mathrm{7}}}}  \sigma({\tilde{\mathcal{T}}_{\ell}}) \leq {{\ensuremath{\Lambda_{\mathrm{7}}}} M} 
+		(N_\ell+1)^{-s} \leq \xi \sigma_\ell\sqrt{1-q}<\xi \sigma_\ell.\qquad \endproof
+	\end{align*}
+
+	\textit{4. Proof of (b).}
+	The definition of ${\tilde{\mathcal{T}}_{\ell}}$, the overlay estimate in \eqref{eq:overlay}, and the upper bound for $N_\ell$ in \eqref{eq:invNMinimal} lead to
+	\begin{align*}
+		{\left\lvert {{\mathcal T_{\ell}}\setminus {\hat{\mathcal{T}}_{\ell}}} \right\rvert}\leq {\left\lvert {{\hat{\mathcal{T}}_{\ell}}} \right\rvert}-{\left\lvert {{\mathcal T_{\ell}}} \right\rvert} \leq
+		{\left\lvert {{\tilde{\mathcal{T}}_{\ell}}} \right\rvert}-{\left\lvert {{\mathcal T_{0}}} \right\rvert}\leq N_\ell \leq \left( \frac{{\ensuremath{\Lambda_{\mathrm{7}}}} M}{\xi \sigma_\ell\sqrt{1-q}} \right)^{1/s}.\quad \endproof
+	\end{align*}
+	
+	\textit{5. Proof of (c).}
+	For any $0<\nu< \infty, 0<\xi<1$,  (A1) and (A3) result in 
+	\begin{align*}
+		\eta^2_\ell({\mathcal T_{\ell}}\cap {\hat{\mathcal{T}}_{\ell}}) &\leq (1+\nu)\eta^2({\hat{\mathcal{T}}_{\ell}},{\hat{\mathcal{T}}_{\ell}} \cap {\mathcal T_{\ell}}) + (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2 \delta^2({\mathcal T_{\ell}},{\hat{\mathcal{T}}_{\ell}})\\
+		& \leq\left(1+\nu+ (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}\right)\eta^2({\hat{\mathcal{T}}_{\ell}}) \\
+		& \quad + (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}} \left( \eta^2_\ell(\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})) + \mu^2_\ell\right).
+	\end{align*}
+	This, (a),  and ${\mathcal T_{\ell}} \setminus {\hat{\mathcal{T}}_{\ell}} \subseteq \mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})$ result in
+	\begin{align*}
+		{\eta_{{\ell}}}^2 &= \eta^2_\ell({\mathcal T_{\ell}}\cap {\hat{\mathcal{T}}_{\ell}}) + \eta^2_\ell({\mathcal T_{\ell}} \setminus {\hat{\mathcal{T}}_{\ell}}) \\
+		&\leq \left(1+\nu+ (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}\right)\xi^2 \sigma^2_\ell + \left(1+( 1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}\right) \eta^2_\ell(\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})) \\
+		&\quad +   ( 1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}\mu^2_\ell. 
+		\end{align*}
+		Some rearrangements with $\sigma^2_\ell=\eta^2_\ell+\mu_\ell^2$ prove (c).
+\qquad \endproof
+\subsection{Proof of Theorem \ref{thm:safem}}\label{Subsectionname=ProofofTheorem}
+
+\textit{Proof of Theorem \ref{thm:safem}.a.}
+This is a consequence of Theorem \ref{thm:qmono} plus (B2).
+\qquad \endproof
+
+\textit{Proof of ``$\lesssim $'' in \eqref{eq:optim} of Theorem \ref{thm:safem}.b.}
+	Since $\theta_A<\theta_0$ and the function 
+	\begin{align*}
+		f(\xi,\nu):=\frac{1 -\xi^2\left((1+\kappa)(1+\nu)+ (1+\kappa)(1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}\right) -\kappa (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}}{1+( 1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}}
+	\end{align*}
+	is strictly smaller than $\theta_0=\lim_{\nu \to \infty} f(0,\nu)$, there exists 
+	$\nu$, $\xi$ such that 
+	\[\theta_A< f(\xi,\nu)< \theta_0. \]
+	Given $\kappa_0$ from Theorem~\ref{thm:contraction} and assume 
+	$\kappa<\kappa_1:=\min\left\lbrace\kappa_0,{\ensuremath{\Lambda_{\mathrm{1}}}}^{-2}{\ensuremath{\Lambda_{\mathrm{3}}}}^{-1}\right\rbrace$.
+
+\textit{Case (A).} 
+	Lemma \ref{lem:competition}.c and $\mu_\ell^2 \leq \kappa \eta_\ell^2$  prove 
+	that $\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})$ satisfies 
+		\begin{align*}
+	 		&\left( 1 -(1+\kappa)\xi^2(1+\nu)- (1+\kappa)\xi^2(1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} -\kappa  (1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}\right){\eta_{{\ell}}}^2 \\
+			&\qquad \leq  
+		\left(1+( 1+1/\nu){\ensuremath{\Lambda_{\mathrm{1}}}}^2{\ensuremath{\Lambda_{\mathrm{3}}}}\right) \eta^2_\ell( \mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})).
+		\end{align*}
+		This reads $\theta_A\eta_\ell^2 \le  f(\xi,\nu)\eta_\ell^2\le \eta^2_\ell( \mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}}))$ and 
+ implies  that $\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})$ satisfies D\"orfler
+		marking in Case (A). 
+		
+
+		Let ${\mathcal M_{\ell}}=:{\mathcal M_{\ell}}^{(0)}$ be the set of marked elements in the D\"orfler 
+		marking on level $\ell$, while ${\mathcal M_{\ell}}^{\star}$ is the optimal set of marked elements. 
+		Hence, there exists $0<{\ensuremath{\Lambda_{\mathrm{opt}}}}<\infty$ such that 
+	\begin{align*}
+		{\left\lvert {{\mathcal M_{\ell}}} \right\rvert} \leq {\ensuremath{\Lambda_{\mathrm{opt}}}}{\left\lvert {{\mathcal M_{\ell}}^{\star}} \right\rvert} \leq {\ensuremath{\Lambda_{\mathrm{opt}}}}{\left\lvert {\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})} \right\rvert}.
+	\end{align*}
+	The control over  $\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})$ of (A3) in  
+	Lemma \ref{lem:competition}.b results in
+	\begin{align*}
+		{\left\lvert {\mathcal R({\mathcal T_{\ell}}, {\hat{\mathcal{T}}_{\ell}})} \right\rvert} \leq  {\ensuremath{\Lambda_{\mathrm{ref}}}}{\left\lvert {{\mathcal T_{\ell}} \setminus {\hat{\mathcal{T}}_{\ell}}} \right\rvert} \leq
+		{\ensuremath{\Lambda_{\mathrm{ref}}}} \left(\frac{{\ensuremath{\Lambda_{\mathrm{7}}}} M }{\sqrt{1-q}\xi \sigma_\ell}\right)^{1/s}.
+	\end{align*}
+	Hence,  ${\ensuremath{\Lambda_{\mathrm{9}}}}:={\ensuremath{\Lambda_{\mathrm{opt}}}}{\ensuremath{\Lambda_{\mathrm{ref}}}} {\ensuremath{\Lambda_{\mathrm{7}}}}^{1/s}(\sqrt{1-q}\xi)^{-1/s}$ satisfies 
+	\begin{align}\label{eq:optA}
+		{\left\lvert {{\mathcal M_{\ell}}^{(0)}} \right\rvert}={\left\lvert {{\mathcal{M}} _\ell} \right\rvert} \leq {\ensuremath{\Lambda_{\mathrm{9}}}} M^{1/s}\sigma_\ell^{-1/s}.
+	\end{align}
+
+\textit{Case (B).}
+The output of \texttt{appx} with  input triangulation ${\mathcal T_{0}}$ and input tolerance 
+	$\operatorname{Tol}:= \rho_B \mu_\ell^2$ on the level $\ell$ satisfies  (B1). Since 
+	$\sigma_\ell^2 = \eta_\ell^2 + \mu_\ell^2 \leq (1+1/\kappa)\mu_\ell^2$ 
+	in Case (B), this leads to 
+\begin{align*}
+		{\left\lvert {{\mathcal T_{\operatorname}}{Tol}} \right\rvert}-{\left\lvert {{\mathcal T_{0}}} \right\rvert} \le  {\ensuremath{\Lambda_{\mathrm{5}}}} (1+1/\kappa) \rho_B ^{-1/(2s)} \sigma_\ell^{-1/s} .
+	\end{align*}
+According  to \cite{CR09,safem2015} for ${\mathcal T_{{\ell+1}}}= {\mathcal T_{\ell}} \oplus {\mathcal T_{\operatorname}}{Tol}$ 
+there exists  a finite sequence 
+$({\mathcal M_{\ell}}^{(k)})_{k=0,\ldots,K(\ell)}$ of sets of marked element domains that 
+${\mathcal T_{{\ell}}}^{(0)}:={\mathcal T_{{\ell}}}$ and 
+satisfies
+\begin{align*}
+		{\mathcal T_{{\ell}}}^{(k+1)}= \text{{\scshape Refine}\xspace}( {\mathcal T_{\ell}}^{(k)}, {\mathcal M_{\ell}}^{(k)})
+		\quad\text{for all } k=0,\ldots,K(\ell)-1
+\end{align*}
+leads to ${\mathcal{T}}_{\ell+1}={\mathcal T_{{\ell}}}^{(K(\ell))}$. 
+This observation and the estimate for the overlay with the sequence 
+$({\mathcal M_{\ell}}^{(k)})_{k=0,\ldots,K(\ell)}$  \cite[Theorem 3.3]{CR09} show
+\begin{align}\label{eq:optB}
+		\sum_{k=0}^{K(\ell)} \vert{\mathcal M_{\ell}}^{(k)}\vert \leq {\left\lvert {{\mathcal T_{\operatorname}}{Tol}} \right\rvert} - {\left\lvert {{\mathcal T_{0}}} \right\rvert}
+			\lesssim  {\ensuremath{\Lambda_{\mathrm{5}}}} (1+1/\kappa) \rho_B ^{-1/(2s)}  \sigma_\ell^{-1/s}.
+\end{align}
+	The estimate from \cite[Theorem 3.3]{CR09} is for 2D only, however it is expected to hold in general.
+
+\textit{Finish of the proof of ``$\lesssim$''.} 
+	It is proven in \cite{CR09,safem2015} that the overhead control of \cite{BDD04,Stev08} holds in the sense that
+	\begin{align}\label{eq:overheadClB}
+		{\left\lvert {{\mathcal T_{\ell}}} \right\rvert}-{\left\lvert {{\mathcal T_{0}} } \right\rvert} \leq {\ensuremath{\Lambda_{\mathrm{BDdV}}}}
+		 \sum_{j=0}^{\ell-1} \sum_{k=0}^{K(j)}\vert{\mathcal M_{j}}^{(k)}\vert.
+	\end{align}
+	With \eqref{eq:optA}-\eqref{eq:optB} and Theorem \ref{th:conv}.c,  this proves
+	\begin{align}\label{eq:optFin}
+		{\left\lvert {{\mathcal T_{\ell}}} \right\rvert}-{\left\lvert {{\mathcal T_{0}}} \right\rvert} &  
+		\lesssim ({\ensuremath{\Lambda_{\mathrm{5}}}}+M^{1/s}) \sigma_\ell^{-1/s}.
+	\end{align}
+	Finally, $1\leq {\left\lvert {{\mathcal T_{\ell}}} \right\rvert}- {\left\lvert {{\mathcal T_{0}}} \right\rvert}$ implies $1+  {\left\lvert {{\mathcal T_{\ell}}} \right\rvert}- {\left\lvert {{\mathcal T_{0}}} \right\rvert} \leq 2( {\left\lvert {{\mathcal T_{\ell}}} \right\rvert}- {\left\lvert {{\mathcal T_{0}}} \right\rvert})$ while ${\left\lvert {{\mathcal T_{\ell}}} \right\rvert}={\left\lvert {{\mathcal T_{0}}} \right\rvert}$ implies $1\leq \sigma_\ell^{-1/s}({\ensuremath{\Lambda_{\mathrm{5}}}}+M^{1/s})$. Hence \eqref{eq:optFin} proves 
+	$\sigma_\ell (1+ {\left\lvert {{\mathcal T_{\ell}}} \right\rvert}- {\left\lvert {{\mathcal T_{0}}} \right\rvert})^s \lesssim {\ensuremath{\Lambda_{\mathrm{5}}}}^s +M$ 
+	and so ``$\lesssim$'' in the assertion of \cref{thm:safem}.
+\qquad \endproof
+
+\textit{Proof of ``$\gtrsim$''  in \eqref{eq:optim} of Theorem \ref{thm:safem}.b.}
+Given $N\in{\mathbb{N}_0}$ suppose that $\min\sigma({\mathbb T\left(N\right)})$ is positive and so $\sigma_\ell>0$ for all 
+$\ell\in{\mathbb{N}_0}$ with $N_\ell:= |{\mathcal{T}}_{\ell}|-|{\mathcal{T}}_0|\le N$. This leads on the level $\ell$ in {\textsc{safem}\xspace} to $N_{\ell+1}>N_\ell$ 
+for it only stops with ${\mathcal{T}}_{\ell}={\mathcal{T}}_{\ell+1}={\mathcal{T}}_{\ell+2}=\dots$ when $\sigma_\ell=0$. Hence there exists some level $\ell$ with $N_\ell<N\le N_{\ell+1}$. This implies 
+\begin{equation}\label{cceqN+1Sigmaell}
+(N+1)^s\min\sigma({\mathbb T\left(N\right)})\le (N_{\ell+1}+1)^s \sigma_\ell,
+\end{equation}
+which is evident in case $\min\sigma({\mathbb T\left(N\right)})=0$. 
+
+In Case (A) on the level $\ell$ of  {\textsc{safem}\xspace}, there is a one-level refinement to create ${\mathcal{T}}_{\ell+1}$
+(indicated in  \cref{fig:refine} for 2D), where each simplex in ${\mathcal{T}}_{\ell}$ creates a finite number $\le K(n)$ of children in a completion step. The constant $K(n)\ge 2$ depends only 
+on the spatial dimension   $n$ \cite{GSStevcmam}. This leads to the bound 
+$|{\mathcal{T}}_{\ell+1}|\le K(n)\, |{\mathcal{T}}_{\ell}| $ and then to
+\[
+(N_{\ell+1}+1)/(N_{\ell}+1)\le  K(n)+ (K(n)-1)(|{\mathcal{T}}_0|-1)\lesssim 1.
+\]
+In Case (B) on the level $\ell$ of  {\textsc{safem}\xspace}, the refinement ${\mathcal{T}}_{\ell+1}:={\mathcal{T}}_{\ell}\oplus {\mathcal{T}}_\operatorname{Tol}$
+is controlled by $|{\mathcal{T}}_\operatorname{Tol}|-|{\mathcal{T}}_0|\le {\ensuremath{\Lambda_{\mathrm{5}}}} \operatorname{Tol}^{-1/(2s)}\le  {\ensuremath{\Lambda_{\mathrm{5}}}}\rho_B^{-1/(2s)}
+\mu_{\ell}^{-1/s}$. Since  $\sigma_\ell^2\le (1+1/\kappa)\mu_{\ell}^2$ in Case (B), 
+the overlay estimate
+of \cite{CKNS07,Stev07} proves
+\[
+N_{\ell+1}-N_\ell\le |{\mathcal{T}}_\operatorname{Tol}|-|{\mathcal{T}}_0|\le {\ensuremath{\Lambda_{\mathrm{5}}}}\rho_B^{-1/(2s)} (1+1/\kappa)^{1/(2s)}
+\sigma_{\ell}^{-1/s}.
+\]
+This leads to the bound 
+\[
+2^{-s}(N_{\ell+1}+1)^s\le (N_\ell+1)^s + \rho_B^{-1/2} (1+1/\kappa)^{1/2} {\ensuremath{\Lambda_{\mathrm{5}}}}.
+\]
+Consequently, in each of the  Cases (A) and (B), it follows 
+\[
+(N_{\ell+1}+1)^s\sigma_\ell\le   \left(K(n)+ (K(n)-1)(|{\mathcal{T}}_0|-1)\right)^s  (N_{\ell}+1)^{s}\sigma_\ell
++2^{s}\rho_B^{-s/2} (1+1/\kappa)^{s/2}{\ensuremath{\Lambda_{\mathrm{5}}}}^s.
+\]
+With $S:= \sup_{\ell \in {\mathbb{N}_0}}\left(N_{\ell}+1 \right)^{s}  \sigma_\ell$, this and   \eqref{cceqN+1Sigmaell} 
+imply 
+\begin{align*}
+(N+1)^s\min\sigma({\mathbb T\left(N\right)})\le  \left(K(n)+ (K(n)-1)(|{\mathcal{T}}_0|-1)\right)^s S + 
+2^{s}\rho_B^{-s/2} (1+1/\kappa)^{s/2}{\ensuremath{\Lambda_{\mathrm{5}}}}^s.
+\end{align*}
+Since this holds for any $N\in{\mathbb{N}_0}$, the previous $N$-independent upper bound is greater than or equal to 
+the supremum $M$ as well. This concludes the proof of ``$\gtrsim$''  in \eqref{eq:optim}.
+\endproof
+
+\section{Application to mixed FEM}
+\label{s:applmfem}
+The a~posteriori error analysis of mixed finite element schemes \cite{CC-MC-97,Alonso96} was completed in  \cite{ccdpas2015} with a reliable and efficient error control in  $H(\operatorname{div},\Omega)\times L^2(\Omega)$,
+which is the natural functional analytical framework for the dual formulation of a Poisson model problem.
+
+Given the right-hand side $f\in L^2(\Omega)$, the dual formulation of the Laplace equation 
+on a 2D polygonal bounded simply-connected Lipschitz domain $\Omega$ 
+seeks  $p\in H(\operatorname{div},\Omega)$ and $u\in L^2(\Omega)$ with 
+\begin{align}\label{e:abstractmixed}
+	\begin{aligned}
+		a(p,q)+b(q,u)&=  0\quad\mbox{for all } q\in H(\operatorname{div},\Omega),  \\
+		b(p,v)&=-F(v) := -\int_\Omega fv\, dx \quad\mbox{for all }v\in L^2(\Omega).
+	\end{aligned}
+\end{align}
+Therein, the bilinear forms model the $L^2$ scalar product and the divergence term,
+\begin{equation}
+\label{e:bilinear}
+a(p,q):=\int_\Omega p\cdot q\, dx\quad\text{and} \quad 
+b(q,v):=\int_\Omega v\,\operatorname{div} q\, dx.
+\end{equation}
+It is well established that  the weak solution 
+$u\in V:= H^1_0(\Omega)$ to $-\Delta u=f$  in $\Omega$ 
+specifies the flux $p:=\nabla u$; the two formulations are equivalent and allow for unique solutions.
+
+Given an admissible triangulation ${\mathcal{T}}\in{\mathbb T}$  let 
+$(p_{RT},u_{RT})\in RT_0({\mathcal{T}})\times P_0({\mathcal{T}})$ solve the discrete problem 
+\begin{align}\label{e:abstractmixedfem}
+	\begin{aligned}
+a(p_{RT},q_{RT})+b(q_{RT},u_{RT})&= 0\quad\mbox{for all } q_{RT}\in RT_0({\mathcal{T}}),  \\
+	b(p_{RT},v_{RT})&=-F(v_{RT})  \quad\mbox{for all }v_{RT}\in P_0({\mathcal{T}}).
+\end{aligned}
+\end{align}
+Given the unique discrete solution $(p_{RT},u_{RT})$ (resp. $({\widehat{p_{RT}}},{\widehat{u_{RT}}})$) with respect to the triangulation 
+${\mathcal{T}}\in{\mathbb T}$ (resp.\ its refinement ${\hat{\mathcal{T}}}\in{\mathbb T}({\mathcal{T}})$),  the estimators  of \cite{ccdpas2015} 
+and the distance function read
+\begin{align*}
+\eta^2({\mathcal{T}},K)&:= |K|\, || p_{RT} ||_{L^2(K)}^2+ |K|^{1/2}\, \sum_{E\in \operatorname{\mathcal{E}}(K)} ||[p_{RT}]_E\cdot\tau_E\|_{L^2(E)}^2,\\
+\mu^2(K) & := ||f- f_K||_{L^2(K)}^2 \qquad\text{for any }K\in{\mathcal{T}} ,\\
+\delta^2({\mathcal{T}},{\hat{\mathcal{T}}}) & := \| {\widehat{p_{RT}}}-p_{RT}\|_\operatorname{\mathrm H( div, \Omega )}^2. 
+\end{align*} 
+The standard 2D notation applies  to the triangle $K$ of area $|K|$ and its set $\operatorname{\mathcal{E}}(K)$ of the three edges and the integral mean  $f_K:=\int f(x)\, dx/|K|$ of $f$. The jump $[\bullet]_E$ across  an interior edge $E=\partial T_+\cap\partial T_-$
+with tangential normal vector $\tau_E$ and normal $\nu_E$ 
+is the difference of the respective traces 
+$ [q]_E:= q|_{T_+}-q|_{T_-}$ on $E$ from the two neighboring triangles $T_\pm$. Homogeneous 
+Dirichlet boundary data translate into homogeneous jumps on the boundary:
+ $ [q]_E:= q|_{T_+}$ for $E\subset\partial\Omega$ with neighboring triangle $T_+$. 
+ 
+It is remarkable that, in the lowest-order case at hand, the Lagrange multiplier 
+$u_{RT}$  does \textit{not} enter the estimators and hence the distance function acts on the flux approximations only. 
+
+\begin{theorem}[(A1)-(A4)] \label{thm:mfemA3}
+The estimators and distance functions satisfy (A1)-(A4) and (B2) for 
+$\mathcal{R}({\mathcal{T}},{\hat{\mathcal{T}}}):={\mathcal{T}}\setminus{\hat{\mathcal{T}}}$, ${\ensuremath{\Lambda_{\mathrm{ref}}}}=1={\ensuremath{\Lambda_{\mathrm{6}}}}$, and ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} =0$. 
+\end{theorem}
+
+The estimator is reliable and efficient \cite{ccdpas2015} in that the exact (resp.\ discrete) solution $(p,u)$ (resp.\ $(p_{RT},u_{RT})$ with respect to ${\mathcal{T}}\in{\mathbb T}$) satisfies
+\[
+\sigma({\mathcal{T}})\approx \| p-p_{RT}\|_{H(\operatorname{div},\Omega)}+\| u-u_{RT}\|_{L^2(\Omega)}.
+\] 
+Hence the optimal rates of the estimators is equivalent to the optimal rates of the errors in terms of nonlinear approximation 
+classes with respect to the natural norms in $H(\operatorname{div})\times L^2$ of the mixed FEM.
+
+\textit{Proof of \cref{thm:mfemA3}.}
+It is straightforward to see that the estimators and distance function satisfy (A1)-(A2)
+with $\rho_2:=2^{-1/4}$ and ${\ensuremath{\Lambda_{\mathrm{1}}}}={\ensuremath{\Lambda_{\mathrm{2}}}}\approx 1$ stemming from trace 
+and inverse estimates.
+
+The proof of (A3) requires an intermediate solution ${\widehat{p_{RT}}}^*\in RT_0({\hat{\mathcal{T}}})$ with respect to the fine 
+triangulation ${\hat{\mathcal{T}}}$ to the  above  Poisson model problem with a piecewise constant right-hand side 
+$\Pi_0 f\in P_0({\mathcal{T}})$ with respect to the coarse triangulation ${\mathcal{T}}$.
+Let $\mathcal{E}'\subseteq \operatorname{\mathcal{E}}$ be the subset of all edges 
+such that at least one of the neighboring triangles
+$K\in{\mathcal{T}}\setminus{\hat{\mathcal{T}}}$ with $E\in\operatorname{\mathcal{E}}(K)$ is refined ($K\notin{\hat{\mathcal{T}}}$).
+The  divergence-free Raviart-Thomas function ${\widehat{p_{RT}}}^*-{p_{RT}}$ equals the rotated gradient
+of some continuous and piecewise affine function and so gives rise to a stability result
+\begin{equation}\label{stabilityintermediate}
+\|   {\widehat{p_{RT}}}^*-{p_{RT}}\|^2_{L^2(\Omega)}  \lesssim  \sum_{E\in \mathcal{E}'} |E|\, ||[{p_{RT}}]_E\cdot\tau_E ||_{L^2(E)}^2
+\end{equation}
+proved via a discrete Helmholtz decomposition (cf. e.g. \cite[Thm 5.6]{LCMHJX} for 
+references and the arguments) for a simply connected domain $\Omega$.  
+
+The discrete inf-sup condition (with respect to the finer mesh ${\hat{\mathcal{T}}}$) 
+leads to some ${\widehat{q_{RT}}}\in RT_0({\hat{\mathcal{T}}})$ and $\widehat{v_0}\in P_0({\hat{\mathcal{T}}})$ with norm
+$ \| {\widehat{q_{RT}}}\|_{H(\operatorname{div},\Omega)} +\| \widehat{v_0}\|_{L^2(\Omega)}\lesssim 1$ and 
+\begin{align} \notag
+	\text{LHS}:=&\,\| {\widehat{p_{RT}}}-{p_{RT}}\|_{H(\operatorname{div},\Omega)} +\| {\widehat{u_{RT}}}-u_{RT} \|_{L^2(\Omega)}\\ 
+	=& \,a({\widehat{p_{RT}}}-{p_{RT}},{\widehat{q_{RT}}})+b({\widehat{q_{RT}}}, {\widehat{u_{RT}}}-u_{RT}  )+b( {\widehat{p_{RT}}}-{p_{RT}}, \widehat{v_0}  ).
+\intertext{The discrete equations \eqref{e:abstractmixedfem} on the fine level ${\hat{\mathcal{T}}}$ and $\operatorname{div} p_{RT}=-\Pi_0 f$ show}
+\text{LHS}=&-a({p_{RT}},{\widehat{q_{RT}}})-b( {\widehat{q_{RT}}}, u_{RT} )- F( \widehat{v_0} -\Pi_0 \widehat{v_0}   ).
+\label{eq:est:LHS}
+\end{align}
+Given $ {\widehat{q_{RT}}}$ with bounded norm, let $ {q_{RT}}$ denote the mixed finite element solution to
+a Poisson model problem with right-hand side $-\Pi_0 \operatorname{div}  {\widehat{q_{RT}}} \in P_0({\mathcal{T}})$. This leads to 
+$\|{q_{RT}}\|_{H(\operatorname{div},\Omega)}\lesssim  1 $ and 
+\begin{align*}
+b( {\widehat{q_{RT}}}, u_{RT} )=b( {q_{RT}}, u_{RT} )=-a({p_{RT}},{q_{RT}}).
+\end{align*}
+With $\|  \widehat{v_0}\|\lesssim 1$, the combination of the two previously displayed formulas shows
+\[
+\text{LHS}\lesssim
+ \|\widehat{\Pi_0} f-\Pi_0 f\|_{L^2(\Omega)} + a({p_{RT}},{q_{RT}}-{\widehat{q_{RT}}}).
+\]
+The Cauchy-Schwarz inequality leads to
+\begin{align}\label{eq:biA:CSI}
+a({p_{RT}},{q_{RT}}-{\widehat{q_{RT}}})&=a({p_{RT}}-{\widehat{p_{RT}}}^*,{q_{RT}}-{\widehat{q_{RT}}})+a({\widehat{p_{RT}}}^*,{q_{RT}}-{\widehat{q_{RT}}})\\
+&\lesssim 
+\|{p_{RT}}-{\widehat{p_{RT}}}^*\|_{L^2(\Omega)}
+ 
+ + a({\widehat{p_{RT}}}^*,{q_{RT}}-{\widehat{q_{RT}}}).
+\end{align}
+Due to \eqref{stabilityintermediate} it remains to analyze the latter term.
+The  test function equals \cite{Marini,ArnoldBrezzi}
+\begin{equation}\label{aforementionedrepresentation}
+ {q_{RT}}-{\widehat{q_{RT}}}=\nabla_{NC} \widehat{v_{CR}} + \operatorname{curl} \widehat{\beta_C}+ 
+ 1/2\, \left((\Pi_0-1)\operatorname{div} {\widehat{q_{RT}}} \right)(\bullet -{\operatorname{mid}({\hat{\mathcal{T}}})})
+\end{equation}
+for unique discrete functions $\widehat{v_{CR}}\in \mathrm{CR}^1_0({\hat{\mathcal{T}}})$ and $\widehat \beta_C \in S^1({\hat{\mathcal{T}}})/\mathbb R$ 
+on the fine level, all   bounded by the left-hand side  $\lesssim 1$. 
+The same argument shows   
+\begin{equation}\label{marinipur}
+	{\widehat{p_{RT}}}^*= \nabla_{NC} {\widehat{u_{CR}}}^* - 1/2\, \left(\Pi_0 f\right) (\bullet -{\operatorname{mid}({\hat{\mathcal{T}}})})
+\end{equation}
+for some ${\widehat{u_{CR}}}^*\in CR^1_0({\hat{\mathcal{T}}})$.
+The remaining term $a({\widehat{p_{RT}}}^*,{q_{RT}}-{\widehat{q_{RT}}})$  equals 
+\[
+\int_\Omega {\widehat{p_{RT}}}^*\cdot \nabla_{NC} \widehat{v_{CR}} \, dx+
+\frac12 \int_\Omega{\widehat{p_{RT}}}^*  \cdot (x -{\operatorname{mid}({\hat{\mathcal{T}}})}) (\Pi_0-1)\operatorname{div} {\widehat{q_{RT}}}   dx.
+\]
+This, the representation \eqref{aforementionedrepresentation} of $ {q_{RT}}-{\widehat{q_{RT}}}$, and an
+integration by parts show 
+\begin{align*}
+& \int_\Omega {\widehat{p_{RT}}}^*\cdot \nabla_{NC} \widehat{v_{CR}} \, dx
+	  = \int_\Omega \nabla_{NC} {\widehat{u_{CR}}}^*\cdot  \nabla_{NC} {\widehat{v_{CR}}}  dx \\
+	&  = \int_\Omega \nabla_{NC} {\widehat{u_{CR}}}^*\cdot( {q_{RT}}-{\widehat{q_{RT}}} ) dx 
+	 =\int_{\Omega'}   {\widehat{u_{CR}}}^*  \operatorname{div} ( {\widehat{q_{RT}}}-{q_{RT}} ) dx.
+\end{align*}
+Therein, $\Omega'$ is the interior of the $\bigcup ({\mathcal{T}}\setminus{\hat{\mathcal{T}}})$, the union of the elements in ${\mathcal{T}}\setminus{\hat{\mathcal{T}}}$.
+Since $ \operatorname{div} ( {\widehat{q_{RT}}}-{q_{RT}} )=(1-\Pi_0)\operatorname{div} {\widehat{q_{RT}}}$ is $L^2$ perpendicular to $P_0({\mathcal{T}})$ (and so
+vanishes on ${\mathcal{T}}\cap{\hat{\mathcal{T}}}$ outside of $\Omega'$), 
+a discrete Poincare inequality proves
+that this is bounded from above by  
+$\lesssim ||  h_{\mathcal{T}}   \nabla_{NC}   {\widehat{u_{CR}}}^*  ||_{L^2(\Omega')} $.
+Since  $(1-\Pi_0)\operatorname{div} {\widehat{q_{RT}}}$ vanishes outside of $\Omega'$ and has a
+bounded $L^2$ norm,  the second integral reads
+\[
+\frac12 \int_\Omega{\widehat{p_{RT}}}^*  \cdot (x -{\operatorname{mid}({\hat{\mathcal{T}}})}) (\Pi_0-1)\operatorname{div} {\widehat{q_{RT}}}   dx
+\lesssim \|  h_{\mathcal{T}} {\widehat{p_{RT}}}^* \|_{L^2(\Omega')}.
+\]
+The combination of the three previously displayed formulas and a triangle inequality lead to
+\begin{align*}
+a({\widehat{p_{RT}}}^*,{q_{RT}}-{\widehat{q_{RT}}})&\lesssim  \|  h_{\mathcal{T}}  {\widehat{p_{RT}}}^* \|_{L^2(\Omega')}
++ ||  h_{\mathcal{T}}   \nabla_{NC}   {\widehat{u_{CR}}}^*  ||_{L^2(\Omega')} \\
+&\lesssim  \|  h_{\mathcal{T}}  {\widehat{p_{RT}}}^* \|_{L^2(\Omega')}
++ ||  h_{\mathcal{T}}  (  {\widehat{p_{RT}}}^*- \nabla_{NC}   {\widehat{u_{CR}}}^* )  ||_{L^2(\Omega')}.
+\end{align*}
+The representation \eqref{marinipur} shows that the last term is equal to
+\[
+	1/2 \,  ||  h_{\mathcal{T}}  \, (\Pi_0 f)\, (\bullet -{\operatorname{mid}({\hat{\mathcal{T}}})})  ||_{L^2(\Omega')}
+\lesssim  ||  h_{\mathcal{T}}^2 \,\operatorname{div} p_{RT}  ||_{L^2(\Omega')}.
+\]
+An inverse estimate for  $ {p_{RT}}$ on any $K\in{\mathcal{T}}\setminus{\hat{\mathcal{T}}}$ leads to 
+\[
+ \|  h_{\mathcal{T}}^2  \operatorname{div} p_{RT} \|_{L^2(\Omega')} \lesssim  \|  h_{\mathcal{T}}  p_{RT} \|_{L^2(\Omega')}.
+\]
+A triangle inequality plus  $||  h_{\mathcal{T}} ||_{L^\infty(\Omega')}\lesssim 1$ prove
+\[
+ \|  h_{\mathcal{T}}  {\widehat{p_{RT}}}^* \|_{L^2(\Omega')}\lesssim  
+  \|  h_{\mathcal{T}}  {p_{RT}} \|_{L^2(\Omega')}
+ +||  {\widehat{p_{RT}}}^*-p_{RT}  ||_{L^2(\Omega')}.
+\]
+The combination of the above estimates (i.e.\ \eqref{eq:est:LHS},\eqref{eq:biA:CSI} and the three previously displayed formulas) shows that
+\begin{eqnarray}\label{referenceestimate}
+&&\| {\widehat{p_{RT}}}-{p_{RT}}\|_{H(\operatorname{div},\Omega)} +\| {\widehat{u_{RT}}}-u_{RT} \|_{L^2(\Omega)}\\ 
+\nonumber
+&& \lesssim   ||  {\widehat{p_{RT}}}^*-p_{RT}  ||_{L^2(\Omega)}+ \|  h_{\mathcal{T}}  {p_{RT}} \|_{L^2(\Omega')}
++ \|\widehat{\Pi_0} f-\Pi_0 f\|_{L^2(\Omega)}.
+\end{eqnarray}
+The $L^2$ orthogonal projection $\Pi_0$ (resp. $\widehat{\Pi_0}$) with respect to ${\mathcal{T}}\in{\mathbb T}$
+ (resp. its refinement ${\hat{\mathcal{T}}}\in{\mathbb T}({\mathcal{T}})$) leads to the data approximation term  
+ \[
+ \|\widehat{\Pi_0} f-\Pi_0 f\|_{L^2(\Omega)}^2= \mu^2({\mathcal{T}})-\mu^2({\hat{\mathcal{T}}}).
+ \]
+The combination of this with \eqref{stabilityintermediate} and \eqref{referenceestimate} proves (A3) in the sharper form
+\[
+\delta^2({\mathcal{T}},{\hat{\mathcal{T}}})\le \| {\widehat{p_{RT}}}-{p_{RT}}\|_{H(\operatorname{div},\Omega)}^2 +\| {\widehat{u_{RT}}}-u_{RT} \|_{L^2(\Omega)}^2
+\lesssim \eta^2({\mathcal{T}},{\mathcal{T}}\setminus{\hat{\mathcal{T}}})+  \mu^2({\mathcal{T}})-\mu^2({\hat{\mathcal{T}}}).
+\]
+
+The proof of (A4) recalls the  $L^2$ quasiorthogonality of the flux errors of
+\cite[Thm 3.2]{LCMHJX} or 
+\cite[Lemma 4.3 and (4.4)]{CR09} in the form
+\[
+ \| p_{\ell+1} -p_{\ell}\|_{L^2(\Omega)}^2
+ +\| p -p_{\ell+1}\|_{L^2(\Omega)}^2
+ - \| p -p_{\ell}\|_{L^2(\Omega)}^2 
+  \lesssim 
+  \| p -p_{\ell+1}\|_{L^2(\Omega)}\, \operatorname{osc}(f_{\ell+1},{\mathcal{T}}_\ell).
+\]
+The mixed FEM fixes the divergence of the flux approximations, $-\operatorname{div} p_\ell=\Pi_\ell f=: f_\ell$, and their orthogonality
+\[
+ \| f_{\ell+1} -f_{\ell}\|_{L^2(\Omega)}^2
+ +\| f -f_{\ell+1}\|_{L^2(\Omega)}^2
+ - \| f -f_{\ell}\|_{L^2(\Omega)}^2 =0
+\]
+leads (for all $\ell\in\mathbb{N}$) in the aforementioned  $L^2$ quasiorthogonality to 
+\[
+ \| p_{\ell+1} -p_{\ell}\|_{H(\operatorname{div},\Omega)}^2
+ +\| p -p_{\ell+1}\|_{H(\operatorname{div},\Omega)}^2
+ - \| p -p_{\ell}\|_{H(\operatorname{div},\Omega)}^2 
+  \lesssim 
+  \| p -p_{\ell+1}\|_{L^2(\Omega)}\, \operatorname{osc}(f_{\ell+1},{\mathcal{T}}_\ell).
+\]
+For any $0<\varepsilon$ with $\varepsilon {\ensuremath{\Lambda_{\mathrm{3}}}}<1$ and the multiplicative constant $C\approx 1$ hidden in the notation $\lesssim$ 
+the sum of those estimates results for any $\ell,m\in\mathbb{N}_0$ in 
+\begin{align}\label{proofofa4inmfem}
+	\begin{aligned}
+		\sum_{k=\ell}^{\ell+m} \| p_{k+1} -p_{k}\|_{H(\operatorname{div},\Omega)}^2
+		& \le  \| p -p_{\ell}\|_{H(\operatorname{div},\Omega)}^2 +   
+\varepsilon/{\ensuremath{\Lambda_{\mathrm{3}}}} \sum_{k=\ell}^{\ell+m-1}  \| p -p_{k+1}\|_{L^2(\Omega)}^2 \\
+&\quad 
++ C^2{\ensuremath{\Lambda_{\mathrm{3}}}}/\varepsilon \sum_{k=\ell}^{\ell+m}  \operatorname{osc}^2(f_{k+1},{\mathcal{T}}_k). 
+\end{aligned}
+\end{align}
+For a sequence of uniformly refined meshes ${\hat{\mathcal{T}}}$, the discrete reliability (A3) leads  
+to the reliability  of \cite{ccdpas2015}, 
+\[
+	\| p -p_{\ell}\|_{H(\operatorname{div},\Omega)}^2 \le {\ensuremath{\Lambda_{\mathrm{3}}}}\,\eta_\ell^2:=\eta^2({\mathcal{T}}_\ell)
+ \quad\text{for all }\ell\in \mathbb{N}_0.
+\]
+The oscillation  $\operatorname{osc}(f_{k+1},{\mathcal{T}}_k)=\| h_\ell(f_{k+1}-f_k)\|_{L^2(\Omega)}$ is bounded by 
+$\| h_\ell \|_{L^\infty(\Omega)}\, \| f_{k+1}-f_k\|_{L^2(\Omega)}$. 
+With $h_{\max} :=  \| h_0 \|_{L^\infty(\Omega)} \lesssim 1$,
+the $L^2$ orthogonality of the integrants shows
+\[
+ \sum_{k=\ell}^{\ell+m}  \operatorname{osc}^2(f_{k+1},{\mathcal{T}}_k)\le h_{\max} \, \| f_{\ell+m+1}-f_\ell\|_{L^2(\Omega)}^2
+ \le h_{\max} \, \| f -f_\ell\|_{L^2(\Omega)}^2.
+\]
+The combination of the previous estimates with \eqref{proofofa4inmfem} leads to the quasiorthogonality
+(A4) in the form
+\[
+\sum_{k=\ell}^{\ell+m} \delta_{k,k+1}^2
+\le {\ensuremath{\Lambda_{\mathrm{3}}}}\eta_\ell^2+ \varepsilon \, \sum_{k=\ell+1}^{\ell+m}\eta_k^2
++C {\ensuremath{\Lambda_{\mathrm{3}}}} h_{\max}/\varepsilon \, \mu^2({\mathcal{T}}_\ell).
+\]
+This is ($A4_\varepsilon$) with ${\ensuremath{\Lambda_{\mathrm{4}(\varepsilon)}}}:=\max\{ {\ensuremath{\Lambda_{\mathrm{3}}}}, C {\ensuremath{\Lambda_{\mathrm{3}}}} h_{\max}/\varepsilon\}$ 
+for any $\varepsilon>0$. This and (A1)-(A2) imply (A4) owing to \cref{thm:A4eA4}.
+The remaining details are omitted. 
+\qquad \endproof
+
+\section{Application to least-squares FEM}
+\label{s:appllsfem}
+
+The div least-squares formulation  \cite{BG09} of the Poisson model example of the previous section seeks 
+the minimizer  $(p,u)$ of the functional
+\begin{equation*}
+	\operatorname{LS}(f; q,v):=
+	\|f+\operatorname{div}q\|_{L^2(\Omega)}^2+\|q -\nabla v\|_{L^2(\Omega)}^2
+\end{equation*}
+amongst $(q,v)\in H(\operatorname{div},\Omega)\times H^1_0(\Omega)$. The functional $\operatorname{LS}(f;\bullet)$ is indeed a natural a~posteriori error estimator. Given any admissible triangulation ${\mathcal{T}}\in{\mathbb T}$,
+the least-squares FEM seeks the minimizer
+$({p_{\operatorname{LS}}},{u_{\operatorname{LS}}})$ of $\operatorname{LS}(f;\bullet)$ in the discrete subspace $RT_0({\mathcal{T}})\times S^1_0({\mathcal{T}})$. 
+This leads in \cite{CCP-lsfem} 
+to the alternative a~posteriori error estimate with
+\begin{eqnarray}  \label{eq:estimatorls}
+\tilde \eta^2({\mathcal{T}},K)&:=& \|(1-\Pi_0){p_{\operatorname{LS}}} \|^2_{L^2(K)}
++|K|^{{1}/{2}} \hspace{-2mm}
+\sum_{E\in\operatorname{\mathcal{E}}(K)} \hspace{-1mm} \| [ {p_{\operatorname{LS}}}  ]_E \cdot \tau_E \|_{L^2(E)}^2\\  \nonumber
+&& + |K|^{{1}/{2}}\hspace{-2mm} \sum_{E\in\operatorname{\mathcal{E}}(K)\setminus\operatorname{\mathcal{E}}(\partial\Omega)}\hspace{-1mm}
+\| [ \partial {u_{\operatorname{LS}}} /\partial \nu_E]_E \|_{L^2(E)}^2, \\
+\mu^2(K)&:=&|| f-\Pi_0 f||^2_{L^2(K)}\quad\text{for any }K\in{\mathcal{T}}.  \label{eq:muls}
+\end{eqnarray}
+Given a refined triangulation ${\hat{\mathcal{T}}}\in{\mathbb T}({\mathcal{T}})$ with discrete solutions 
+$(\widehat{p_{\operatorname{LS}}},\widehat{u_{\operatorname{LS}}})$, the distance 
+\[
+\delta^2({\mathcal{T}},{\hat{\mathcal{T}}}):= \operatorname{LS}(f; {p_{\operatorname{LS}}},{u_{\operatorname{LS}}})- \operatorname{LS}(f; \widehat{p_{\operatorname{LS}}},\widehat{u_{\operatorname{LS}}})
+=\operatorname{LS}(0; \widehat{p_{\operatorname{LS}}}-{p_{\operatorname{LS}}},\widehat{u_{\operatorname{LS}}}-{u_{\operatorname{LS}}})\]
+is equivalent to the norm of the difference $(\widehat{p_{\operatorname{LS}}}-{p_{\operatorname{LS}}}, \widehat{u_{\operatorname{LS}}} -{u_{\operatorname{LS}}})$ of the two discrete solutions
+in $H(\operatorname{div},\Omega)\times H^1_0(\Omega)$ \cite{BG09}.
+
+\begin{theorem}[A1--A4] \label{thm:lsfem}
+The estimators and distance function satisfy (A1)-(A4) and (B2) for 
+$\mathcal{R}({\mathcal{T}},{\hat{\mathcal{T}}}):={\mathcal{T}}\setminus{\hat{\mathcal{T}}}$, ${\ensuremath{\Lambda_{\mathrm{ref}}}}=1={\ensuremath{\Lambda_{\mathrm{6}}}}$, and (QM). 
+\end{theorem}
+
+Since the estimator is reliable and efficient, for the discrete solution $({p_{\operatorname{LS}}},{u_{\operatorname{LS}}})$ with respect to 
+${\mathcal{T}}\in{\mathbb T}$, 
+\[
+\sigma({\mathcal{T}})\approx \| p-{p_{\operatorname{LS}}}\|_{H(\operatorname{div},\Omega)}+\| u-{u_{\operatorname{LS}}}\|_{H^1(\Omega)},
+\] 
+the optimal rates of the estimators is equivalent to the optimal rates of the errors in terms of nonlinear approximation 
+classes with respect to the natural norms in $H(\operatorname{div})\times H^1$ of the least-squares FEM.
+
+\textit{Proof of \cref{thm:lsfem}.}
+The proofs are essentially contained in  \cite{CCP-lsfem}. The axioms (A1)-(A2) are standard and (A3) follows 
+from
+\[
+\operatorname{LS}(f; {p_{\operatorname{LS}}},{u_{\operatorname{LS}}})\lesssim \eta^2({\mathcal{T}},{\mathcal{T}}\setminus{\hat{\mathcal{T}}})+\mu^2({\mathcal{T}}) 
++ \operatorname{LS}(f; \widehat{p_{\operatorname{LS}}},\widehat{u_{\operatorname{LS}}})
+\]
+(this is \cite[p 59, line 24]{CCP-lsfem} in different notation) and another reliability estimate 
+$ \operatorname{LS}(f; \widehat{p_{\operatorname{LS}}},\widehat{u_{\operatorname{LS}}})\approx \sigma^2({\hat{\mathcal{T}}})$ from \cite[Thm 3.1]{CCP-lsfem}.
+Notice that ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}}$ does {\em not} need to be small (at least for coarse meshes according to the Remark \ref{rem:appLS}) and hence \cref{thm:qmono} cannot be applied to ensure (QM) in general. On the other hand, any conforming discretization reduces the least-squares functions and so 
+\[
+\sigma^2({\hat{\mathcal{T}}})\approx  \operatorname{LS}(f; \widehat{p_{\operatorname{LS}}},\widehat{u_{\operatorname{LS}}})\le 
+ \operatorname{LS}(f; {p_{\operatorname{LS}}},{u_{\operatorname{LS}}})\approx \sigma^2({\mathcal{T}})
+\]
+immediately leads to (QM).
+The same argument plus the reliability of \cite[Theorem 3.1]{CCP-lsfem} prove (A4) even in the sharper form of an orthogonality. The remaining details are omitted.
+\qquad \endproof
+
+\begin{remark}\label{rem:appLS}
+A detailed analysis of  \cite{CCP-lsfem} (beyond this paper) with reduced elliptic regularity
+suggests that ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} \le C(\epsilon) \, h_{\max}^{1/2+\epsilon} $ for small $\epsilon>0$ (depending on the interior angles of the domain) and some constant $C(\epsilon)$. Hence  ${\ensuremath{\widehat{\Lambda}_{\mathrm{3}}}} $ tends to zero as the maximal
+mesh-size $h_{\max}$ tends to zero and so \cref{thm:qmono} is applicable for sufficiently fine meshes.
+\end{remark}
+\begin{remark}
+	The analysis also allows optimal convergence rates for modified estimators such as
+	\[
+		\eta^2(K):= {\left\lvert {K} \right\rvert} {\left\lVert {\operatorname{D} p_{LS}} \right\rVert_{{L^2(K)}}} + {\left\lvert {K} \right\rvert}^{1/2} {\left\lVert {[p_{LS}-\nabla u_{LS}]_{\partial K}} \right\rVert_{{L^2(\partial K)}}}
+	\]
+	with $[p_{LS}-\nabla u_{LS}]_{\partial K}:= {\left. {(p_{LS}-\nabla u_{LS})} \right\lvert_{{K}}}$ along $E \in \operatorname{\mathcal{E}}(\partial \Omega)$ with $K= \bar \omega_E$. This estimator is close to the least-squares functional estimators, but not equivalent.
+\end{remark}
+
+\bibliographystyle{alpha}
+\bibliography{biblio}
+
+\end{document}
+

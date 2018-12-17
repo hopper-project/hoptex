@@ -1,0 +1,1839 @@
+
+\documentclass[12pt]{article}
+
+\usepackage{algolyx}
+\usepackage{algorithmic}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{mathtools}
+\usepackage{nicefrac}
+\usepackage{subfig}
+\usepackage{multicol}
+
+\author{Parsiad Azimzadeh\thanks{David R. Cheriton School of Computer Science, University of Waterloo ({\href{mailto:{pazimzad@uwaterloo.ca}}{\nolinkurl{{pazimzad@uwaterloo.ca}}} }, {\href{mailto:{glabahn@uwaterloo.ca}}{\nolinkurl{{glabahn@uwaterloo.ca}}} }).}\and
+Erhan Bayraktar\thanks{Department of Mathematics, University of Michigan
+({\href{mailto:{erhan@umich.edu}}{\nolinkurl{{erhan@umich.edu}}} }).}
+\and
+George Labahn\footnotemark[2]
+}
+
+\makeatletter
+\@ifclassloaded{siamart1116}{
+	\newsiamthm{example}{Example}
+	\newsiamthm{rem}{Remark}
+	\title{Convergence of approximation schemes for weakly nonlocal second order equations\thanks{Submitted to the editors \today. \funding{Erhan Bayraktar is supported in part by the National Science Foundation under grant DMS-1613170.}}}
+	\headers{Schemes for weakly nonlocal equations}{Parsiad Azimzadeh, Erhan Bayraktar, and George Labahn}
+	\bibliographystyle{siamplain}
+	
+	
+	
+	
+}{
+	\title{Convergence of approximation schemes for weakly nonlocal second order equations\thanks{Erhan Bayraktar is supported in part by the National Science Foundation under grant DMS-1613170.}}
+	\date{}
+
+	\pdfoutput=1
+	
+
+	
+	\usepackage{microtype}
+	\usepackage[T1]{fontenc}
+	\usepackage{lmodern}
+
+	\usepackage{amsthm}
+	
+	
+	\usepackage[margin=1in]{geometry}
+	
+	
+	
+	
+	
+	
+	\usepackage{titlesec}
+	\titleformat{\section}{\normalfont\fontsize{16}{19}\selectfont}{\thesection}{1em}{}
+	\titleformat{\subsection}{\normalfont\fontsize{14}{17}\selectfont}{\thesubsection}{1em}{}
+	\titleformat{\subsubsection}{\normalfont\fontsize{14}{17}\selectfont}{\thesubsubsection}{1em}{}
+	
+	
+	\newcounter{dummy}
+	
+	\newtheorem{definition}[dummy]{Definition}
+	\newtheorem{example}[dummy]{Example}
+	\newtheorem{lemma}[dummy]{Lemma}
+	\newtheorem{proposition}[dummy]{Proposition}
+	\newtheorem{rem}[dummy]{Remark}
+	\newtheorem{theorem}[dummy]{Theorem}
+	\newenvironment{keywords}{{\bf Key words.}}{\medskip{}}
+	\newenvironment{AMS}{{\bf AMS subject classifications.}}{}
+
+	\bibliographystyle{plain}
+	
+	\usepackage{hyperref}
+	
+	
+	\usepackage{prettyref}
+	
+	
+	\newrefformat{def}{Definition \ref{#1}}
+	\newrefformat{thm}{Theorem \ref{#1}}
+	\newrefformat{app}{Appendix \ref{#1}}
+	\newrefformat{rem}{Remark \ref{#1}}
+	\newrefformat{sec}{Section \ref{#1}}
+	\newrefformat{subsec}{Section \ref{#1}}
+	\newrefformat{alg}{Algorithm \ref{#1}}
+	\newrefformat{fig}{Figure \ref{#1}}
+	\newrefformat{tab}{Table \ref{#1}}
+	\newrefformat{prop}{Proposition \ref{#1}}
+	
+	
+	
+	
+	\usepackage[dvipsnames]{xcolor}
+	\definecolor{mylinkcolor}{HTML}{0066cc}
+	\definecolor{mycitecolor}{HTML}{cc4400}
+	\definecolor{myurlcolor}{HTML}{6600cc}
+	
+	\hypersetup{
+		linkcolor  = mylinkcolor,
+		citecolor  = mycitecolor,
+		urlcolor   = myurlcolor,
+		colorlinks = true,
+	}
+	
+	\let\OLDthebibliography{
+	  \OLDthebibliography{}}
+	  \setlength{\parskip}{0pt}
+	  \setlength{\itemsep}{4pt}
+	}
+\makeatother
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+That a monotone, stable, and consistent scheme converges to the viscosity solution of a fully nonlinear second order \emph{local} equation satisfying a comparison principle is a seminal result in the viscosity theory.
+We extend these ideas in a very general manner to \emph{weakly nonlocal} equations and apply our results to obtain convergent schemes for finite and infinite-horizon equations arising from impulse control, including a new ``stochastic semi-Lagrangian'' scheme that is fully explicit, unconditionally stable, trivially monotone in higher dimensions, and embarrassingly parallel.
+\end{abstract}
+
+\begin{keywords}
+numerical scheme, weakly nonlocal, viscosity solution, impulse control, Hamilton--Jacobi--Bellman quasi--variational inequality (HJBQVI)
+\end{keywords}
+
+\begin{AMS}
+49L25, 49N25, 65M06, 65M12, 93E20
+\end{AMS}
+
+\section{Introduction}
+
+That a monotone, stable, and consistent scheme converges to the viscosity
+solution of a fully nonlinear second order \emph{local} equation
+\begin{equation}
+F(D^{2}u(x),Du(x),u(x),x)=0\tag{loc.}\label{eq:local}
+\end{equation}
+satisfying a comparison principle is a seminal result in the viscosity
+theory due to Barles and Souganidis \cite{MR1115933}. The significance
+of this result (named the Barles\textendash Souganidis framework in
+honour of its authors) is perhaps best described by likening it to
+a Lax equivalence theorem for viscosity solutions: its simultaneous
+simplicity and power allows one to easily create convergent schemes
+for a variety of second order equations.
+
+In this work, we are instead concerned with equations of the form
+\begin{equation}
+F(D^{2}u(x),Du(x),u(x),u,x)=0.\tag{nonloc.}\label{eq:nonlocal}
+\end{equation}
+The difference between \eqref{eq:local} and \eqref{eq:nonlocal}
+is that in the latter, an additional argument $u$ appears in the
+operator $F$. This signifies that at each point $x$, $F$ may query
+the value of $u$ at one or more points in ${\operatorname{dom}}(u)$, not just at
+$x$. Since this nonlocality does not extend to the derivatives $D^{i}u$, we refer to such equations as \emph{weakly nonlocal}.
+
+There are a few reasonable definitions of viscosity solution for \eqref{eq:nonlocal}.
+Roughly speaking, one approach is to replace the derivatives of $u$
+appearing in \eqref{eq:nonlocal} with those of a test function $\varphi$
+in order to obtain the equation 
+\begin{equation}
+F(D^{2}\varphi(x),D\varphi(x),u(x),u,x)=0.\tag{def. 1}\label{eq:nonlocal_definition}
+\end{equation}
+Another approach is to replace all terms involving $u$ in order to
+obtain the equation 
+\begin{equation}
+F(D^{2}\varphi(x),D\varphi(x),\varphi(x),\varphi,x)=0.\tag{def. 2}\label{eq:local_definition}
+\end{equation}
+It is well-known that the Barles\textendash Souganidis framework can
+still be applied to create schemes that converge to the solution of
+\eqref{eq:nonlocal} in the sense of \eqref{eq:local_definition} \cite{MR2182141}.
+
+In \cite[Pg. 300]{MR1395674}, it is shown that when $F$ is an \emph{integro-differential
+operator} satisfying some reasonable conditions, the two definitions
+above are equivalent. In this case, no issues arise in applying the
+Barles\textendash Souganidis framework.
+
+For nonlocal equations arising from \emph{impulse control}, \eqref{eq:nonlocal_definition}
+is the relevant notion of viscosity solution \cite{MR2568293}. In
+\cite[Theorem 3.1]{MR2486085}, it is shown that for these equations,
+\eqref{eq:nonlocal_definition} and \eqref{eq:local_definition} are
+equivalent if subsolutions and supersolutions are assumed to be \emph{uniformly
+continuous}. Since the Barles\textendash Souganidis framework uses
+half-relaxed limits to produce functions that are only \emph{semicontinuous},
+this leads to technical issues in applying the framework in this context,
+leading us to the following natural question:
+\begin{enumerate}[label=(Q)]
+\item \emph{\label{enu:question}If }\eqref{eq:nonlocal_definition} and
+\eqref{eq:local_definition}\emph{ are not equivalent, is it possible
+to create schemes that provably converge to the solution of \eqref{eq:nonlocal}
+in the sense of \eqref{eq:nonlocal_definition}?}
+\end{enumerate}
+While our answer to the above question is general, our driving motivation
+is impulse control.\footnote{The interested reader can review \cite{MR673169,MR1240006,MR1306930,MR2109687,MR2568293,MR2735526,MR2812853,MR3053571,MR3070528,MR3071398,MR3145856,MR3200009,MR3615458,MR3626187}
+for information and recent developments on impulse control. We do
+not claim this list to be exhaustive.} In particular, we apply our findings to prove the convergence of
+various schemes for impulse control problems.
+Two of these schemes were implemented in \cite{MR3493959}, though no convergence proofs were given.
+We also introduce a new ``stochastic
+semi-Lagrangian'' scheme that is fully explicit, unconditionally stable,
+trivially monotone in higher dimensions, and embarrassingly parallel
+(i.e., no effort is needed to separate the problem into a number of
+parallel tasks \cite{herlihy2012art}).
+
+We mention that in \cite{MR2422079}, the authors prove convergence of a scheme for a specific impulse control problem in the sense of \eqref{eq:local_definition}, not \eqref{eq:nonlocal_definition}.
+Other authors \cite{MR2314777,seydel2009impulse} consider instead
+iterated optimal stopping, in which an impulse control problem is
+transformed into a sequence of coupled local equations, sidestepping
+the issues described in the previous paragraph.
+However, iterated optimal stopping is
+inadequate for finite horizon settings (see {\prettyref}{rem:ios}).
+
+In answering \ref{enu:question}, our results echo those of Barles
+and Souganidis in that to ensure convergence to a solution of \eqref{eq:nonlocal}
+in the sense of \eqref{eq:nonlocal_definition}, schemes are required
+to be monotone, stable, and satisfy a consistency condition that is,
+in some sense, stronger than that which is posed in \cite{MR1115933}.
+When there are no nonlocal terms, this stronger consistency condition
+becomes the original one posed in \cite{MR1115933}.
+
+This work is organized as follows. In {\prettyref}{sec:discontinuous_solutions}
+we discuss the equations and the notion of viscosity solution we are
+concerned with in this work. {\prettyref}{sec:convergence_result} gives
+the main convergence result. {\prettyref}{sec:hjbqvi} applies our findings
+to study equations arising from impulse control. {\prettyref}{sec:integro_differential_equations}
+discusses integro-differential equations. A numerical application
+is given in {\prettyref}{sec:numerical_example}. Some of the more technical details have been gathered in several appendices
+appearing at the end of this document.
+
+\section{\label{sec:discontinuous_solutions}Discontinuous solutions of weakly
+nonlocal second order equations}
+
+We consider equations of the form
+\begin{equation}
+F(D^{2}u(x),Du(x),u(x),u,x)=0\text{ for }x\in\overline{\Omega}\label{eq:pde}
+\end{equation}
+where $\Omega$ is an open subset of $\mathbb{R}^{N}$, $\overline{\Omega}$
+is its closure, and $Du$ and $D^{2}u$ are the (formal) gradient
+vector and second derivative matrix of $u$. The function $u$ is
+in $B_{\operatorname{loc}}(\overline{\Omega})$ (the set of locally bounded real-valued
+maps from $\overline{\Omega}$) and $F$ is a real-valued map from
+$\mathcal{S}^{N}\times\mathbb{R}^{N}\times\mathbb{R}\times B_{\operatorname{loc}}(\overline{\Omega})\times\overline{\Omega}$
+where $\mathcal{S}^{N}$ is the set of real $N\times N$ symmetric
+matrices.
+
+As mentioned in the introduction, the defining characteristic of \eqref{eq:pde}
+is that $F$ may query the function $u$ both locally through its
+third argument $u(x)$ and nonlocally through its fourth argument
+$u$.
+
+For a locally bounded real-valued function $z$ mapping from a metric
+space, we define its upper and lower semicontinuous envelopes $z^{*}$
+and $z_{*}$ by
+\[
+z^{*}(x)\coloneqq\limsup_{y\rightarrow x}z(y)\text{ and }z_{*}(x)\coloneqq\liminf_{y\rightarrow x}z(y).
+\]
+We are now ready to state the definition of viscosity solution
+hinted at in \eqref{eq:nonlocal_definition}.
+\begin{definition}
+\label{def:viscosity_solution}$u\in B_{\operatorname{loc}}(\overline{\Omega})$
+is a (viscosity) subsolution (respectively supersolution) of \eqref{eq:pde}
+if for all $\varphi\in C^{2}(\overline{\Omega})$ and $x\in\overline{\Omega}$
+such that $u^{*}-\varphi$ (respectively $u_{*}-\varphi$) has a local
+maximum (respectively minimum) at $x$, we have
+\begin{align*}
+ & G_{*}(D^{2}\varphi(x),D\varphi(x),u^{*}(x),x){\leqslant}0\\
+\text{(respectively } & G^{*}(D^{2}\varphi(x),D\varphi(x),u_{*}(x),x){\geqslant}0\text{)}
+\end{align*}
+where $G(X,p,r,x)\coloneqq F(X,p,r,u^{*},x)$ (respectively $G(X,p,r,x)\coloneqq F(X,p,r,u_{*},x)$).
+
+The function $u$ is said to be a (viscosity) solution\emph{}\footnote{The notion of viscosity solution in {\prettyref}{def:viscosity_solution}
+is distinct from one in which $G_{*}$ and $G^{*}$ are replaced by
+$G$. To make explicit this distinction, comparison principles for
+this notion of viscosity solution are sometimes referred to as \emph{strong}.
+For a discussion regarding weak versus strong comparison, see \cite[Remark 3.2]{MR2857450}.
+It is easy to apply the ideas of this work to settings in which only
+weak comparison holds (we have used the particular form of {\prettyref}{def:viscosity_solution}
+only to conform to the original setting of the Barles\textendash Souganidis
+framework). We show in {\prettyref}{app:comparison_principle} that
+the two notions of comparison (weak and strong) coincide for impulse
+control.} of \eqref{eq:pde} if it is both a sub and supersolution of \eqref{eq:pde}.
+\end{definition}
+\begin{rem}\label{rem:locally_bounded}In practice,
+$(X,p,r,x)\mapsto F(X,p,r,u,x)$ is locally bounded from below
+(respectively above) for any upper (respectively lower) semicontinuous
+function $u$ so that $G_{*}$ (respectively $G^{*}$) is finite at all points in its domain.\end{rem}
+
+Our usage of $\overline{\Omega}$
+instead of $\Omega$ in \eqref{eq:pde} is so that we may write both the partial differential
+equation and its boundary conditions as a single expression (cf. \cite{MR1115933}):
+
+\begin{example}Consider the weakly nonlocal\emph{ }Dirichlet problem
+\begin{align*}
+H(D^{2}u(x),Du(x),u(x),u,x) & =0\text{ for }x\in\Omega\\
+u(x)-\psi(x) & =0\text{ for }x\in\partial\Omega.
+\end{align*}
+We can write this in the form \eqref{eq:pde} by defining
+\[
+F(X,p,r,u,x)\coloneqq\begin{cases}
+H(X,p,r,u,x) & \text{if }x\in\Omega\\
+r-\psi(x) & \text{if }x\in\partial\Omega.
+\end{cases}
+\]
+In view of {\prettyref}{def:viscosity_solution}, $u\in B_{\operatorname{loc}}(\overline{\Omega})$
+is a subsolution of the Dirichlet problem if for all $\varphi\in C^{2}(\overline{\Omega})$
+and $x\in\overline{\Omega}$ such that $u^{*}-\varphi$ has a local
+maximum at $x$, we have
+\[
+0{\geqslant}\begin{cases}
+G_{*}(D^{2}\varphi(x),D\varphi(x),\varphi(x),x) & \text{if }x\in\Omega\\
+\min\{G_{*}(D^{2}\varphi(x),D\varphi(x),\varphi(x),x),\varphi(x)-\psi(x)\} & \text{if }x\in\partial\Omega
+\end{cases}
+\]
+where $G(X,p,r,x)\coloneqq H(X,p,r,u^{*},x)$. A symmetric claim holds
+for supersolutions.\end{example}
+
+In the next section, we present our extension of the Barles\textendash Souganidis
+framework. To motivate its necessity, we sketch in {\prettyref}{app:technical}
+the technical issues that arise in attempting to apply the original
+Barles\textendash Souganidis framework to impulse control problems.
+Since the discussion of {\prettyref}{app:technical} is somewhat technical,
+we recommend that the reader return to it after a first-read.
+
+\section{\label{sec:convergence_result}Extending the Barles\textendash Souganidis framework}
+
+We consider approximation schemes of the form
+\begin{equation}
+S(\rho,x,u^{\rho}(x),u^{\rho},u^{\rho})=0\text{ for }x\in\overline{\Omega}\label{eq:scheme}
+\end{equation}
+where $S$ is a real-valued map from $(0,\infty)\times\overline{\Omega}\times\mathbb{R}\times B(\overline{\Omega})^{2}$
+and $B(\overline{\Omega})$ is the set of bounded real-valued maps
+from $\overline{\Omega}$. Compared to the notion of approximation
+scheme in \cite[Eq. (2.1)]{MR1115933}, $S$ has an additional fifth
+argument. This argument is present so that, roughly speaking,
+we may distinguish terms contributing to the approximation of local
+phenomena from those contributing to the approximation of nonlocal
+phenomena.
+
+We prove that if such a scheme is monotone, stable, and consistent,
+it converges to the unique solution of \eqref{eq:pde}, provided that
+\eqref{eq:pde} satisfies a comparison principle. To account for nonlocality,
+our notion of consistency differs from the usual notion defined in
+\cite[Eq. (2.4)]{MR1115933}. As such, we distinguish it by referring
+to it as \emph{nonlocal} consistency.
+
+For a family $(z^{\rho})_{\rho>0}$ of real-valued maps from a metric
+space $C$ such that $(\rho,x)\mapsto z^{\rho}(x)$ is locally bounded,
+we define the upper and lower half-relaxed limits $\overline{z}$
+and $\underline{z}$ by
+\[
+\overline{z}(x)\coloneqq\limsup_{\substack{\rho\rightarrow0\\
+y\rightarrow x
+}
+}z^{\rho}(y)\text{ and }\underline{z}(x)\coloneqq\liminf_{\substack{\rho\rightarrow0\\
+y\rightarrow x
+}
+}z^{\rho}(y).
+\]
+
+We now state precisely the notions of monotonicity, stability, and
+nonlocal consistency. A scheme $S$ is \emph{monotone} if (cf. \cite[Eq. (2.2)]{MR1115933})
+\[
+S(\cdot,\cdot,\cdot,u,\cdot){\leqslant} S(\cdot,\cdot,\cdot,w,\cdot)\text{ whenever }u{\geqslant} w\text{ pointwise}.
+\]
+A scheme $S$ is \emph{stable} if (cf. \cite[Eq. (2.3)]{MR1115933})
+\[
+\text{there exists a unique solution }u^{\rho}\text{ of }\eqref{eq:scheme}\text{ for each }\rho>0\text{ and }\sup_{\rho>0}\Vert u^{\rho}\Vert_{\infty}<\infty.
+\]
+As mentioned above, our notion of consistency differs from the usual
+notion defined in \cite[Eq. (2.4)]{MR1115933}. Precisely, a scheme
+$S$ is \emph{nonlocally consistent} if for each family $(w^{\rho})_{\rho>0}$
+of uniformly bounded real-valued maps from $\overline{\Omega}$, $\varphi\in C^{2}(\overline{\Omega})$,
+and $x\in\overline{\Omega}$, we have
+\begin{align}
+\liminf_{\substack{\rho\rightarrow0\\
+y\rightarrow x\\
+\xi\rightarrow0
+}
+}S(\rho,y,\varphi(y)+\xi-e^{-1/\rho},\varphi+\xi,w^{\rho}) & {\geqslant} G_{*}(D^{2}\varphi(x),D\varphi(x),\varphi(x),x)\label{eq:subconsistency}\\
+\text{where }G(X,p,r,x) & \coloneqq F(X,p,r,\overline{w},x)\nonumber 
+\end{align}
+and
+\begin{align}
+\limsup_{\substack{\rho\rightarrow0\\
+y\rightarrow x\\
+\xi\rightarrow0
+}
+}S(\rho,y,\varphi(y)+\xi+e^{-1/\rho},\varphi+\xi,w^{\rho}) & {\leqslant} G^{*}(D^{2}\varphi(x),D\varphi(x),\varphi(x),x)\label{eq:superconsistency}\\
+\text{where }G(X,p,r,x) & \coloneqq F(X,p,r,\underline{w},x).\nonumber 
+\end{align}
+Finally, we require a \emph{comparison principle} on the original
+equation:
+\begin{equation}
+\text{if }u\in B(\overline{\Omega})\text{ is a subsolution of }\eqref{eq:pde}\text{ and }w\in B(\overline{\Omega})\text{ is a supersolution of }\eqref{eq:pde}\text{, }u^{*}{\leqslant} w_{*}.\label{eq:comparison}
+\end{equation}
+We are now ready to state the main result.
+\begin{theorem}
+\label{thm:convergence_result}Let $S$ be a monotone, stable, and
+nonlocally consistent scheme whose limiting equation satisfies the comparison
+principle \eqref{eq:comparison}. Then, as $\rho\rightarrow0$,
+the solution $u^{\rho}$ of \eqref{eq:scheme} converges locally uniformly
+to the unique\footnote{Precisely, we mean that $u^{\rho}$ converges to a solution that is
+unique among all bounded solutions (i.e., we have not precluded the
+existence of other unbounded solutions).} bounded solution of \eqref{eq:pde}.
+\end{theorem}
+The proof follows closely that of \cite[Theorem 2.1]{MR1115933},
+differing only in its use of the modified consistency requirement.
+\begin{proof}
+Let $\overline{u}$ and $\underline{u}$ denote the half-relaxed limits
+of the family $(u^{\rho})_{\rho>0}$. We seek to show that $\overline{u}$
+is a subsolution and $\underline{u}$ is a supersolution of \eqref{eq:pde}.
+In this case, \eqref{eq:comparison} yields $\overline{u}=\overline{u}^{*}{\leqslant}\underline{u}_{*}=\underline{u}$,
+while the reverse inequality is a consequence of the definition of
+$\overline{u}$ and $\underline{u}$. Therefore, $u\coloneqq\overline{u}=\underline{u}$
+is a (continuous) solution of \eqref{eq:pde}. It follows that
+\[
+\lim_{\substack{\rho\rightarrow0\\
+y\rightarrow x
+}
+}u^{\rho}(y)=u(x)\text{ for }x\in\overline{\Omega},
+\]
+from which we obtain that convergence is locally uniform.
+
+Returning to our previous claim, we prove that $\overline{u}$ is
+a subsolution (that $\underline{u}$ is a supersolution is proved
+similarly). To this end, let $x\in\overline{\Omega}$ be a maximum
+point of $\overline{u}-\varphi$ on $U\coloneqq\overline{\Omega}\cap B(x;r)$
+for some $\varphi\in C^{2}(\overline{\Omega})$ and $r>0$. Without
+loss of generality, we may assume the local maximum is strict, $\overline{u}(x)=\varphi(x)$,
+and $\varphi{\geqslant}1+\sup_{\rho}\Vert u^{\rho}\Vert_{\infty}$ outside
+$U$. By the definition of $\overline{u}$, we can find a sequence
+$(\rho_{n},x_{n})_{n}$ such that $\rho_{n}\rightarrow0$, $x_{n}\rightarrow x$,
+and $u^{\rho_{n}}(x_{n})\rightarrow\overline{u}(x)$. For each $n$,
+pick $y_{n}\in U$ such that
+\[
+u^{\rho_{n}}(y_{n})-\varphi(y_{n})+e^{-1/\rho_{n}}{\geqslant}\sup_{y\in U}\left\{ u^{\rho_{n}}(y)-\varphi(y)\right\} .
+\]
+Due to the compactness of $\overline{U}$, we can pick a subsequence
+of $(\rho_{n},x_{n},y_{n})_{n}$ such that its last argument converges
+to some point $\hat{y}\in\overline{U}$. With a slight abuse of notation,
+relabel this subsequence $(\rho_{n},x_{n},y_{n})_{n}$. It follows
+that
+\begin{align*}
+0=\overline{u}(x)-\varphi(x) & =\lim_{n\rightarrow\infty}\left\{ u^{\rho_{n}}(x_{n})-\varphi(x_{n})\right\} \\
+ & {\leqslant}\limsup_{n\rightarrow\infty}\left\{ u^{\rho_{n}}(y_{n})-\varphi(y_{n})+e^{-1/\rho_{n}}\right\} \\
+ & {\leqslant}\limsup_{\substack{\rho\rightarrow0\\
+y\rightarrow\hat{y}
+}
+}\left\{ u^{\rho}(y)-\varphi(y)+e^{-1/\rho}\right\} \\
+ & {\leqslant}\overline{u}(\hat{y})-\varphi(\hat{y}).
+\end{align*}
+Because $x$ was assumed to be a strict maximum point, the above inequality
+implies $\hat{y}=x$. Letting $\xi_{n}\coloneqq u^{\rho_{n}}(y_{n})-\varphi(y_{n})+e^{-1/\rho_{n}}$,
+we have $\xi_{n}\rightarrow0$ and $u^{\rho_{n}}{\leqslant}\varphi+\xi_{n}$
+for $n$ sufficiently large (recall that outside of $U$, $\varphi+\xi_{n}{\geqslant}1+\sup_{\rho>0}\Vert u^{\rho}\Vert_{\infty}+\xi_{n}$).
+
+The definition of $u^{\rho}$ and the monotonicity of $S$ yield
+\[
+0=S(\rho_{n},y_{n},u^{\rho_{n}}(y_{n}),u^{\rho_{n}},u^{\rho_{n}}){\geqslant} S(\rho_{n},y_{n},\varphi(y_{n})+\xi_{n}-e^{-1/\rho_{n}},\varphi+\xi_{n},u^{\rho_{n}})
+\]
+for $n$ sufficiently large. Taking limit inferiors and employing
+nonlocal consistency,
+\begin{align*}
+0 & {\geqslant}\liminf_{n\rightarrow\infty}S(\rho_{n},y_{n},\varphi(y_{n})+\xi_{n}-e^{-1/\rho_{n}},\varphi+\xi_{n},u^{\rho_{n}})\\
+ & {\geqslant}\liminf_{\substack{\rho\rightarrow0\\
+y\rightarrow x\\
+\xi\rightarrow0
+}
+}S(\rho,y,\varphi(y)+\xi-e^{-1/\rho},\varphi+\xi,u^{\rho})\\
+ & {\geqslant} G_{*}(D^{2}\varphi(x),D\varphi(x),\varphi(x),x),
+\end{align*}
+which is the desired inequality, since $\overline{u}(x)=\varphi(x)$.
+\end{proof}
+\begin{rem}The function $\rho\mapsto e^{-1/\rho}$ in the consistency
+requirement is used to allow for discontinuous solutions $u^{\rho}$
+(cf. \cite{253954}). Examining the proof above, we find that this
+function can be replaced by any positive function that vanishes as
+$\rho\rightarrow0$.\end{rem}
+
+We close this section by mentioning an extension of the theory that
+allows us to approximate solutions that are not necessarily bounded.
+Let $r:\mathbb{R}\rightarrow\mathbb{R}$ be a map defined by $r(x)\coloneqq{\operatorname{const.}}(1+x^{d})$
+where $d$ is a positive integer and let $R(\overline{\Omega})$ be
+the set of all functions $u:\overline{\Omega}\rightarrow\mathbb{R}$
+satisfying the polynomial growth condition
+\[
+\left|u(x)\right|{\leqslant} r(|x|)\text{ for all }x\in\overline{\Omega}.
+\]
+Now, relax (i) the stability condition to read
+\[
+\text{there exists a unique solution }u^{\rho}\in R(\overline{\Omega})\text{ of }\eqref{eq:scheme}\text{ for each }\rho>0,
+\]
+(ii) the consistency condition by requiring \eqref{eq:subconsistency}
+and \eqref{eq:superconsistency} to hold more generally for families
+$(w^{\rho})_{\rho>0}\subset R(\overline{\Omega})$ not necessarily
+uniformly bounded, and (iii) the comparison principle \eqref{eq:comparison}
+by replacing instances of $B(\overline{\Omega})$ by $R(\overline{\Omega})$.
+Then, we obtain a straightforward relaxation of {\prettyref}{thm:convergence_result}
+which allows for solutions of polynomial growth.
+
+\section{\label{sec:hjbqvi}Hamilton-Jacobi-Bellman quasi-variational inequalities}
+
+In this section, we apply our results to study numerically the finite-horizon
+Hamilton-Jacobi-Bellman quasi-variational inequality (HJBQVI)
+\begin{align}
+\min\left\{ -u_{t}-\sup_{b\in B}\left\{ H(D_{x}^{2}u(\cdot),D_{x}u(\cdot),\cdot,b)+f(\cdot,b)\right\} ,u-\mathcal{M}u\right\}  & =0\text{ on }[0,T)\times\mathbb{R}^{N}\nonumber \\
+\min\left\{ u(T,\cdot)-u_{T},u(T,\cdot)-\mathcal{M}u(T,\cdot)\right\}  & =0\text{ on }\mathbb{R}^{N}\label{eq:hjbqvi}
+\end{align}
+where $H$ is the (local) Hamiltonian defined by
+\begin{equation}
+H(X,p,t,x,b)\coloneqq\frac{1}{2}{\operatorname{trace}}(\sigma(t,x,b)\sigma(t,x,b)^{\intercal}X)+\left\langle \mu(t,x,b),p\right\rangle ,\label{eq:hamiltonian}
+\end{equation}
+and $\mathcal{M}$ is the (nonlocal) intervention operator defined
+by
+\begin{equation}
+\mathcal{M}u(t,x)\coloneqq\sup_{z\in Z(t,x)}\left\{ u(t,x+\Gamma(t,x,z))+K(t,x,z)\right\} .\label{eq:intervention}
+\end{equation}
+The HJBQVI above arises naturally from optimal impulse control \cite{MR673169,MR2109687,MR2568293}.
+We make the following assumptions about the quantities appearing in
+the HJBQVI:
+\begin{enumerate}[label=(H\arabic*)]
+\item \label{enu:vanilla_start}$f$, $\sigma$, $\mu$, $\Gamma$, $K$,
+and $u_{T}$ are continuous functions of their parameters.
+\item $f$ and $u_{T}$ are bounded.
+\item $B$ is a nonempty compact subset of $\mathbb{R}^{M_{1}}$.
+\item $Z(t,x)$ is a nonempty compact subset of $\mathbb{R}^{M_{2}}$ for
+each $(t,x)$.
+\item \label{enu:vanilla_end}$\sup_{t,x,z}K(t,x,z)<0$.
+\end{enumerate}
+
+To write the HJBQVI in the form \eqref{eq:pde}, we take
+\begin{multline}
+F(X,(a,p),r,u,(t,x))\\
+\coloneqq\begin{cases}
+\min\left\{ -a-\sup_{b\in B}\left\{ H(X,p,t,x,b)+f(t,x,b)\right\} ,r-\mathcal{M}u(t,x)\right\}  & \text{if }t<T\\
+\min\left\{ r-u_{T}(x),r-\mathcal{M}u(T,x)\right\}  & \text{if }t=T
+\end{cases}\label{eq:hjbqvi_operator}
+\end{multline}
+where we have used the notation $(a,p)$ to distinguish between the
+time derivative ($a=u_{t}(t,x)$) and gradient vector ($p=D_{x}u(t,x)$).
+
+\subsection{\label{subsec:penalty_scheme}Penalty scheme}
+
+We present in this section a ``penalty'' scheme for computing approximations
+to the HJBQVI. To simplify presentation, we restrict ourselves to
+the one-dimensional case ($N=1$). In this case, the Hamiltonian simplifies
+to
+\[
+H(X,p,t,x,b)=\frac{1}{2}\sigma(t,x,b)^{2}X+\mu(t,x,b)p.
+\]
+Consider a grid in time and space of mesh size $\Delta t$ and
+$\Delta x$ and denote by $P=T/\Delta t$ and $2M+1$ the integer
+number of timesteps and grid points. Letting $\rho$ be a positive
+meshing parameter, assume $\Delta x={\operatorname{const.}}\rho$, $\Delta t={\operatorname{const.}}\rho$,
+and $M\Delta x\rightarrow\infty$ as $\rho\rightarrow0$.
+
+Writing $u_{j}^{n}$ for the quantity $u(n\Delta t,j\Delta x)$, let
+$u^{n}\coloneqq(u_{j}^{n})_{j=-M}^{M}$ be the image of $u(n\Delta t,\cdot)$
+on the grid. Note that $u^{n}$ is a vector with $2M+1$ entries.
+For a vector $w$ in $\mathbb{R}^{2M+1}$, define
+\[
+(H^{n}(b,r)w)_{j}\coloneqq(H_{(1)}^{n}(b,r)w)_{j}+(H_{(2)}^{n}(b,r)w)_{j}
+\]
+where
+\[
+(H_{(1)}^{n}(b,r)w)_{j}\coloneqq\left|\mu(n\Delta t,j\Delta x,b)\right|\frac{w_{j+\operatorname{sgn}(\mu(n\Delta t,j\Delta x,b))}-r}{\Delta x}\left(1-\delta_{|j|,M}\right)
+\]
+and
+\begin{equation}
+(H_{(2)}^{n}(b,r)w)_{j}\coloneqq\frac{1}{2}\sigma(n\Delta t,j\Delta x,b)^{2}\frac{w_{j-1}-2r+w_{j+1}}{\left(\Delta x\right)^{2}}\left(1-\delta_{|j|,M}\right)\label{eq:diffusion_discretization}
+\end{equation}
+are approximations of the first and second derivative terms appearing
+in the Hamiltonian \eqref{eq:hamiltonian} ($\delta_{j,k}$ is the
+Kronecker delta). Therefore, we have
+\[
+H(D_{x}^{2}u(t,x),D_{x}u(t,x),t,x,b)\approx(H^{n}(b)u^{n})_{j}
+\]
+where $(H^{n}(b)w)_{j}\coloneqq(H^{n}(b,w_{j})w)_{j}$.
+
+Since the control set $B$ appearing in \eqref{eq:hjbqvi} may be
+infinite, we approximate it by a nonempty finite set $B^{\rho}\subset B$.
+To ensure consistency, we require:
+\begin{enumerate}[label=(H\arabic*),start=6]
+\item $B^{\rho}$ converges to $B$ as $\rho\rightarrow0$.
+\end{enumerate}
+In the above, convergence is with respect to the Hausdorff metric.
+Unless otherwise mentioned, we will always assume the Hausdorff metric
+when discussing compact sets.
+
+Similarly, since the set $Z(t,x)$ appearing in intervention operator
+\eqref{eq:intervention} may be infinite at each point $(t,x)$, we
+approximate it by a nonempty finite set $Z^{\rho}(t,x)\subset Z(t,x)$.
+To ensure consistency, we have the following requirements on $Z^{\rho}$:
+\begin{enumerate}[label=(H\arabic*),start=7]
+\item $(t,x)\mapsto Z^{\rho}(t,x)$ is continuous for each $\rho$.
+\item \label{enu:comparison_end}$Z^{\rho}$ converges to $Z$ locally uniformly
+as $\rho\rightarrow0$.
+\end{enumerate}
+\begin{rem}\label{rem:Z_is_continuous}The above implies that $(t,x)\mapsto Z(t,x)$
+is continuous, which in turn implies that $\mathcal{M}u$
+is upper (respectively lower) semicontinuous whenever $u$ is a real-valued
+upper (respectively lower) semicontinuous function \cite[Lemma 4.3]{MR2568293}.
+In this case, the function $(X,p,r,x)\mapsto F(X,p,r,\cdot,x)$ satisfies
+the requirements of {\prettyref}{rem:locally_bounded}.\end{rem}
+
+To approximate the value of $\mathcal{M}u(n\Delta t,j\Delta x)$ (see
+\eqref{eq:intervention}) using only information from the grid, we
+need to interpolate the value of $u(n\Delta t,\cdot)$ at $j\Delta x+\Gamma(n\Delta t,j\Delta x,z)$.
+As such, for a vector $w$ in $\mathbb{R}^{2M+1}$ and a point $x$
+in space, define
+\[
+{\operatorname{interp}}(w,x)\coloneqq\alpha w_{k+1}+(1-\alpha)w_{k}
+\]
+where $k$ is an integer in $\{-M,\ldots,M-1\}$ such that 
+\[
+\hat{x}\coloneqq\max\left\{ \min\left\{ x,\left(M-1\right)\Delta x\right\} ,-M\Delta x\right\} \in[k\Delta x,(k+1)\Delta x)
+\]
+and $\alpha\coloneqq(\hat{x}-k\Delta x)/\Delta x$. Though we have
+suppressed this in the notation, note that the quantities $\alpha$
+and $k$ depend on $x$. Now, defining
+\[
+(Q^{n}(z)w)_{j}\coloneqq{\operatorname{interp}}(w,j\Delta x+\Gamma(n\Delta t,j\Delta x,z)),
+\]
+we can make the approximation $\mathcal{M}u(n\Delta t,j\Delta x)\approx(\mathcal{M}^{n}u)_{j}$
+where
+\[
+(\mathcal{M}^{n}w)_{j}\coloneqq\max_{z\in Z^{\rho}(n\Delta t,j\Delta x)}\left\{ (Q^{n}(z)w)_{j}+K(n\Delta t,j\Delta x,z)\right\} .
+\]
+
+Finally, a ``penalty'' approximation of the HJBQVI (cf. \cite{altarovici2016optimal})
+is given by solving the discrete equations
+\begin{align}
+-\frac{u_{j}^{n+1}-u_{j}^{n}}{\Delta t}-\max_{b\in B^{\rho}}\left\{ (H^{n}(b)u^{n})_{j}+f(n\Delta t,j\Delta x,b)\right\} +\min\left\{ \frac{u_{j}^{n}-(\mathcal{M}^{n}u^{n})_{j}}{\rho\Delta t},0\right\}  & =0\nonumber \\
+u_{j}^{P}-u_{T}(j\Delta x) & =0\label{eq:penalty_scheme}
+\end{align}
+for $0{\leqslant} n<P$ and $-M{\leqslant} j{\leqslant} M$. For the intuition as to why
+such a scheme is referred to as a penalty scheme, we point the reader
+to \cite{MR673169}.
+
+Since our theory requires comparison to hold for the limiting equation
+(recall {\prettyref}{thm:convergence_result}), we mention at this point
+that a comparison principle for the HJBQVI holds under the following
+additional assumption:
+\begin{enumerate}[label=(H\arabic*),start=9]
+\item \label{enu:lipschitz}$\mu$, $\sigma$, and $f$ are Lipschitz in
+$x$ uniformly in $(t,b)$:
+\begin{multline*}
+\left|\mu(t,x,b)-\mu(t,y,b)\right|+\left|\sigma(t,x,b)-\sigma(t,y,b)\right|+\left|f(t,x,b)-f(t,y,b)\right|\\
+{\leqslant}{\operatorname{const.}}\left|x-y\right|.
+\end{multline*}
+\end{enumerate}
+The comparison principle is stated in {\prettyref}{app:comparison_principle}.
+
+Lastly, to discuss convergence, we need to identify a solution of
+the discrete equations \eqref{eq:penalty_scheme} with a real-valued
+function mapping from $[0,T]\times\mathbb{R}$. In particular, given
+a solution $(u^{n})_{n}$ of \eqref{eq:penalty_scheme}, we define
+the function $u^{\rho}:[0,T]\times\mathbb{R}\rightarrow\mathbb{R}$
+by
+\[
+u^{\rho}(t,x)\coloneqq\sum_{\substack{0{\leqslant} n{\leqslant} P\\
+-M{\leqslant} j{\leqslant} M
+}
+}u_{j}^{n}\mathbf{1}_{E_{j}^{n}}(t,x)
+\]
+where
+\begin{equation}
+E_{j}^{n}\coloneqq[(n-\nicefrac{1}{2})\Delta t,(n+\nicefrac{1}{2})\Delta t)\times[(j-\nicefrac{1}{2})\Delta x,(j+\nicefrac{1}{2})\Delta x).\label{eq:domain_partition}
+\end{equation}
+
+We are now finally ready to state the convergence result, whose proof
+(which relies on {\prettyref}{thm:convergence_result}) is given in
+{\prettyref}{app:penalty_convergence}.
+\begin{theorem}
+\label{thm:penalty_convergence}As $\rho\rightarrow0$, the solution
+$u^{\rho}$ of \eqref{eq:penalty_scheme} converges locally uniformly
+to the unique bounded solution of \eqref{eq:hjbqvi}.
+\end{theorem}
+\begin{rem}\label{rem:ios}\eqref{eq:penalty_scheme} should not
+be confused with the iterated optimal stopping (IOS) approach analyzed
+in \cite{MR2314777}. The idea behind IOS is to compute a solution
+of \eqref{eq:hjbqvi} as the limit of a nondecreasing sequence $(u^{k})_{k}$
+where $u^{0}$ is the solution of
+\begin{align*}
+-u_{t}-\sup_{b\in B}\left\{ H(D_{x}^{2}u(\cdot),D_{x}u(\cdot),\cdot,b)+f(\cdot,b)\right\}  & =0\text{ on }[0,T)\times\mathbb{R}^{N}\\
+u(T,\cdot)-u_{T} & =0\text{ on }\mathbb{R}^{N}
+\end{align*}
+and $u^{k}$ ($k{\geqslant}1$) is the solution of
+\begin{align*}
+\min\left\{ -u_{t}-\sup_{b\in B}\left\{ H(D_{x}^{2}u(\cdot),D_{x}u(\cdot),\cdot,b)+f(\cdot,b)\right\} ,u-\mathcal{M}u^{k-1}\right\}  & =0\text{ on }[0,T)\times\mathbb{R}^{N}\\
+u(T,\cdot)-u_{T} & =0\text{ on }\mathbb{R}^{N}.
+\end{align*}
+
+IOS is ill-suited for finite time-horizon (i.e., $T<\infty$) problems.
+To see why, note that in order to compute $u^{k}$ numerically, we
+require $u^{k-1}$. Computationally, this corresponds to storing the
+entire solution (consisting of $\Theta(MP)$ grid points). Instead,
+to solve \eqref{eq:penalty_scheme}, we need only ever store the solution
+at the previous timestep (consisting of $\Theta(M)$ grid points).
+For a detailed discussion, we refer to \cite{MR3150265}.\end{rem}
+
+\subsubsection{\label{subsec:penalty_scheme_computation}Computation}
+
+Equation \eqref{eq:penalty_scheme} relates $u^{n}$ to the solution
+at the next timestep, $u^{n+1}$. Since \eqref{eq:penalty_scheme}
+is a nonlinear equation in $u^{n}$, it is not immediately clear how
+to compute $u^{n}$. This issue was considered in \cite{MR3493959}.
+For the reader's convenience, we repeat the results of \cite{MR3493959}
+here.
+
+Let 
+\[
+\boldsymbol{B}\coloneqq\prod_{j=-M}^{M}B^{\rho}\text{ and }\boldsymbol{Z}^{n}\coloneqq Z^{\rho}(n\Delta t,-M\Delta x)\times\cdots\times Z^{\rho}(n\Delta t,M\Delta x).
+\]
+A member $\boldsymbol{b}\coloneqq(b_{-M},\ldots,b_{M})$ of $\boldsymbol{B}$
+is interpreted as a ``grid control'' (i.e., $b_{j}$ is the control
+employed at the grid point $j\Delta x$). Members $\boldsymbol{z}\coloneqq(z_{-M},\ldots,z_{M})$
+of $\boldsymbol{Z}^{n}$ are interpreted similarly. Let $H^{n}(\boldsymbol{b})$
+and $Q^{n}(\boldsymbol{z})$ be $(2M+1)\times(2M+1)$ matrices whose
+entries are determined by
+\[
+(H^{n}(\boldsymbol{b})w)_{j}\coloneqq(H^{n}(b_{j})w)_{j}\text{ and }(Q^{n}(\boldsymbol{z})w)_{j}\coloneqq(Q^{n}(z_{j})w)_{j}.
+\]
+Similarly, $f^{n}(\boldsymbol{b})$ and $K^{n}(\boldsymbol{z})$ are vectors whose
+entries are given by
+\[
+(f^{n}(\boldsymbol{b}))_{j}\coloneqq f(n\Delta t,j\Delta x,b_{j})\text{ and }(K^{n}(\boldsymbol{z}))_{j}\coloneqq K(n\Delta t,j\Delta x,z_{j}).
+\]
+Lastly, let $\boldsymbol{D}\coloneqq\{0,1\}^{2M+1}$ be the set of
+binary strings $\boldsymbol{d}\coloneqq(d_{-M},\ldots,d_{M})$ of
+length $2M+1$.
+
+Now, fix $n{\geqslant}1$. Writing $P\coloneqq(\boldsymbol{b},\boldsymbol{z},\boldsymbol{d})$,
+define the matrix-vector pair
+\begin{align*}
+A(P) & \coloneqq I-H^{n}(\boldsymbol{b})\Delta t+{\operatorname{diag}}(\boldsymbol{d})(I-Q^{n}(\boldsymbol{z}))/\rho\\
+\text{and }g(P) & \coloneqq u^{n+1}+f^{n}(\boldsymbol{b})\Delta t+{\operatorname{diag}}(\boldsymbol{d})K^{n}(\boldsymbol{z})/\rho.
+\end{align*}
+Performing some straightforward algebra on \eqref{eq:penalty_scheme},
+it is easily verified that $w=u^{n}$ is a solution of the Bellman
+problem
+\begin{equation}
+\text{find }w\in\mathbb{R}^{2M+1}\text{ such that }\max_{P\in\mathcal{P}}\left\{ -A(P)w+g(P)\right\} =0\label{eq:bellman_problem}
+\end{equation}
+where $\mathcal{P}\coloneqq\boldsymbol{B}\times\boldsymbol{Z}^{n}\times\boldsymbol{D}$
+and it is understood that the maximum is taken with respect to the
+element-wise partial order on $\mathbb{R}^{2M+1}$. We have the following
+result from \cite{MR3493959}.
+\begin{proposition}[\cite{MR3493959}]
+\label{prop:bellman}The unique solution of \eqref{eq:bellman_problem}
+can be computed by policy iteration ({\prettyref}{alg:policy_iteration}),
+which is guaranteed to terminate in at most $|\mathcal{P}|+1$
+iterations.
+\end{proposition}
+\begin{proof}
+Show that $A(P)$ is an M-matrix for each $P$ in $\mathcal{P}$ (see
+\cite{MR0444681} for a definition of M-matrix) and apply \cite[Theorem 2.1]{MR2551155}.
+\end{proof}
+\begin{algorithm}[H]
+\begin{algor}[1]
+\item [{{*}}] $w^{0}\coloneqq u^{n+1}$
+\item [{for}] $\ell=1,2,\ldots$
+\begin{algor}[1]
+\item [{{*}}] Pick $P^{\ell}$ such that $-A(P^{\ell})w^{\ell-1}+g(P^{\ell})=\max_{P\in\mathcal{P}}(-A(P)w^{\ell-1}+g(P))$
+\item [{{*}}] Let $w^{\ell}$ be the solution of the linear system $A(P^{\ell})w=g(P^{\ell})$
+\item [{if}] $w^{\ell}=w^{\ell-1}$
+\begin{algor}[1]
+\item [{{*}}] \textbf{return} $w^{\ell}$
+\end{algor}
+\item [{endif}]~
+\end{algor}
+\item [{endfor}]~
+\end{algor}
+\caption{Policy iteration algorithm to compute the unique solution of \eqref{eq:bellman_problem}\label{alg:policy_iteration}}
+\end{algorithm}
+
+\subsubsection{Extension to the infinite-horizon case}
+
+If we assume the functions $f$, $\sigma$, $\mu$, $Z$, $\Gamma$,
+and $K$ are independent of time (i.e., $f(t,x,b)=f(0,x,b)$, $\sigma(t,x,b)=\sigma(0,x,b)$,
+etc.), the infinite-horizon analogue of \eqref{eq:hjbqvi} is given
+by
+\begin{multline*}
+\min\biggl\{ \beta u-\sup_{b\in B}\left\{ H(D^{2}u(x),Du(x),t=0,\cdot,b)+f(t=0,\cdot,b)\right\} ,\\
+u-\mathcal{M}u(t=0,\cdot)\biggr\} =0\text{ on }\mathbb{R}^{N}
+\end{multline*}
+where $\beta>0$ is a positive decay (a.k.a. discount) factor. We
+can extend the scheme \eqref{eq:penalty_scheme} to this setting by
+considering the discrete equations
+\begin{equation}
+\beta u_{j}-\max_{b\in B^{\rho}}\left\{ (H^{0}(b)u)_{j}+f(t=0,j\Delta x,b)\right\} +\min\left\{ \frac{u_{j}-(\mathcal{M}^{0}u)_{j}}{\rho},0\right\} =0\label{eq:penalty_informal-1}
+\end{equation}
+for $-M{\leqslant} j{\leqslant} M$. We can establish an analogue of {\prettyref}{thm:penalty_convergence}
+for the infinite-horizon case. Moreover, similar to {\prettyref}{prop:bellman},
+we can show that the solution $(u_{j})_{j}$ of the scheme \eqref{eq:penalty_informal-1}
+is unique and can be obtained by applying policy iteration ({\prettyref}{alg:policy_iteration})
+to the Bellman problem \eqref{eq:bellman_problem} with $\mathcal{P}\coloneqq\boldsymbol{B}\times\boldsymbol{Z}^{0}\times\boldsymbol{D}$,
+\begin{align*}
+A(P) & \coloneqq\beta I-H^{0}(\boldsymbol{b})+{\operatorname{diag}}(\boldsymbol{d})(I-Q^{0}(\boldsymbol{z}))/\rho,\\
+\text{and }g(P) & \coloneqq f^{0}(\boldsymbol{b})+{\operatorname{diag}}(\boldsymbol{d})K^{0}(\boldsymbol{z})/\rho.
+\end{align*}
+
+\subsection{Semi-Lagrangian scheme}
+
+The penalty scheme of the previous section is versatile: it handles
+both finite and infinite-horizon problems with minimal restrictions
+on the coefficients of the HJBQVI. However, as we saw in {\prettyref}{subsec:penalty_scheme_computation},
+computing the solution of the penalty scheme requires an iterative method such as policy iteration at each timestep.
+
+If the horizon is finite (i.e., $T<\infty$) and the second derivative
+coefficient is independent of the control $b$ (i.e., $\sigma(t,x,b)=\sigma(t,x)$),
+we can avoid having to solve a Bellman problem altogether (thereby speeding up computation) by using
+a technique referred to as \emph{semi-Lagrangian integration}, which
+is well-known in the fluid dynamics literature \cite{staniforth1991semi}
+and has been previously used in the finance literature \cite{MR2201186}.
+The idea is described below.
+
+Define the Lagrangian derivative
+\[
+\frac{Du}{Dt}(t,x,b)\coloneqq u_{t}(t,x)+\left\langle \mu(t,x,b),D_{x}u(t,x)\right\rangle 
+\]
+so that we may write
+\[
+u_{t}(t,x){+}H(D_{x}^{2}u(t,x){,}D_{x}u(t,x){,}t{,}x{,}b){=}\frac{Du}{Dt}(t,x,b){+}\frac{1}{2}{\operatorname{trace}}(\sigma(t,x)\sigma(t,x)^\intercal D_{x}^{2}u(t,x)).
+\]
+Restricting our attention to the one-dimensional grid of the previous
+section for simplicity, we can discretize the Lagrangian derivative
+by
+\begin{equation}
+\frac{Du}{Dt}(n\Delta t,j\Delta x,b)\approx\frac{{\operatorname{interp}}(u^{n+1},j\Delta x+\mu_j^n(b)\Delta t)-u_{j}^{n}}{\Delta t}\label{eq:lagrangian_discretization}
+\end{equation}
+where $\mu_j^n(b)\coloneqq \mu(n\Delta t,j\Delta x, b)$.
+The above is obtained by a Taylor expansion.
+
+Due to our assumption that $\sigma$ is independent of the control
+$b$, we can define
+\[
+(H_{(2)}^{n}(r)w)_{j}\coloneqq\frac{1}{2}\sigma(n\Delta t,j\Delta x)^{2}\frac{w_{j-1}-2r+w_{j+1}}{\left(\Delta x\right)^{2}}\left(1-\delta_{|j|,M}\right)
+\]
+as the control-independent version of \eqref{eq:diffusion_discretization}.
+Motivated by the discretization \eqref{eq:lagrangian_discretization},
+we create a scheme according to the equations
+\begin{align}
+\min\left\{ -\max_{b\in B^{\rho}}\left\{ \begin{gathered}\frac{{\operatorname{interp}}(u^{n+1},j\Delta x+\mu_j^n(b)\Delta t)-u_{j}^{n}}{\Delta t}\\
++(H_{(2)}^{n}u^{n})_{j}+f(n\Delta t,j\Delta x,b)
+\end{gathered}
+\right\} ,u_{j}^{n}-(\mathcal{M}^{n}u^{n+1})_{j}+\gamma_{j}^{n}\right\}  & =0\nonumber \\
+u_{j}^{P}-u_{T}(j\Delta x) & =0\label{eq:semi_lagrangian_scheme}
+\end{align}
+where $(H_{(2)}^{n}w)_{j}\coloneqq(H_{(2)}^{n}(w_{j})w)_{j}$ and
+we will choose the term $\gamma_{j}^{n}$ momentarily. If we take
+$\gamma_{j}^{n}\coloneqq-(H_{(2)}^{n}u^{n})_{j}\Delta t$, some algebra
+reveals that we may rewrite the scheme as
+\begin{align}
+u_{j}^{n}-(H_{(2)}^{n}u^{n})_{j}\Delta t & =\max\left\{ \max_{b\in B^{\rho}}\left\{ \begin{gathered}{\operatorname{interp}}(u^{n+1},j\Delta x+\mu_j^n(b)\Delta t)\\
++f(n\Delta t,j\Delta x,b)\Delta t
+\end{gathered}
+\right\} ,(\mathcal{M}^{n}u^{n+1})_{j}\right\} \nonumber \\
+u_{j}^{P} & =u_{T}(j\Delta x).\label{eq:semi_lagrangian_scheme_modified}
+\end{align}
+
+Now, fix $n{\geqslant}1$. Writing $P\coloneqq(\boldsymbol{b},\boldsymbol{z},\boldsymbol{d})$
+as in {\prettyref}{subsec:penalty_scheme_computation}, define the 
+pair
+\begin{align*}
+A & \coloneqq I-H_{(2)}^{n}\Delta t\\
+\text{and }g(P) & \coloneqq(I-{\operatorname{diag}}(\boldsymbol{d}))(\hat{u}^{n+1}(\boldsymbol{b})+f^{n}(\boldsymbol{b})\Delta t)+{\operatorname{diag}}(\boldsymbol{d})(Q^{n}(\boldsymbol{z})u^{n+1}+K^{n}(\boldsymbol{z}))
+\end{align*}
+where $\hat{u}^{n+1}(\boldsymbol{b})$ is the vector with entries
+\[
+(\hat{u}^{n+1}(\boldsymbol{b}))_{j}\coloneqq{\operatorname{interp}}(u^{n+1},j\Delta x+\mu(n\Delta t,j\Delta x,b_{j})\Delta t).
+\]
+Then, performing some straightforward algebra on \eqref{eq:semi_lagrangian_scheme_modified},
+it is easily verified that
+\[
+Au^{n}=\max_{P\in\mathcal{P}}g(P)
+\]
+where $\mathcal{P}\coloneqq\boldsymbol{B}\times\boldsymbol{Z}^{n}\times\boldsymbol{D}$
+as in {\prettyref}{subsec:penalty_scheme_computation}. In particular,
+$u^{n}$ is the unique solution of a linear system involving a strictly
+diagonally dominant (nonsingular) matrix. This implies that
+no policy iteration is necessary in the semi-Lagrangian scheme.
+
+\begin{rem}The semi-Lagrangian scheme can be sped up even further
+when the second derivative coefficient depends only on space
+(i.e., $\sigma(t,x,b)=\sigma(x)$). In this case, we factor
+$A$ once (instead of at each timestep). If we are instead using an
+iterative linear system solver, we precondition $A$ once (instead
+of at each timestep).\end{rem}
+
+We have the following convergence result, whose proof is given
+in {\prettyref}{app:semi_lagrangian_convergence}.
+\begin{theorem}
+\label{thm:semi_lagrangian_convergence}As $\rho\rightarrow0$, the
+solution $u^{\rho}$ of \eqref{eq:semi_lagrangian_scheme_modified}
+converges locally uniformly to the unique bounded solution of \eqref{eq:hjbqvi}.
+\end{theorem}
+
+\subsection{\label{subsec:stochastic_semi_lagrangian_scheme}Stochastic semi-Lagrangian
+scheme}
+
+While the scheme of the previous section is appealing, it
+\begin{itemize}
+\item is not easy to parallelize;
+\item requires wide-stencils \cite{MR2399429} or techniques involving interpolation
+\cite{MR3042570} to ensure monotonicity in higher dimensions;
+\item requires $\sigma$ to be independent of the control.
+\end{itemize}
+The first two points above also apply to the penalty scheme.
+
+We give, in this section, a stochastic extension of the semi-Lagrangian
+scheme that does not suffer from these issues. As usual, to simplify
+presentation, we restrict ourselves to the one-dimensional case ($N=1$).
+The reader should have no trouble extending the scheme to higher dimensions.
+
+The scheme is motivated by the approximation
+\begin{equation}
+u_{t}(t,x)+H(D_{x}^{2}u(t,x),D_{x}u(t,x),t,x,b)\approx\frac{\mathbb{E}\left[u(t+\Delta t,\hat{X}^{t,x,b})\right]-u(t,x)}{\Delta t}\label{eq:stochastic_lagrangian_derivative}
+\end{equation}
+where
+\[
+\hat{X}^{t,x,b}\coloneqq x+\mu(t,x,b)\Delta t+\sigma(t,x,b)\phi.
+\]
+and $\phi\sim\mathcal{N}(0,\Delta t)$. Noting that $\hat{X}^{t,x,b}$
+is an Euler discretization of the stochastic differential equation
+(SDE) 
+\[
+dX_{s}=\mu(s,X_{s},b)ds+\sigma(s,X_{s},b)dW_{s},
+\]
+the right-hand side of \eqref{eq:stochastic_lagrangian_derivative}
+can be thought of as an Euler discretization of the infinitesimal
+generator of the process $s\mapsto(s,X_{s})$, where $X$ satisfies
+the above SDE with initial condition $X_{t}=x$. Alternatively, \eqref{eq:stochastic_lagrangian_derivative}
+can be thought of as a stochastic extension of \eqref{eq:lagrangian_discretization}.
+We refer to \cite{MR2857450,MR3190342} for further intuition.
+
+Letting
+\begin{equation}
+U_j^{n+1}\coloneqq {\operatorname{interp}}(u^{n+1},\hat{X}^{n\Delta t,j\Delta x,b}),\label{eq:rv}
+\end{equation}
+we are motivated by the discussion of the previous paragraph to create
+a scheme according to the equations
+\begin{align}
+\min\left\{ -\max_{b\in B^{\rho}}\left\{ \frac{\mathbb{E}^{\rho}\left[U_j^{n+1}\right]-u_{j}^{n}}{\Delta t}+f(n\Delta t,j\Delta x,b)\right\} ,u_{j}^{n}-(\mathcal{M}^{n}u^{n+1})_{j}\right\}  & =0\nonumber \\
+u_{j}^{P}-u_{T}(j\Delta x) & =0\label{eq:stochastic_semi_lagrangian_scheme}
+\end{align}
+where we have used $\mathbb{E}^{\rho}$ to denote an approximate expectation
+(computed by, e.g., a Monte Carlo or quasi-Monte Carlo method). As
+with the semi-Lagrangian scheme of the previous section, some simple
+algebra allows us to rewrite this as
+\begin{align}
+u_{j}^{n} & =\max\left\{ \max_{b\in B^{\rho}}\left\{ \mathbb{E}^{\rho}\left[U_j^{n+1}\right]+f(n\Delta t,j\Delta x,b)\Delta t\right\} ,(\mathcal{M}^{n}u^{n+1})_{j}\right\} \nonumber \\
+u_{j}^{P} & =u_{T}(j\Delta x).\label{eq:stochastic_semi_lagrangian_scheme_modified}
+\end{align}
+In this form, it is clear that $u_{j}^{n}$ can be computed independently
+of $u_{j^{\prime}}^{n}$ ($j\neq j^{\prime}$) so that we may parallelize
+the computation of $u^{n}$.
+
+Let $\mathcal{R}_{k}$ be the family of random variables of the form
+$\psi(\phi)$ where $\psi$ is a real-valued Borel measurable map
+satisfying $\Vert\psi\Vert_{\infty}{\leqslant} k$ and $\phi$ is a normal
+random variable with zero mean and variance $\Delta t={\operatorname{const.}}\rho$.
+For the convergence proofs, we assume:
+\begin{enumerate}[label=(H\arabic*),start=10]
+\item \label{enu:approximate_expectation_1}For each $k>0$, there exist
+$c,\alpha>0$ such that $|\mathbb{E}^{\rho}[R]-\mathbb{E}[R]|{\leqslant} c\rho^{1+\alpha}$
+for all $R$ in $\mathcal{R}_{k}$.
+\item \label{enu:approximate_expectation_2}$\mathbb{E}^{\rho}[R]{\leqslant}\Vert R\Vert_{\infty}$
+for all $R$ in $\cup_{k>0}\mathcal{R}_{k}$.
+\end{enumerate}
+
+We have the following convergence result, whose proof is given
+in {\prettyref}{app:stochastic_semi_lagrangian_convergence}.
+\begin{theorem}
+\label{thm:stochastic_semi_lagrangian_convergence}As $\rho\rightarrow0$,
+the solution $u^{\rho}$ of \eqref{eq:stochastic_semi_lagrangian_scheme_modified}
+converges locally uniformly to the unique bounded solution of \eqref{eq:hjbqvi}.
+\end{theorem}
+\begin{rem}\label{rem:quasi_monte_carlo}The approximate expectation
+in \eqref{eq:stochastic_semi_lagrangian_scheme_modified} should,
+in practice, be computed using a quasi-Monte Carlo method with $S$
+sample paths. Taking $1/S={\operatorname{const.}}\rho$, the Koksma-Hlawka inequality
+\cite{MR1365433} suggests that the error of this scheme is, using
+big O notation, $O((\log S)^{N}/S)=O(|\log\rho|^{N}\rho)$. A (pseudorandom)
+Monte Carlo method would require $1/S={\operatorname{const.}}\rho^{2}$ to obtain a
+comparable $O(\rho)$ error.
+
+It is important also to mention that to compute the numerical solution
+for a fixed meshing parameter $\rho$, we need only compute $S$ elements
+of a quasi-random sequence in total (instead of computing $S$ elements
+at each timestep). This is made clear in the pseudocode implementation
+of \eqref{eq:stochastic_semi_lagrangian_scheme_modified} given in
+{\prettyref}{app:stochastic_semi_lagrangian_pseudocode}.\end{rem}
+
+\section{\label{sec:integro_differential_equations}Integro-differential equations}
+
+In this section, we briefly show how to establish the nonlocal consistency
+of approximations to integro-differential operators. To keep matters
+simple, we consider the same one-dimensional grid introduced in {\prettyref}{subsec:penalty_scheme}
+and the integral operator
+\[
+Ju(t,x)\coloneqq\int_{-\infty}^{\infty}u(t,x+y)\nu(dy)
+\]
+where $\nu$ is a finite activity L\'{e}vy measure (in the case of infinite
+activity, one can use the technique described in \cite[Section 5.2]{MR2182141}).
+Letting
+\[
+\nu_{j}^{\rho}\coloneqq\int_{(j-\nicefrac{1}{2})\Delta x}^{(j+\nicefrac{1}{2})\Delta x}\nu(dy),
+\]
+we may, for example, wish to approximate the integral operator at
+the point $(t,x)=(n\Delta t,j\Delta x)$ by
+\[
+Ju(t,x)\approx(J^{n}u^{n})_{j}\coloneqq\sum_{-M-j{\leqslant} k{\leqslant} M-j}u_{j+k}^{n}\nu_{k}^{\rho}.
+\]
+
+We now show that the approximation above is nonlocally consistent.
+In particular, let $(w^{\rho})_{\rho>0}$ be a family of uniformly
+bounded real-valued maps from $[0,T]\times\mathbb{R}$ with half-relaxed
+limits $\overline{w}$ and $\underline{w}$. Without loss of generality,
+we can assume that for each $\rho>0$, the map $w^{\rho}$ is constant
+on each set of the form $E_{j}^{n}$ (recall that $E_{j}^{n}$ defined
+in \eqref{eq:domain_partition} depends on $\rho$). Now, let $(\rho_{m},t_{m},x_{m})_{m}$
+be an arbitrary sequence such that $\rho_{m}\rightarrow0$, $t_{m}\rightarrow t$,
+and $x_{m}\rightarrow x$. Without loss of generality, we can assume
+$x_{m}=j_{m}\Delta x$ is a grid point. Then, by Fatou's lemma,
+\begin{align*}
+\limsup_{m\rightarrow\infty}\sum_{-M-j{\leqslant} k{\leqslant} M-j}w^{\rho_{m}}(t_{m},(j_{m}+k)\Delta x)\nu_{k}^{\rho} & =\limsup_{m\rightarrow\infty}\int_{-\infty}^{\infty}w^{\rho_{m}}(t_{m},x_{m}+y)\nu(dy)\\
+ & {\leqslant}\int_{-\infty}^{\infty}\limsup_{m\rightarrow\infty}w^{\rho_{m}}(t_{m},x_{m}+y)\nu(dy)\\
+ & {\leqslant}\int_{-\infty}^{\infty}\overline{w}(t,x+y)\nu(dy).
+\end{align*}
+Similarly,
+\[
+\liminf_{m\rightarrow\infty}\sum_{-M-j{\leqslant} k{\leqslant} M-j}w^{\rho_{m}}(t_{m},(j_{m}+k)\Delta x)\nu_{k}^{\rho}{\geqslant}\int_{-\infty}^{\infty}\underline{w}(t,x+y)\nu(dy),
+\]
+establishing analogues of \eqref{eq:subconsistency} and \eqref{eq:superconsistency}
+for the discrete operator $J^{n}$.
+
+From the above discussion, it is clear that we can use the framework
+of this paper to deal with integro-differential operators. Note that
+if we are considering the polynomial growth case discussed at the
+end of {\prettyref}{sec:convergence_result} in which $(w^{\rho})_{\rho>0}\subset R(\mathbb{R})$
+is not necessarily uniformly bounded, we must ensure that
+\[
+\int_{-\infty}^{\infty}r(|x+y|)\nu(dy)<\infty
+\]
+in order to apply Fatou's lemma as above.
+
+\section{\label{sec:numerical_example}Numerical example}
+
+\cite{MR1614233} considers a government able to influence the foreign
+exchange rate (FEX) of their currency by
+\begin{itemize}
+\item choosing the domestic interest rate at all times;
+\item intervening in the FEX market by buying or selling
+foreign currency.
+\end{itemize}
+This results in an impulse control problem. As a proof of concept,
+we apply the scheme of {\prettyref}{subsec:stochastic_semi_lagrangian_scheme}
+to compute solutions of this problem in an extended setting involving
+stochastic volatility.
+
+\subsection{Problem description}
+
+Let $b_{u}$ denote the domestic interest rate at time $u$, chosen
+by the government. Let $\tau_{1}{\leqslant}\tau_{2}{\leqslant}\cdots{\leqslant}\infty$
+be an increasing sequence of (stopping) times at which the government
+intervenes in the FEX market by selling or buying large amounts of
+foreign currency. At time $\tau_{j}$, such an intervention scales
+the FEX rate, the number of domestic monetary units it takes to buy
+one average foreign monetary unit, by a multiplicative factor of $e^{z_{j}}$
+units. In particular, we assume that the logarithm of the FEX rate
+$Y$ is given by
+\[
+Y_{s}=Y_{t}+\int_{t}^{s}-\kappa(b_{u}-\bar{r})du+\int_{t}^{s}\nu_{u}dW_{u}^{Y}+\sum_{t{\leqslant}\tau_{j}{\leqslant} s}z_{j}
+\]
+where the stochastic volatility $\nu$ is given by
+\[
+\nu_{s}=\nu_{t}+\int_{t}^{s}\theta\left(\overline{\nu}-\nu_{u}\right)du+\int_{t}^{s}\xi\sqrt{\nu_{u}}dW_{u}^{\nu}.
+\]
+$W^{Y}$ and $W^{\nu}$ are independent Brownian motions and $\kappa$,
+$\bar{r}$, $\theta$, $\bar{\nu}$, and $\xi$ are nonnegative constants.
+Of particular note is $\bar{r}$, the average foreign interest rate.
+
+For brevity, define $X\coloneqq(Y,\nu)^{\intercal}$ as a vector of
+processes. Then, the cost incurred by the government is captured by
+a function $v$ defined by
+\begin{multline}
+v(t,x)\coloneqq\\
+\inf\mathbb{E}^{(t,x)}\left[\int_{t}^{T}e^{-\beta s}\left[\left(\left(Y_{s}-m\right)^{2}+\gamma\left(b_{s}-\bar{r}\right)^{2}\right)\wedge p\right]ds+\sum_{t{\leqslant}\tau_{j}{\leqslant} T}e^{-\beta\tau_{j}}\left(\lambda\left|z_{j}\right|+c\right)\right]\label{eq:fex_value}
+\end{multline}
+where the symbol $\mathbb{E}^{(t,x)}$ denotes the expectation conditional
+on $X_{t}=x\coloneqq(x_{1},x_{2})^{\intercal}$. In the above, $\beta$,
+$m$, $\gamma$, $p$, and $\lambda$ are nonnegative constants and
+$c$ is a positive constant, parameterizing the problem. In particular,
+$m$ is referred to as the optimal parity, corresponding to the target
+FEX rate the government wishes to maintain. The infimum is taken over
+all controls $(b;\tau_{1},z_{1};\tau_{2},z_{2};\ldots)$ where
+\begin{enumerate}[label=(A\arabic*)]
+\item $b\coloneqq(b_{s})_{s\in[t,T]}$ is a progressively measurable process
+taking values in the interval $[-b^{\max},b^{\max}]$ where $b^{\max}$
+is some nonnegative constant.
+\item \label{enu:gmwb_impulse_assumptions-1}$(\tau_{j})_{j}$ is a nondecreasing
+sequence of stopping times and each $z_{j}$ is a real-valued $\tau_{j}$
+measurable random variable.
+\end{enumerate}
+Using standard arguments (see, e.g., \cite{MR1614233,MR2568293}),
+it is possible to show that $-v$ is a solution of the HJBQVI \eqref{eq:hjbqvi}
+under the following parameterization:
+\begin{align*}
+N & =2,\\
+B & =[-b^{\max},b^{\max}],\\
+f(t,x,b) & =-e^{-\beta t}[((x_{1}-m)^{2}+\gamma(b-\bar{r})^{2})\wedge p],\\
+\sigma(t,x,b) & ={\operatorname{diag}}(x_{2},\xi\sqrt{x_{2}})\\
+\mu(t,x,b) & =(-\kappa(b-\bar{r}),\theta(\overline{\nu}-x_{2}))^{\intercal}\\
+Z(t,x) & =[-d-x_{1},d-x_{1}],\\
+\Gamma(t,x,z) & =(z,0)^{\intercal},\\
+K(t,x,z) & =-e^{-\beta t}(\lambda|z|+c),\\
+\text{and }u_{T}(x) & =0
+\end{align*}
+where $d$ is some sufficiently large positive constant.
+
+\begin{rem}The original formulation in \cite{MR1614233} corresponds
+to the case of $p=\infty$ in \eqref{eq:fex_value}. We have used
+a finite value of $p$ to obtain the boundedness of $v$, simplifying
+the presentation. The case of $p=\infty$ can be handled using the
+extended machinery discussed at the end of {\prettyref}{sec:convergence_result}
+since in this case, $v$ is of quadratic growth (i.e., $|v(t,x)|{\leqslant}{\operatorname{const.}}(1+|x|^{2})$).
+In practice, a large finite value of $p$ is sufficient to study the
+problem numerically.\end{rem}
+
+\subsection{\label{subsec:results}Numerical results}
+
+\begin{table}
+\centering
+\footnotesize
+\begin{tabular}{rrr}
+\toprule 
+\multicolumn{2}{r}{Parameter} & \multicolumn{1}{l}{Value}\tabularnewline
+\midrule
+Volatility reversion speed & $\theta$ & 1\tabularnewline
+Volatility reverting level & $\overline{\nu}$ & 0.3\tabularnewline
+Volatility of stochastic volatility & $\xi$ & 0.5\tabularnewline
+Average foreign interest rate & $\overline{r}$ & 0.02\tabularnewline
+FEX rate drift speed & $\kappa$ & 0.25\tabularnewline
+Horizon & $T$ & 10\tabularnewline
+Discount factor & $\beta$ & 0.02\tabularnewline
+Optimal parity & $m$ & 0\tabularnewline
+Interest rate differential cost & $\gamma$ & 3\tabularnewline
+Scaled transaction cost & $\lambda$ & 1\tabularnewline
+Fixed transaction cost & $c$ & 0.1\tabularnewline
+Maximal domestic interest rate & $b^{\max}$ & 0.07\tabularnewline
+\bottomrule
+\end{tabular}
+\caption{Parameters\label{tab:parameters}}
+\end{table}
+
+\begin{figure}
+\centering
+\subfloat[Convergence\label{fig:convergence}]{\includegraphics[height=1.5in]{fex2d_convergence}}
+~
+\subfloat[Timing\label{fig:timing}]{\includegraphics[height=1.5in]{fex2d_timing}}
+\caption{}
+\end{figure}
+
+\begin{figure}
+\centering
+\subfloat[Control\label{fig:ctrl}]{\includegraphics[height=1.5in]{fex2d_control-crop}}
+~
+\subfloat[Value function\label{fig:val}]{\includegraphics[height=1.5in]{fex2d_value-crop}}
+\caption{Numerical solution at time $t=0$}
+\end{figure}
+
+In this subsection we present our numerical results. The parameters
+used are listed in {\prettyref}{tab:parameters}. Space is discretized
+using (roughly) $90/\rho^{2}$ points. The time-horizon is discretized
+using $P=32/\rho$ points. The control set $B$ is discretized using
+$3/\rho$ points. At each grid point $(t,x)$, the control set $Z(t,x)$
+is discretized using $13/\rho$ points. $S=64/\rho$ elements of a
+Sobol sequence are used to compute the approximate expectation $\mathbb{E}^{\rho}$
+of \eqref{eq:stochastic_semi_lagrangian_scheme_modified}.
+
+Convergence of the method is demonstrated in {\prettyref}{fig:convergence},
+where the computed value function $v$ at the point $(t=0,x_{1}=0,x_{2}=0.3)$
+is plotted versus the meshing parameter $\rho$. Tests were run on
+an Intel Xeon Processor E5440 12M Cache, 2.83 GHz, 1333 MHz FSB.
+We mention that $p$ is chosen to be the maximum double-precision
+floating point number on this architecture. Timing
+results are given in {\prettyref}{fig:timing}.
+
+An optimal control is plotted in {\prettyref}{fig:ctrl}. Regions of
+the $(x_{1},x_{2})$ plane that are shaded correspond to areas where
+interventions occur. Outside of the shaded region, the government
+chooses the domestic interest rate according to the plotted surface.
+We have displayed a few representative interventions that move the
+log FEX rate instantaneously from one point (tail of an arrow) to
+another (head of an arrow).
+
+We see that if the FEX rate is sufficiently close to parity ($m=0$),
+the government does not intervene in the market. In this region, the
+government exerts their influence by choosing the domestic interest
+rate $b$. However, if the log FEX rate is too large in magnitude,
+the government intervenes by selling large amounts of foreign currency
+to bring the FEX rate back to some acceptable level. This discussion
+suggests that the value function satisfies
+\[
+v(t,x)=v(t,\eta_{0}(t,x_{2}),x_{2})-\lambda\left(\left|x_{1}\right|-\eta_{0}(t,x_{2})\right)-c\text{ for }\left|x\right|{\geqslant}\eta(t,x_{2})
+\]
+where $\eta_{0},\eta:[0,T]\times[0,\infty)\rightarrow\mathbb{R}$
+are some (deterministic) functions (cf. \cite{MR1614233}). This phenomenon
+is captured in {\prettyref}{fig:val}.
+
+\section{Summary and future research}
+
+We have extended, in a general manner, the Barles\textendash Souganidis
+framework to weakly nonlocal second order equations. Our method relies
+on a new notion of consistency to handle nonlocalities. This extension
+has allowed us to prove the convergence of several approximation
+schemes for equations arising from impulse control problems (i.e.,
+HJBQVIs). Of particular note is the new
+stochastic semi-Lagrangian scheme,
+which is fully explicit, unconditionally stable, trivially monotone
+in higher dimensions, and embarrassingly parallel.
+
+In terms of future research, we mention work needed to make the stochastic
+semi-Lagrangian scheme effective for use with computing clusters.
+In particular, to compute the approximate expectation in \eqref{eq:stochastic_semi_lagrangian_scheme},
+one requires the solution $u^{n+1}$ at \emph{all} points on the spatial
+grid. This poses an issue if nodes in the cluster do not
+share one source of fast memory (i.e., RAM). Making the stochastic
+semi-Lagrangian scheme ``cluster-friendly'' is important for these
+practical architectures. A second promising direction for future research
+is to extend the techniques of \cite{MR2857450,MR3190342} to obtain
+schemes of Longstaff\textendash Schwartz type. This would
+have the benefit of being able to approximate solutions of high-dimensional impulse control problems.
+
+{{\small}
+\bibliography{convergence}}
+
+\appendix
+
+\section{\label{app:comparison_principle}Comparison principle for the HJBQVI}
+
+We give in this appendix a comparison principle for the HJBQVI \eqref{eq:hjbqvi}.
+To do so, we first introduce an alternate notion of viscosity solution,
+subsequently proving that it is equivalent to {\prettyref}{def:viscosity_solution}
+when $F$ is the operator defined by \eqref{eq:hjbqvi_operator}.
+\begin{definition}
+\label{def:viscosity_solution_alternate}Let $\Omega\coloneqq[0,T)\times\mathbb{R}^{N}$.
+$u\in B_{\operatorname{loc}}(\overline{\Omega})$ is a (viscosity) subsolution (respectively
+supersolution) of \eqref{eq:pde} if for all $\varphi\in C^{2}(\overline{\Omega})$
+and $(t,x)\in\overline{\Omega}$ such that $u^{*}-\varphi$ (respectively
+$u_{*}-\varphi$) has a local maximum (respectively minimum) at $(t,x)$,
+we have
+\begin{align*}
+ & F(D^{2}\varphi(t,x),D\varphi(t,x),u^{*}(t,x),u^{*},(t,x)){\leqslant}0\\
+\text{(respectively } & F(D^{2}\varphi(t,x),D\varphi(t,x),u_{*}(t,x),u_{*},(t,x)){\geqslant}0\text{)}.
+\end{align*}
+\end{definition}
+\begin{lemma}
+Let $F$ be given by \eqref{eq:hjbqvi_operator}. Then, $u\in B_{\operatorname{loc}}(\overline{\Omega})$
+is a subsolution (respectively supersolution) in the sense
+of {\prettyref}{def:viscosity_solution} (with $\Omega=[0,T)\times\mathbb{R}^{N}$)
+if and only if it is a subsolution (respectively supersolution)
+in the sense of {\prettyref}{def:viscosity_solution_alternate}.
+\end{lemma}
+We prove only the nontrivial direction. The proof follows \cite[Remark 3.2]{MR2857450}.
+\begin{proof}
+Let $u$ be a subsolution in the sense of {\prettyref}{def:viscosity_solution}.
+Let $\varphi\in C^{2}(\overline{\Omega})$ and $(T,x)$ be a maximum
+point of $u^{*}-\varphi$. Then,
+\begin{multline*}
+\min\bigl\{-\varphi_{t}(T,x)-\sup_{b\in B}\left\{ H(D_{x}^{2}\varphi(T,x),D_{x}\varphi(T,x),T,x,b)+f(T,x,b)\right\} ,\\
+u(T,x)-\mathcal{M}u(T,x),u(T,x)-u_{T}(x)\bigr\}{\leqslant}0.
+\end{multline*}
+Define $\psi(t,\cdot)\coloneqq\varphi(t,\cdot)+c(T-t)$ where $c$
+is some positive constant, to be chosen later. Then, $(T,x)$ is also
+a maximum point of $u^{*}-\psi$. Therefore,
+\begin{multline*}
+\min\bigl\{-\varphi_{t}(T,x)-\sup_{b\in B}\left\{ H(D_{x}^{2}\varphi(T,x),D_{x}\varphi(T,x),T,x,b)+f(T,x,b)\right\} +c,\\
+u^{*}(T,x)-\mathcal{M}u^{*}(T,x),u^{*}(T,x)-u_{T}(x)\bigr\}{\leqslant}0.
+\end{multline*}
+By choosing $c$ large enough, we obtain
+\begin{multline*}
+F(D^{2}\varphi(T,x),D\varphi(T,x),u^{*}(T,x),u^{*},(T,x))\\
+=\min\left\{ u^{*}(T,x)-\mathcal{M}u^{*}(T,x),u^{*}(T,x)-u_{T}(x)\right\} {\leqslant}0.
+\end{multline*}
+Therefore, $u^{*}$ is also a subsolution in the sense of {\prettyref}{def:viscosity_solution_alternate}.
+The case of supersolutions is handled similarly.
+\end{proof}
+Due to the above equivalence, we have access to a comparison principle
+whose proof is a straightforward modification of \cite[Theorem 2.13]{azimzadeh2016value}.
+For the convenience of the reader, the assumptions are listed explicitly
+in the statement of the result.
+\begin{proposition}
+Let $F$ be given by \eqref{eq:hjbqvi_operator} and assume
+\ref{enu:vanilla_start}\textendash \ref{enu:vanilla_end} and
+\ref{enu:lipschitz} hold and $(t,x)\mapsto Z(t,x)$ is continuous.
+Then, the comparison principle \eqref{eq:comparison} is satisfied.
+\end{proposition}
+
+\section{\label{app:penalty_convergence}Convergence of the penalty scheme}
+
+We prove in this appendix {\prettyref}{thm:penalty_convergence} by
+applying {\prettyref}{thm:convergence_result}. In order to do so, we
+must define precisely a scheme $S$ corresponding to \eqref{eq:penalty_scheme}
+and show that it is \emph{stable}, \emph{monotone}, and \emph{nonlocally
+consistent}. Some algebra reveals that \eqref{eq:penalty_scheme}
+can be written in the alternate form
+\begin{align*}
+\min\left\{ \begin{gathered}-\frac{u_{j}^{n+1}-u_{j}^{n}}{\Delta t}-\max_{b\in B^{\rho}}\left\{ (H^{n}(b)u^{n})_{j}+f(n\Delta t,j\Delta x,b)\right\} \\
+(u_{j}^{n}{-}u_{j}^{n+1}-\max_{b\in B^{\rho}}\left\{ (H^{n}(b)u^{n})_{j}+f(n\Delta t,j\Delta x,b)\right\} \Delta t)\rho+u_{j}^{n}{-}(\mathcal{M}^{n}u^{n})_{j}
+\end{gathered}
+\right\}  & =0\\
+u_{j}^{P}-u_{T}(j\Delta x) & =0.
+\end{align*}
+Recalling the definition of $E_{j}^{n}$ in \eqref{eq:domain_partition},
+let
+\begin{equation}
+S(\rho,(t,x),r,u,w)\coloneqq\sum_{\substack{0{\leqslant} n{\leqslant} P\\
+-M{\leqslant} j{\leqslant} M
+}
+}S_{j}^{n}(\rho,r,u,w)\mathbf{1}_{E_{j}^{n}}(t,x)\label{eq:penalty_formal}
+\end{equation}
+where
+\begin{multline*}
+S_{j}^{n}(\rho,r,u,w)\coloneqq\\
+\min\left\{ \begin{gathered}-\frac{u_{j}^{n+1}-r}{\Delta t}-\max_{b\in B^{\rho}}\left\{ (H^{n}(b,r)u^{n})_{j}+f(n\Delta t,j\Delta x,b)\right\}, \\
+(r-u_{j}^{n+1}-\max_{b\in B^{\rho}}\left\{ (H^{n}(b,r)u^{n})_{j}+f(n\Delta t,j\Delta x,b)\right\} \Delta t)\rho+r-(\mathcal{M}^{n}w^{n})_{j}
+\end{gathered}
+\right\} 
+\end{multline*}
+if $n<P$ and $S_{j}^{P}(\rho,r,u,w)\coloneqq r-u_{T}(j\Delta x)$.
+
+\subsection{Stability}
+\begin{lemma}
+The scheme $S$ is stable.
+\end{lemma}
+\begin{proof}
+Let $(u_{j}^{n})_{n,j}$ be a solution of the scheme for some fixed
+$\rho>0$. The existence and uniqueness of this solution is guaranteed
+by {\prettyref}{prop:bellman}.
+
+Let $0{\leqslant} n<P$ and $j^{*}$ be such that $u_{j^{*}}^{n}=\min_{j}u_{j}^{n}$.
+It is easily verified that $(H^{n}(b)u^{n})_{j^{*}}{\geqslant}0$. Therefore,
+\begin{multline*}
+-\frac{u_{j^{*}}^{n+1}-u_{j^{*}}^{n}}{\Delta t}-\max_{b\in B^\rho}\left\{ (H^{n}(b)u^{n})_{j^{*}}+f(n\Delta t,j^{*}\Delta x,b)\right\} +\min\left\{ \frac{u_{j^{*}}^{n}-(\mathcal{M}^{n}u^{n})_{j^{*}}}{\rho\Delta t},0\right\} \\
+{\leqslant}-\frac{u_{j^{*}}^{n+1}-u_{j^{*}}^{n}}{\Delta t}+\Vert f\Vert_{\infty}.
+\end{multline*}
+Since the left-hand side of this inequality is equal to zero (see
+\eqref{eq:penalty_scheme}), it follows that 
+\[
+u_{j^{*}}^{n}{\geqslant} u_{j^{*}}^{n+1}-\Vert f\Vert_{\infty}\Delta t{\geqslant}\min_{j}u_{j}^{n+1}-\Vert f\Vert_{\infty}\Delta t.
+\]
+Using the above, we can establish (by induction)
+\[
+u_{j}^{n}{\geqslant}-\Vert u_{T}\Vert_{\infty}-\Vert f\Vert_{\infty}\left(T-n\Delta t\right)\text{ for all }n,j.
+\]
+
+Now, let $0{\leqslant} n<P$ and $j^{*}$ be such that $u_{j^{*}}^{n}=\max_{j}u_{j}^{n}$.
+It is easily verified that $(H^{n}(b)u^{n})_{j^{*}}{\leqslant}0$ and $(\mathcal{M}^{n}u^{n})_{j^{*}}{\leqslant} u_{j^{*}}^{n}$
+(since $K{\leqslant}0$). Therefore,
+\begin{multline*}
+-\frac{u_{j^{*}}^{n+1}-u_{j^{*}}^{n}}{\Delta t}-\max_{b\in B^\rho}\left\{ (H^{n}(b)u^{n})_{j^{*}}+f(n\Delta t,j^{*}\Delta x,b)\right\} +\min\left\{ \frac{u_{j^{*}}^{n}-(\mathcal{M}^{n}u^{n})_{j^{*}}}{\rho\Delta t},0\right\} \\
+{\geqslant}-\frac{u_{j^{*}}^{n+1}-u_{j^{*}}^{n}}{\Delta t}-\Vert f\Vert_{\infty}.
+\end{multline*}
+Similar to the previous paragraph, this implies
+\[
+u_{j}^{n}{\leqslant}\Vert u_{T}\Vert_{\infty}+\Vert f\Vert_{\infty}\left(T-n\Delta t\right)\text{ for all }n,j.{}
+\]
+\end{proof}
+
+\subsection{Monotonicity}
+
+The monotonicity of the scheme is a trivial consequence of its definition.
+We leave the details to the reader.
+\begin{lemma}
+The scheme $S$ is monotone.
+\end{lemma}
+
+\subsection{Nonlocal consistency}
+
+To prove the nonlocal consistency of the scheme, we require a few
+lemmas. 
+\begin{lemma}
+\label{lem:commute}Let $(a_{n})_{n}$, $(b_{n})_{n}$, and $(c_{n})_{n}$
+be real sequences with $c_{n}{\geqslant}\min\{a_{n},b_{n}\}$ (respectively
+$c_{n}{\leqslant}\min\{a_{n},b_{n}\}$) for each $n$. Then,
+\begin{align*}
+\liminf_{n\rightarrow\infty}c_{n} & {\geqslant}\min\{\liminf_{n\rightarrow\infty}a_{n},\liminf_{n\rightarrow\infty}b_{n}\}\\
+\text{(respectively }\limsup_{n\rightarrow\infty}c_{n} & {\leqslant}\min\{\limsup_{n\rightarrow\infty}a_{n},\limsup_{n\rightarrow\infty}b_{n}\}\text{)}.
+\end{align*}
+\end{lemma}
+\begin{proof}
+If $c_{n}{\geqslant}\min\{a_{n},b_{n}\}$ for each $n$,
+\[
+\inf_{m{\geqslant} n}c_{n}{\geqslant}\inf_{m{\geqslant} n}\min\{a_{n},b_{n}\}=\min\{\inf_{m{\geqslant} n}a_{n},\inf_{m{\geqslant} n}b_{n}\}.
+\]
+Taking limits and using the continuity of $(x,y)\mapsto\min(x,y)$
+establishes the result. The case of $c_{n}{\leqslant}\min\{a_{n},b_{n}\}$
+is handled similarly.
+\end{proof}
+The next lemma ensures us that we can approximate the term $\max_{b\in B}\{\cdot\}$
+appearing in the HJBQVI \eqref{eq:hjbqvi} using the finite control
+set $B^\rho$.
+\begin{lemma}
+\label{lem:cluster_point}Let $Y$ be a compact metric space and $\gamma:Y\times B\rightarrow\mathbb{R}$
+be a continuous function. Further let $(\rho_{m})_{m}$ be a sequence
+of positive real numbers converging to zero and $(y_{m})_{m}$ be
+a sequence taking values in $Y$ and converging to some $\hat{y}\in Y$.
+Then, 
+\[
+\max_{b\in B^{\rho_{m}}}\gamma(y_{m},b)\rightarrow\max_{b\in B}\gamma(\hat{y},b).
+\]
+\end{lemma}
+\begin{proof}
+Let $\gamma_{m}\equiv\max_{b\in B^{\rho_{m}}}\gamma(y_{m},b)$. Since
+the sequence $(\gamma_{m})_{m}$ is bounded by $\Vert\gamma\Vert_{\infty}<\infty$
+($Y\times B$ is compact and $\gamma$ is continuous), it is sufficient
+to show that every convergent subsequence of $(\gamma_{m})_{m}$ converges
+to $\max_{b\in B}\gamma(\hat{y},b)$.
+
+Therefore, consider an arbitrary convergent subsequence of $(\gamma_{m})_{m}$,
+and relabel it, with a slight abuse of notation, $(\gamma_{m})_{m}$.
+ Since $B^{\rho_{m}}\rightarrow B$, we can find a sequence $(b_{m})_{m}$
+such that $b_{m}\in B^{\rho_{m}}$ for each $m$, $b_{m}\rightarrow\hat{b}\in B$,
+and $\gamma(\hat{y},\hat{b})=\max_{b\in B}\gamma(\hat{y},b)$. Therefore,
+\[
+\lim_{m\rightarrow\infty}\gamma_{m}=\lim_{m\rightarrow\infty}\max_{b\in B^{\rho_{m}}}\gamma(y_{m},b){\geqslant}\lim_{m\rightarrow\infty}\gamma(y_{m},b_{m})=\max_{b\in B}\gamma(\hat{y},b).
+\]
+Furthermore, note that
+\[
+\lim_{m\rightarrow\infty}\gamma_{m}=\lim_{m\rightarrow\infty}\max_{b\in B^{\rho_{m}}}\gamma(y_{m},b){\leqslant}\lim_{m\rightarrow\infty}\max_{b\in B}\gamma(y_{m},b)=\max_{b\in B}\gamma(\hat{y},b)
+\]
+where we have obtained the last inequality by the continuity
+of $y\mapsto\max_{b\in B}\gamma(y,b)$.
+
+To see that $y\mapsto\max_{b\in B}\gamma(y,b)$ is continuous, let
+$y_{0}\in Y$ and $\epsilon>0$ be arbitrary. Since $\gamma$ is defined
+on a compact set and thereby uniformly continuous, we can pick $\delta>0$
+such that for all $b\in B$ and $y_{1}\in Y$ with $|y_{0}-y_{1}|<\delta$,
+$|\gamma(y_{0},b)-\gamma(y_{1},b)|<\epsilon$ and hence
+\[
+\left|\max_{b\in B}\gamma(y_{0},b)-\max_{b\in B}\gamma(y_{1},b)\right|{\leqslant}\max_{b\in B}\left|\gamma(y_{0},b)-\gamma(y_{1},b)\right|<\epsilon.{}
+\]
+\end{proof}
+The next lemma characterizes the approximate intervention operator
+as $\rho\rightarrow0$.
+\begin{lemma}
+\label{lem:intervention_limits}Let $(w^{\rho})_{\rho>0}$ be a family
+of uniformly bounded real-valued maps from $[0,T]\times\mathbb{R}$
+with half-relaxed limits $\overline{w}$ and $\underline{w}$. Let
+$w^{n,\rho}\coloneqq(w^{\rho}(n\Delta t,j\Delta x))_{j}$ be the image
+of $w^{\rho}(n\Delta t,\cdot)$ on the grid and $W^{\rho}$ be the
+function defined by
+\begin{equation}
+W^{\rho}(t,x)=\sum_{\substack{0{\leqslant} n{\leqslant} P\\
+-M{\leqslant} j{\leqslant} M
+}
+}(\mathcal{M}^{n}w^{n,\rho})_{j}\mathbf{1}_{E_{j}^{n}}(t,x)\label{eq:W}
+\end{equation}
+(while not explicit in the notation, the quantities $P$, $M$, $\mathcal{M}^{n}$,
+and $E_{j}^{n}$ depend on $\rho$). Then,
+\[
+\mathcal{M}\underline{w}(t,x){\leqslant}\liminf_{\substack{\rho\rightarrow0\\
+(s,y)\rightarrow(t,x)
+}
+}W^{\rho}(s,y){\leqslant}\limsup_{\substack{\rho\rightarrow0\\
+(s,y)\rightarrow(t,x)
+}
+}W^{\rho}(s,y){\leqslant}\mathcal{M}\overline{w}(t,x).
+\]
+\end{lemma}
+\begin{proof}
+We first prove the leftmost inequality. Let
+$(\rho_{m},t_{m},x_{m})_{m}$ be an arbitrary sequence satisfying
+$\rho_{m}\rightarrow0$, $t_{m}\rightarrow t$, and $x_{m}\rightarrow x$.
+Without loss of generality, we can assume $t_{m}=n_{m}\Delta t$ and
+$x_{m}=j_{m}\Delta x$ are grid points. Now, let $\delta>0$ and choose
+$z^{\delta}\in Z(t,x)$ such that
+\[
+\mathcal{M}\underline{w}(t,x){\leqslant}\underline{w}(t,x+\Gamma(t,x,z^{\delta}))+K(t,x,z^{\delta})+\delta.
+\]
+Since it was assumed that $Z^{\rho}\rightarrow Z$ locally uniformly,
+we can pick a sequence $(z_{m})_{m}$ such that $z_{m}\rightarrow z^{\delta}$
+and $z_{m}\in Z^{\rho_{m}}(t_{m},x_{m})$ for each $m$. For brevity,
+we write $w_{j}^{m}$ for the quantity $w^{\rho_{m}}(n_{m}\Delta t,j\Delta x)$.
+Then,
+\[
+W^{\rho_{m}}(t_{m},x_{m})=\alpha_{m}w_{k_{m}+1}^{m}+(1-\alpha_{m})w_{k_{m}}^{m}+K(t_{m},x_{m},z_{m})
+\]
+where $0{\leqslant}\alpha_{m}{\leqslant}1$ and $k_{m}\Delta x\rightarrow x+\Gamma(t,x,z^{\delta})$.
+Therefore, by {\prettyref}{lem:commute},
+\begin{align*}
+\liminf_{m\rightarrow\infty}W^{\rho_{m}}(t_{m},x_{m}) & {\geqslant}\liminf_{m\rightarrow\infty}\left\{ \min\left\{ w_{k_{m}+1}^{m},w_{k_{m}}^{m}\right\} +K(t_{m},x_{m},z_{m})\right\} .\\
+ & {\geqslant}\min\left\{ \liminf_{m\rightarrow\infty}w_{k_{m}+1}^{m},\liminf_{m\rightarrow\infty}w_{k_{m}}^{m}\right\} +K(t,x,z^{\delta}).\\
+ & =\underline{w}(t,x+\Gamma(t,x,z^{\delta}))+K(t,x,z^{\delta})\\
+ & {\geqslant}\mathcal{M}\underline{w}(t,x)-\delta.
+\end{align*}
+Since $\delta$ is arbitrary, the desired result follows.
+
+We now handle the rightmost inequality. Let
+$(\rho_{m},t_{m},x_{m})_{m}$ be an arbitrary sequence satisfying
+$\rho_{m}\rightarrow0$, $t_{m}\rightarrow t$, and $x_{m}\rightarrow x$.
+Without loss of generality, we can assume $t_{m}=n_{m}\Delta t$ and
+$x_{m}=j_{m}\Delta x$ are grid points. Since $Z^{\rho_{m}}(t_{m},x_{m})$
+was assumed to be finite, for each $m$, there exists a $z_{m}\in Z^{\rho_{m}}(t_{m},x_{m})$
+such that
+\[
+W^{\rho_{m}}(t_{m},x_{m})=\alpha_{m}w_{k_{m}+1}^{m}+(1-\alpha_{m})w_{k_{m}}^{m}+K(t_{m},x_{m},z_{m})
+\]
+where $0{\leqslant}\alpha_{m}{\leqslant}1$ and $k_{m}\Delta x\rightarrow x+\Gamma(t,x,z^{\delta})$.
+Since $Z^{\rho_{m}}(t_{m},x_{m})\subset Z(t_{m},x_{m})$, it follows
+that $(z_{m})_{m}$ is contained in a bounded set and thus has a convergent
+subsequence with limit $\hat{z}\in Z(t,x)$. Therefore, by {\prettyref}{lem:commute},
+\begin{align*}
+\limsup_{m\rightarrow\infty}W^{\rho_{m}}(t_{m},x_{m}) & {\leqslant}\limsup_{m\rightarrow\infty}\left\{ \max\left\{ w_{k_{m}+1}^{m},w_{k_{m}}^{m}\right\} +K(t_{m},x_{m},z_{m})\right\} \\
+ & {\leqslant}\max\left\{ \limsup_{m\rightarrow\infty}w_{k_{m}+1}^{m},\limsup_{m\rightarrow\infty}w_{k_{m}}^{m}\right\} +K(t,x,\hat{z})\\
+ & =\overline{w}(t,x+\Gamma(t,x,\hat{z}))+K(t,x,\hat{z})\\
+ & {\leqslant}\mathcal{M}\overline{w}(t,x).{}
+\end{align*}
+\end{proof}
+We can now conclude our proof with the following lemma.
+\begin{lemma}
+\label{lem:nonlocal_consistency}The scheme $S$ is nonlocally consistent.
+\end{lemma}
+We prove only the inequality \eqref{eq:subconsistency}, \eqref{eq:superconsistency}
+being similar.
+\begin{proof}
+Let $(w^{\rho})_{\rho>0}$ be a family of uniformly bounded real-valued
+maps from $[0,T]\times\mathbb{R}$ with half-relaxed limits $\overline{w}$
+and $\underline{w}$, $\varphi\in C^{1,2}([0,T]\times\mathbb{R})$,
+$(t,x)\in[0,T]\times\mathbb{R}$, and $(\rho_{m},t_{m},x_{m},\xi_{m})_{m}$
+be an arbitrary sequence such that $\rho_{m}\rightarrow0$, $t_{m}\rightarrow t$,
+$x_{m}\rightarrow x$, and $\xi_{m}\rightarrow0$. Without loss of
+generality, we can assume $t_{m}=n_{m}\Delta t$ and $x_{m}=j_{m}\Delta x$
+are grid points. For brevity, let $\varphi_{j}^{n}$ denote $\varphi(n\Delta t,j\Delta x)$
+and $\varphi^{n}\coloneqq(\varphi_{j}^{n})_{j}$.
+
+Suppose $t<T$. In this case, we may assume that $t_{m}<T$ for each
+$m$ so that
+\begin{equation}
+S(\rho_{m},(t_{m},x_{m}),\varphi(t_{m},x_{m})+\xi_{m}-e^{-1/\rho_{m}},\varphi+\xi_{m},w^{\rho_{m}})=\min\left\{ S_{m}^{(1)},S_{m}^{(2)}\right\} \label{eq:consistency_proof_1}
+\end{equation}
+where
+\[
+S_{m}^{(1)}\coloneqq-\frac{\varphi_{j_{m}}^{n_{m}+1}-\varphi_{j_{m}}^{n_{m}}}{\Delta t}-\max_{b\in B^{\rho_{m}}}\left\{ (H^{n_{m}}(b)\varphi^{n_{m}})_{j}+f(t_{m},x_{m},b)\right\} +O\left(\frac{e^{-1/\rho_{m}}}{\rho_{m}^{2}}\right)
+\]
+and
+\[
+S_{m}^{(2)}\coloneqq\varphi_{j_{m}}^{n_{m}}+\xi_{m}-e^{-1/\rho_{m}}-W^{\rho_{m}}(t_{m},x_{m}).
+\]
+($W^{\rho}$ is defined in \eqref{eq:W}). Taking limit inferiors
+in \eqref{eq:consistency_proof_1} and applying {\prettyref}{lem:commute},
+\begin{multline*}
+\liminf_{m\rightarrow\infty}S(\rho_{m},(t_{m},x_{m}),\varphi(t_{m},x_{m})+\xi_{m}-e^{-1/\rho_{m}},\varphi+\xi_{m},w^{\rho_{m}})\\=\liminf_{m\rightarrow\infty}\min\left\{ S_{m}^{(1)},S_{m}^{(2)}\right\}
+{\geqslant}\min\left\{ \liminf_{m\rightarrow\infty}S_{m}^{(1)},\liminf_{m\rightarrow\infty}S_{m}^{(2)}\right\} .
+\end{multline*}
+Since $M\Delta x\rightarrow\infty$, by {\prettyref}{lem:cluster_point},
+\[
+\lim_{m\rightarrow\infty}S_{m}^{(1)}=-\varphi_{t}(t,x)-\max_{b\in B}\left\{ H(D_{x}^{2}\varphi(t,x),D_{x}\varphi(t,x),t,x,b)+f(t,x,b)\right\} .
+\]
+Moreover, by {\prettyref}{lem:intervention_limits},
+\[
+\liminf_{m\rightarrow\infty}S_{m}^{(2)}{\geqslant}\varphi(t,x)-\limsup_{m\rightarrow\infty}W^{\rho_{m}}(t_{m},x_{m}){\geqslant}\varphi(t,x)-\mathcal{M}\overline{w}(t,x).
+\]
+Since the sequence $(\rho_{m},t_{m},x_{m},\xi_{m})_{m}$ was arbitrary,
+we have
+\begin{multline*}
+\liminf_{\substack{\rho\rightarrow0\\
+(s,y)\rightarrow(t,x)\\
+\xi\rightarrow0
+}
+}S(\rho,(s,y),\varphi(s,y)+\xi-e^{-1/\rho},\varphi+\xi,w^{\rho})\\
+{\geqslant}\min\left\{ -\varphi_{t}(t,x)-H(D_{x}^{2}\varphi(t,x),t,x),\varphi(t,x)-\mathcal{M}\overline{w}(t,x)\right\} ,
+\end{multline*}
+which is the desired inequality.
+
+Suppose $t=T$. In this case, for each $m$,
+\[
+S(\rho_{m},(t_{m},x_{m}),\varphi(t_{m},x_{m})+\xi_{m}-e^{-1/\rho_{m}},\varphi+\xi_{m},w^{\rho_{m}}){\geqslant}\min\left\{ S_{m}^{(1)},S_{m}^{(2)},S_{m}^{(3)}\right\} 
+\]
+where $S_{m}^{(3)}\coloneqq\varphi_{j_{m}}^{n_{m}}+\xi_{m}-e^{-1/\rho_{m}}-u_{T}(x_{m})$
+approaches $\varphi(t,x)-u_{T}(x)$ as $m\rightarrow\infty$. The
+rest of the proof proceeds as in the case of $t<T$.
+\end{proof}
+
+\section{\label{app:semi_lagrangian_convergence}Convergence of the semi-Lagrangian
+scheme}
+
+We prove in this appendix {\prettyref}{thm:semi_lagrangian_convergence}.
+As usual, we must first define precisely a scheme $S$ corresponding
+to \eqref{eq:semi_lagrangian_scheme}. We define $S$ by \eqref{eq:penalty_formal}
+where
+\begin{multline*}
+S_{j}^{n}(\rho,r,u,w)\\
+\coloneqq\min\left\{ -\max_{b\in B^{\rho}}\left\{ \begin{gathered}\frac{{\operatorname{interp}}(u^{n+1},j\Delta x+\mu_j^n(b)\Delta t)-r}{\Delta t}\\
++(H_{(2)}^{n}(b,r)u^{n})_{j}+f(n\Delta t,j\Delta x,b)
+\end{gathered}
+\right\} ,r-(\mathcal{M}^{n}w^{n+1})_{j}+\gamma_{j}^{n}\right\} 
+\end{multline*}
+if $n<P$ and $S_{j}^{P}(\rho,r,u,w)\coloneqq r-u_{T}(j\Delta x)$.
+In the above, $\gamma_{j}^{n}\coloneqq(H_{(2)}^{n}(r)u^{n})_{j}\Delta t$.
+
+While stability and monotonicity are established following similar
+ideas as in {\prettyref}{app:penalty_convergence}, the nonlocal consistency
+arguments require a bit more care.
+
+\subsection{Nonlocal consistency}
+\begin{lemma}
+The scheme $S$ is nonlocally consistent.
+\end{lemma}
+\begin{proof}[Proof sketch]
+For a smooth function $\varphi$ and constant $\xi$ we have
+\begin{multline*}
+\frac{{\operatorname{interp}}(\varphi(n\Delta t+\Delta t,\cdot)+\xi,x+\mu(n\Delta t,x,b)\Delta t)-\varphi(n\Delta t,x)-\xi\pm e^{-1/\rho}}{\Delta t}\\
+=\frac{\varphi(n\Delta t+\Delta t,x+\mu(n\Delta t,x,b)\Delta t)-\varphi(n\Delta t,x)}{\Delta t}+O(\rho)\\
+=\varphi_{t}(t,x)+\mu(t,x,b)D_{x}\varphi(t,x)+O(\rho)
+\end{multline*}
+by a Taylor expansion. Moreover,
+\[
+(H_{(2)}^{n}(r)\varphi^{n})_{j}\Delta t=O(\rho).
+\]
+Using these facts, we can modify the proof of {\prettyref}{lem:nonlocal_consistency}
+to arrive at the result.
+\end{proof}
+
+\section{\label{app:stochastic_semi_lagrangian_convergence}Convergence of
+the stochastic semi-Lagrangian scheme}
+
+We prove in this appendix {\prettyref}{thm:stochastic_semi_lagrangian_convergence}.
+As usual, we must first define precisely a scheme $S$ corresponding
+to \eqref{eq:stochastic_semi_lagrangian_scheme}. We define $S$ by
+\eqref{eq:penalty_formal} where
+\[
+S_{j}^{n}(\rho,r,u,w)\coloneqq
+\min\left\{ -\max_{b\in B^{\rho}}\left\{ \frac{\mathbb{E}^{\rho}\left[U_j^{n+1}\right]-r}{\Delta t}+f(n\Delta t,j\Delta x,b)\right\} ,r-(\mathcal{M}^{n}w^{n+1})_{j}\right\} 
+\]
+if $n<P$ and $S_{j}^{P}(\rho,r,u,w)\coloneqq r-u_{T}(j\Delta x)$ (recall that $U_j^{n+1}$ is defined by \eqref{eq:rv}).
+
+While stability is easily established using \ref{enu:approximate_expectation_2}
+(obtaining the bound $\Vert u_{T}\Vert_{\infty}+\Vert f\Vert_{\infty}T$
+on solutions similar to the proof of stability in {\prettyref}{app:penalty_convergence}),
+the monotonicity and nonlocal consistency arguments require a bit
+more care.
+
+\subsection{Monotonicity}
+
+Since the approximate expectation $\mathbb{E}^{\rho}$ is not necessarily
+monotone, it is not possible to establish the monotonicity of the
+stochastic semi-Lagrangian scheme. However, an examination of the
+proof of {\prettyref}{thm:convergence_result} reveals that the monotonicity
+requirement of {\prettyref}{sec:convergence_result} is stronger than
+what is needed for convergence (cf. \cite[Remark 2.1]{MR1115933}).
+
+In particular, we require only
+\begin{gather}
+S(\rho,\cdot,\cdot,u,\cdot){\leqslant} S(\rho,\cdot,\cdot,w,\cdot)+h(\rho)\nonumber \\
+\text{for all }u,w\text{ such that }\Vert u\Vert_{\infty},\Vert w\Vert_{\infty}{\leqslant} k\text{ and }u{\geqslant} w\text{ pointwise}\label{eq:approximate_monotonicity}
+\end{gather}
+where $h$ is a function satisfying $h(\rho)\rightarrow0$ as $\rho\rightarrow0$
+and $k$ is an appropriately chosen constant. For example, an appropriate
+choice of $k$ so that the proof of {\prettyref}{thm:convergence_result}
+remains valid subject to the ``approximate'' monotonicity requirement
+\eqref{eq:approximate_monotonicity} is $k\coloneqq2+\sup_{\rho}\Vert u^{\rho}\Vert_{\infty}$
+($u^{\rho}$ are the solutions of the scheme) which we fix for the
+remainder of this appendix.
+\begin{lemma}
+There exists a function $h$ such that $h(\rho)\rightarrow0$ as $\rho\rightarrow0$
+such that \eqref{eq:approximate_monotonicity} is satisfied for the
+scheme $S$.
+\end{lemma}
+\begin{proof}[Proof sketch]
+Write the approximate expectation as $\mathbb{E}^{\rho}[\cdot]=\mathbb{E}[\cdot]+(\mathbb{E}^{\rho}[\cdot]-\mathbb{E}[\cdot])$
+and employ the monotonicity of the ordinary expectation $\mathbb{E}$
+and \ref{enu:approximate_expectation_1}.
+\end{proof}
+
+\subsection{Nonlocal consistency}
+
+In order to apply \ref{enu:approximate_expectation_1} to obtain \eqref{eq:approximate_monotonicity},
+we required $\Vert u\Vert_{\infty},\Vert w\Vert_{\infty}{\leqslant} k$.
+A similar issue arises in the nonlocal consistency requirement, for
+which we must restrict the definition of nonlocal consistency to test
+functions $\varphi\in C_{b}^{1,2}([0,T]\times\mathbb{R})$ satisfying
+$\Vert\varphi\Vert_{\infty}{\leqslant} k$. With a slight abuse of notation,
+we continue to refer to this restricted definition as nonlocal consistency.
+\begin{lemma}
+The scheme $S$ is nonlocally consistent.
+\end{lemma}
+\begin{proof}[Proof sketch]
+For a smooth function $\varphi$ with bounded derivatives and $\Vert\varphi\Vert_{\infty}{\leqslant} k$
+and a constant $\xi$ we have (using little o notation),
+\begin{multline*}
+\frac{(\mathbb{E}+\left(\mathbb{E}^{\rho}-\mathbb{E}\right))\left[{\operatorname{interp}}(\varphi(n\Delta t+\Delta t,\cdot)+\xi,\hat{X}^{n\Delta t,j\Delta x,b})\right]-\varphi(t,x)-\xi\pm e^{-1/\rho}}{\Delta t}\\
+=\frac{\mathbb{E}\left[\varphi(n\Delta t+\Delta t,\hat{X}^{n\Delta t,j\Delta x,b})\right]-\varphi(t,x)+o(\rho)}{\Delta t}\\
+=\varphi_{t}(t,x)+\frac{1}{2}\sigma(t,x,b)^{2}D_{x}^{2}\varphi(t,x)+\mu(t,x,b)D_{x}\varphi(t,x)+o(1)
+\end{multline*}
+where the last equality is established by \cite[Lemma 3.1]{MR2857450}.
+Using this fact, we can modify the proof of {\prettyref}{lem:nonlocal_consistency}
+to arrive at the desired result.
+\end{proof}
+
+\section{\label{app:stochastic_semi_lagrangian_pseudocode}Pseudocode for
+the stochastic semi-Lagrangian scheme}
+
+This appendix gives pseudocode for the scheme of {\prettyref}{subsec:stochastic_semi_lagrangian_scheme}.
+As usual, to simplify presentation, we restrict ourselves to the one-dimensional
+case ($N=1$). The reader should have no trouble extending the pseudocode
+to higher dimensions.
+
+At least conceptually, the function $\operatorname{sample}()$ below
+samples a normal distribution with mean zero and variance $\Delta t$.
+In practice, $\operatorname{sample}()$ should be implemented using
+a quasi-random sequence (see {\prettyref}{rem:quasi_monte_carlo}).
+
+\medskip{}
+
+{\footnotesize
+
+\begin{multicols}{2}
+\begin{algor}[1]
+\item [{{*}}] \emph{// Generate samples}
+\item [{for}] $s=1,\ldots,S$
+\begin{algor}[1]
+\item [{{*}}] $\phi_{s}\gets\operatorname{sample}()$
+\end{algor}
+\item [{endfor}]~
+\item [{{*}}]~
+\item [{{*}}] \emph{// Set the initial condition}
+\item [{for}] $j=-M,\ldots,-M$
+\begin{algor}[1]
+\item [{{*}}] $u_{j}^{P}\gets u_{T}(j\Delta x)$
+\end{algor}
+\item [{endfor}]~
+\item [{{*}}]~
+\item [{\emph{{*}}}] \emph{// Perform timestepping}
+\item [{for}] $n=P-1,\ldots,0$
+\begin{algor}[1]
+\item [{for}] $j=-M,\ldots,-M$
+\begin{algor}[1]
+\item [{for}] $b\in B^\rho$
+\begin{algor}[1]
+\item [{{*}}] $y\gets0$
+\item [{for}] $s=1,\ldots,S$
+\begin{algor}[1]
+\item [{{*}}] $x\gets j\Delta x+\mu(n\Delta t,j\Delta x,b)\Delta t+\sigma(n\Delta t,j\Delta x,b)\phi_{s}$
+\item [{{*}}] $y\gets y+{\operatorname{interp}}(u^{n+1},x)$
+\end{algor}
+\item [{endfor}]~
+\item [{{*}}] $L \gets y/S+f(n\Delta t,j\Delta x,b)\Delta t$
+\item [{{*}}] $M \gets (\mathcal{M}^{n}u^{n+1})_{j}$
+\item [{{*}}] $u_{j}^{n}\gets\max(L,M)$
+\end{algor}
+\item [{endfor}]~
+\end{algor}
+\item [{endfor}]~
+\end{algor}
+\item [{endfor}]~
+\end{algor}
+\end{multicols}
+
+}
+
+\section{\label{app:technical}Technical issues arising in approximation of
+impulse control problems}
+
+This appendix discusses the technical issues that arise in attempting
+to apply the original Barles\textendash Souganidis framework to impulse
+control problems.
+
+We begin by stating the definition of viscosity solution hinted at
+in \eqref{eq:local_definition} and comparing it to {\prettyref}{def:viscosity_solution}.
+To distinguish it from {\prettyref}{def:viscosity_solution}, we refer
+to it as a \emph{localized (viscosity) solution}. Whenever we are
+trying to be explicit, we will refer to the solution concept in {\prettyref}{def:viscosity_solution}
+as an \emph{ordinary (viscosity) solution}.
+\begin{definition}
+\label{def:localized_viscosity_solution}$u\in B_{\operatorname{loc}}(\overline{\Omega})$
+is a localized (viscosity) subsolution (respectively supersolution)
+of \eqref{eq:pde} if for all $\varphi\in C^{2}(\overline{\Omega})$
+and $x\in\overline{\Omega}$ such that $u^{*}(x)-\varphi(x)=0$ (respectively
+$u_{*}(x)-\varphi(x)=0$) is a global maximum (respectively minimum)
+of $u^{*}-\varphi$ (respectively $u_{*}-\varphi$), we have
+\begin{align*}
+ & G_{*}(D^{2}\varphi(x),D\varphi(x),\varphi(x),x){\leqslant}0\\
+\text{(respectively } & G^{*}(D^{2}\varphi(x),D\varphi(x),\varphi(x),x){\geqslant}0\text{)}
+\end{align*}
+where $G(X,p,r,x)\coloneqq F(X,p,r,\varphi,x)$.
+
+The function $u$ is said to be a localized (viscosity) solution of
+\eqref{eq:pde} if it is both a localized sub and supersolution of
+\eqref{eq:pde}.
+\end{definition}
+Showing that a localized subsolution is also an ordinary subsolution
+generally requires imposing assumptions on the operator $F$ (similarly
+for supersolutions). Such a result is established in \cite[Pg. 300]{MR1395674}
+for a wide class of integro-differential operators (cf. \cite[Section 1]{MR2422079}).
+Similarly, in \cite[Theorem 3.1]{MR2486085}, it is shown that a uniformly
+continuous localized subsolution is also an ordinary subsolution for
+a wide class of impulse control problems (similarly for supersolutions).
+
+\begin{rem}\label{rem:fathi}Using \cite[Exercise 6(ii)]{MR3002594},
+we can extend the result of \cite[Theorem 3.1]{MR2486085} to require
+only continuity instead of uniform continuity.\end{rem}
+
+On the other hand, if
+\begin{equation}
+F(\cdot,\cdot,\cdot,u,\cdot){\leqslant} F(\cdot,\cdot,\cdot,w,\cdot)\text{ whenever }u{\geqslant} w\text{ pointwise},\label{eq:nonlocal_monotonicity}
+\end{equation}
+any ordinary subsolution is a localized
+subsolution (similarly for supersolutions). \eqref{eq:nonlocal_monotonicity}
+is generally satisfied for all problems of interest and as such, one
+may be tempted to employ the following program to approximate the
+ordinary solution of \eqref{eq:pde}:
+\begin{enumerate}
+\item Establish a \emph{localized }comparison principle (i.e., if $u$ is
+a \emph{localized} subsolution and $w$ is a \emph{localized} supersolution,
+$u^{*}{\leqslant} w_{*}$). By virtue of \eqref{eq:nonlocal_monotonicity},
+this implies the uniqueness of both ordinary and localized solutions.
+\item Create a scheme that is monotone, stable, and consistent in the sense
+of Barles\textendash Souganidis and as such, converges to the unique
+localized solution.
+\item Establish that any \emph{continuous} localized solution is also an
+odinary solution.
+\end{enumerate}
+However, this approach has the undesirable feature of having to establish
+a comparison principle in the localized setting.
+
+For example, in the context of equations arising from impulse control,
+it is unclear to the authors how such a comparison principle can be
+established. Moreover, since the Barles\textendash Souganidis approach
+in the second step produces a localized subsolution and localized
+supersolution that are \emph{semicontinuous} (not necessarily \emph{continuous}),
+one cannot simply replace the localized comparison principle of the
+first step with an ordinary comparison principle since by {\prettyref}{rem:fathi},
+while the localized and ordinary solution concepts are equivalent
+if we require \emph{continuity}, they are not necessarily equivalent
+if we require only \emph{semicontinuity}.
+
+\end{document}
+
