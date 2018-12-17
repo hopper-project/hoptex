@@ -58,5 +58,3 @@ if __name__ == '__main__':
     parser.add_argument('output_dir', help='Path at which the file lists will be stored')
     args = parser.parse_args()
     separate_eqs(**vars(args))
-
-    # send singular_articles to habanero
