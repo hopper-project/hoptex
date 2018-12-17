@@ -18,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description='Usage for equation enumeration')
     parser.add_argument("directory", help="Path to directory of .tex files")
     parser.add_argument("--parent", action="store_true", help="Set to true if this is a folder of folders of .tex files")
-    parser.add_argument("--initial", action="store_false", help="Use flag for initial batch processing")
+    parser.add_argument("--initial", action="store_true", help="Use flag for initial batch processing")
     parser.add_argument("K", help="K splits of singular articles")
 
     args = parser.parse_args()
@@ -55,6 +55,7 @@ def main():
     else:
         # get the next available eqid
         eqcount, meqcount = next_eqid()
+        #print(eqcount)
     all_math = pool.imap(grab_math_from_file,tex_files)
     for document_equations in all_math:
         document_name = document_equations[0].rstrip('.tex')
@@ -96,6 +97,7 @@ def main():
                         if equation not in unique_meqs:
                             if not initial:
                                 result = get_eqid(mask(equation))
+                                print(result)
                                 if result == '':
                                     eqid = "EQDM"+str(meqcount)+"Q"
                                     meqcount += 1
@@ -108,18 +110,20 @@ def main():
                             unique_meqs[equation] = (eqid, mask(equation), 1)
                         else:
                             prev = unique_meqs[equation]
-                            unique_meqs[equation] = (prev[0], prev[1], prev[2], prev[3]+1)
+                            unique_meqs[equation] = (prev[0], prev[1], prev[2]+1)
                         doc_list[equation].add(document_name)
                         break
                     else:
                         if flt_eq not in unique_eqs:
                             if not initial:
-                                    result = get_eqid(mask(beq+std_eq+eeq))
-                                    if result == '':
-                                        eqid = "EQDS"+str(eqcount)+"Q"
-                                        eqcount += 1
-                                    else:
-                                        eqid = result
+                                #print(flt_eq)
+                                result = get_eqid(mask(beq+std_eq+eeq))
+                                print(result)
+                                if result == '':
+                                    eqid = "EQDS"+str(eqcount)+"Q"
+                                    eqcount += 1
+                                else:
+                                    eqid = result
                             else:
                                 eqid = "EQDS"+str(eqcount)+"Q"
                                 eqcount += 1

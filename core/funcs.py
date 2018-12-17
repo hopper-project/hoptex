@@ -319,23 +319,28 @@ def populate_db(eqs, article):
 
     db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
     cursor = db.cursor()
-    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+    #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
+    progress = 0.
     for e in eqs.keys():
+        progress += 1
+        print("progress: {}%".format(round(progress*100/len(eqs),2)))
         eqid, tex, freq  = eqs[e]
         if '_F' in eqid:
             _eqid = eqid.strip('_F')
 
             """Increment frequency count"""
-            sql_command = ("""UPDATE equation_metadata SET frequency=frequency+{} \
-                    WHERE BINARY equation_id='{}'""").format(freq,_eqid)
+            sql_command = ('''UPDATE equation_metadata SET frequency=frequency+{} \
+                    WHERE BINARY equation_id="{}"''').format(freq,_eqid)
             nr = cursor.execute(sql_command)
             #if nr != 1:
             #    print('UPDATE operation failed for {}'.format(eqid))
         else:
-            sql_command = ("""INSERT INTO equation_metadata(equation_id,tex,frequency) \
-                    VALUES{}""").format((eqid,tex,repr(freq)))
+            sql_command = ('''INSERT INTO equation_metadata(equation_id,tex,frequency) \
+                    VALUES("{}","{}",{})''').format(eqid,add_backslash(tex),repr(freq))
             nr = cursor.execute(sql_command)
+            #print(tex)
+            #print(sql_command)
             #if nr != 1:
             #    print('INSERT operation failed for {}'.format(eqid))
 
@@ -344,7 +349,7 @@ def populate_db(eqs, article):
             if '_F' in eqid: eqid = eqid.strip('_F')
             sql_command = ("""INSERT INTO article_equations(article_id,equation_id) \
                     VALUES{}""").format((a,eqid))
-            nr = cursor.execute(sql_command)
+            #nr = cursor.execute(sql_command)
             #if nr != 1:
             #    print('INSERT operation failed for {}'.format((a,eqid)))
 
@@ -357,24 +362,24 @@ def put_mathml(tex, mathml):
 
     db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
     cursor = db.cursor()
-    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+    #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
-    sql_command = ("""UPDATE equation_metadata SET mathml='{}' \
-            WHERE BINARY tex='{}'""").format(mathml,tex)
+    sql_command = ('''UPDATE equation_metadata SET mathml='{}' \
+            WHERE BINARY tex="{}"''').format(mathml,add_backslash(tex))
     nr = cursor.execute(sql_command)
     #if nr != 1:
     #    print('INSERT operation failed for {}'.format(eqid))
 
-    '''
-    sql_command = ("""SELECT equation_id FROM equation_metadata \
-            WHERE BINARY tex='{}'""").format(tex)
+    """
+    sql_command = ('''SELECT equation_id FROM equation_metadata \
+            WHERE BINARY tex="{}"''').format(tex)
     nr = cursor.execute(sql_command)
     if nr != 1:
         print('INSERT operation failed for {}'.format(eqid))
     else:
         eqid = cursor.fetchall()[0][0]
         print('MathML inserted for {}'.format(eqid))
-    '''
+    """
 
     db.commit()
     db.close()
@@ -384,7 +389,7 @@ def next_eqid():
 
     db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
     cursor = db.cursor()
-    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+    #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
     sql_command = ("""SELECT equation_id FROM equation_metadata \
             WHERE equation_id LIKE '{}'""").format("EQDS%")
@@ -423,10 +428,10 @@ def get_mathml(tex):
 
     db = MySQLdb.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
     cursor = db.cursor()
-    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+    #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
-    sql_command = ("""SELECT mathml FROM equation_metadata \
-            WHERE BINARY tex='{}'""").format(tex)
+    sql_command = ('''SELECT mathml FROM equation_metadata \
+            WHERE BINARY tex="{}"''').format(add_backslash(tex))
 
     cursor.execute(sql_command)
     mathml = cursor.fetchall()
@@ -446,13 +451,15 @@ def get_eqid(tex):
 
     db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
     cursor = db.cursor()
-    cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
+    #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
-    sql_command = ("""SELECT equation_id FROM equation_metadata \
-            WHERE BINARY tex='{}'""".format(tex)
+    sql_command = ('''SELECT equation_id FROM equation_metadata \
+            WHERE BINARY tex="{}"''').format(add_backslash(tex))
+    #print(sql_command)
     cursor.execute(sql_command)
 
     eqid= cursor.fetchall()
+    #print(eqid)
 
     db.commit()
     db.close()
@@ -476,9 +483,9 @@ def separate_articles(eqs, article_list, output_dir, K):
     article_id_set = set()
 
     for e in eqs:
-        eq_id, _, eq_freq  = eqs[x]
+        eq_id, _, eq_freq  = eqs[e]
         eq_freq = int(eq_freq)
-        article_ids = article_list[x].split(',')
+        article_ids = list(article_list[e])
 
         for article_id in article_ids:
             article_id_set.add(article_id)
@@ -506,9 +513,10 @@ def separate_articles(eqs, article_list, output_dir, K):
     sing_file.close()
     nonsing_file.close()
 
-    l = int(math.ceil(float(sing_count) / K))
+    os.chdir('./sep')
+    subprocess.call(["split --numeric=1 -d -a 4 -n {} singular_articles.txt".format(str(K))], shell=True)
+    subprocess.call(["rename 's/^x0*//' x*"], shell=True)
+    subprocess.call(["chmod 770 *"], shell=True)
 
-    subprocess.call(["split","--numeric=1","-d","-a","4","-l",
-        str(l),"./sep/singular_articles.txt"])
-    subprocess.call(["rename","'s/^x0*//'","./sep/x*"])
-    subprocess.call(["chmod","770","./sep/*"])
+def add_backslash(tex):
+    return tex.replace('\\','\\\\').replace("'", "\\'").replace('"','\\"')
