@@ -1,0 +1,792 @@
+\documentclass[10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{algorithm,algorithmicx,algpseudocode}
+\usepackage{verbatim}
+\usepackage{graphicx,color}
+\usepackage{graphics}
+\usepackage{subfigure}
+\usepackage{mathrsfs}
+\usepackage{epstopdf}
+
+\numberwithin{equation}{section}
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{prop}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary} 
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{exmp}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{rem}[theorem]{Remark}
+\newtheorem{note}[theorem]{Note}
+\newtheorem{case}[theorem]{Case}
+
+ 
+
+\begin{document} 
+\title{Convergence of a \\ discontinuous Galerkin multiscale method}
+
+\author{Daniel Elfverson\footnotemark[2]\ \footnotemark[5] \and Emmanuil H. Georgoulis\footnotemark[3] \and Axel MÃ¥lqvist\footnotemark[2]\ \footnotemark[5] \and Daniel Peterseim\footnotemark[4]\ \footnotemark[6]}
+
+\footnotetext[2]{Information Technology, Uppsala University, Box 337, SE-751 05, Uppsala, Sweden.}
+\footnotetext[3]{Department of Mathematics, University of Leicester, Leicester, UK.}
+\footnotetext[4]{Institut fÃ¼r Mathematik, Humboldt-UniversitÃ¤t zu Berlin, Berlin, Germany.}
+\footnotetext[5]{Supported by The Swedish Research Council and The GÃ¶ran Gustafsson Foundation.}
+\footnotetext[6]{Supported by the DFG Research Center Matheon Berlin through project C33.}
+
+\pagestyle{myheadings}
+\thispagestyle{plain}
+
+\maketitle
+\begin{abstract} A convergence result for a discontinuous Galerkin multiscale method for a second order elliptic problem  is presented. We consider a heterogeneous and highly varying diffusion coefficient in $L^\infty(\Omega,\mathbb{R}^{d\times d}_{sym})$ with uniform spectral bounds and without any assumption on scale separation or periodicity. The multiscale method uses a corrected basis that is computed on patches/subdomains. The error, due to truncation of corrected basis, decreases exponentially with the size of the patches. Hence, to achieve an algebraic convergence rate of the multiscale solution on a uniform mesh with mesh size $H$ to a reference solution, it is sufficient to choose the patch sizes as $\mathcal{O}(H|\log(H^{-1})|)$. We also discuss a way to further localize the corrected basis to element-wise support leading to a slight increase of the dimension of the space. Improved convergence rate can be achieved depending on the piecewise regularity of the forcing function. Linear convergence in energy norm and quadratic convergence in $L^2$-norm is obtained independently of the forcing function. A series of numerical experiments confirms the theoretical rates of convergence. 
+\end{abstract}
+
+\begin{keywords}
+  multiscale method, discontinuous Galerkin, a priori error estimate, convergence  
+\end{keywords}
+\begin{AMS}
+   65N12, 65N30
+\end{AMS}
+
+ \section{Introduction}
+This work considers the numerical solution of second order elliptic problems with heterogeneous and highly varying (non-periodic) diffusion coefficient. The heterogeneities and oscillations of the coefficient may appear on several non-separated scales. 
+More specifically, let $\Omega\subset\mathbb{R}^{d}$ be a bounded Lipschitz domain with polygonal boundary $\Gamma$. The boundary $\Gamma$ may be partitioned into some non-empty closed subset $\Gamma_D$ (the Dirichlet boundary) and its complement $\Gamma_N:=\Gamma\setminus\Gamma_D$ (the, possibly empty, Neumann boundary).
+We assume that the diffusion matrix $A\in L^\infty\left(\Omega,\mathbb{R}_{\mathrm{sym}}^{d\times d}\right)$ has uniform spectral bounds $0<\alpha,\beta<\infty$, defined by
+\begin{equation}\label{eq:ba}
+0<\alpha:=\underset{x\in\Omega}{\operatorname{ess}\inf}\hspace{-1ex}
+\inf\limits_{v\in\mathbb{R}^{d}\setminus\{0\}}\hspace{-2ex}\dfrac{(A( x)v)\cdot v}{v\cdot v}\leq\underset{x\in\Omega}{\operatorname{ess}\sup}\hspace{-1ex}
+\sup\limits_{v\in\mathbb{R}^{d}\setminus\{0\}}\hspace{-2ex}\dfrac{(A( x)v)\cdot v
+}{v\cdot v}=:\beta<\infty.
+\end{equation}
+Given $f\in L^{2}( \Omega) $, we seek the weak solution of the boundary-value problem
+\begin{equation}\notag
+  \begin{aligned}
+    -\nabla \cdot{A} \nabla u &= f\quad \text{in }\Omega, \\
+    u & = 0 \quad \text{on }\Gamma_D, \\
+    \nu\cdot{A}\nabla u &= 0\quad \text{on }\Gamma_N,
+  \end{aligned}
+\end{equation}
+i.e., we seek $u\in H^1_D(\Omega):=\{v\in H^1(\Omega)\;\vert\;v\vert_{\Gamma_D}=0\text{ in the sense of traces}\}$, such that
+\begin{equation}\label{e:modelvar}
+a\left(  u,v\right):=\int_{\Omega}A\nabla u\cdot \nabla
+v{\operatorname*{d}\hspace{-0.3ex}x} =\int_{\Omega}fv{\operatorname*{d}\hspace{-0.3ex}x}=:F( v) \quad\text{for all } v\in H^1_D(\Omega).
+\end{equation}
+
+Many methods have been developed in recent years to overcome the lack of performance of classical finite element methods in cases where $A$ is rough, meaning that $A$ has discontinuities and/or high variation; we refer to \cite{MR701094,MR1286212,MR1660141,MR1455261,resbub} amongst others. Common to all the aforementioned approaches is the idea to solve the problems on small subdomains and to use the results to construct a better basis for some Galerkin method or to modify the coarse scale operator. However, apart from the one-dimensional setting, the performance of those methods correlates strongly with periodicity and scale separation of the diffusion coefficient. 
+
+Other approaches \cite{MR2721592,OwhadiZ11,BabLip11} perform well without any assumptions of periodicity or scale separation in the diffusion coefficient at the price of a high computational cost: in \cite{MR2721592,OwhadiZ11} the support of the modified basis functions is large and in \cite{BabLip11} the computation of the basis functions involves the solutions of local eigenvalue problems. 
+
+Only recently in \cite{MP11}, a variational multiscale method has been developed that allows for textbook convergence with respect to the mesh size $H$,
+$\left\Vert u-u_{H}\right\Vert _{H^{1}(\Omega) }\leq C_{f,{\beta}/{\alpha}}H$ with a constant $C_{f,{\beta}/{\alpha}}$ that depends on $f$ and the global bounds of the diffusion coefficient but not its variations. This result is achieved by an operator-dependent modification of the classical nodal basis based on the solution of local problems on vertex patches of diameter ${\mathcal}{O}(H|\log(H^{-1})|)$. The method  in \cite{MP11} is an extension of the method presented in \cite{Larson20072313,malqvist2010}.
+
+In this work, we present a discontinuous Galerkin (dG) multiscale method with similar performance. The method is a slight variation of the method \cite{EGM12}, in the sense that the boundary conditions for the local problems are now of Dirichlet type. The dG finite element method admits good conservation properties of the state variable, and also offers the use of very general meshes due to the lack of inter-element continuity requirements, e.g., meshes that contain several different types of elements and/or hanging nodes. Both those features are crucial in many applications. 
+In the context of multiscale methods the discontinuous formulation allows for more flexibility in the construction of the basis function e.g., allowing more general boundary conditions \cite{EGM12}.
+Although the error analysis presented in this work is restricted to regular simplicial or quadrilateral/hexahedral meshes, we stress that all the results appear to be extendable for the case of irregular meshes (i.e., meshes containing hanging nodes). We refrained from presenting these extensions here for simplicity of the current presentation. Under these assumptions, we provide a complete a priori error analysis of this method including errors caused by the approximation of basis functions. 
+
+In this dG multiscale method and in previous related methods \cite{MP11,EGM12}, the accuracy is ensured by enlarging the support of basis functions appropriately. Hence, supports of basis functions overlap and the communication is no longer restricted to neighboring elements but is present also between elements at a certain distance. We will prove that resulting overhead is acceptable in the sense that it scales only logarithmically in the mesh size. 
+
+In order to retain the dG-typical structure of the stiffness matrix, we discuss the possibility of localizing the multiscale basis functions to single elements. Instead of having ${\mathcal}{O}(1)$ basis functions per element with ${\mathcal}{O}(H|\log(H^{-1})|)$ support, we would then have $\mathcal{O}(|\log(H^{-1})|)$ basis functions per element with element support. The element-wise application of a singular value decomposition easily prevents ill-conditioning of the element stiffness matrices, while simultaneously achieving further compression of the multiscale basis. 
+
+The outline of the paper is as follows. In Section~\ref{s:discretesetting}, we recall the dG finite element method. Section~\ref{s:multiscale} defines our multiscale method, which is then analyzed in Section~\ref{s:apriori}. Section~\ref{s:numexp} presents numerical experiments confirming the theoretical developments. 
+
+Throughout this paper, standard notation on Lebesgue and Sobolev spaces is employed. Let $0\leq C<\infty$ be any generic constant that neither depends on the mesh size nor the diffusion matrix $A$; $a\lesssim b$ abbreviates an inequality $a\leq C\,b$ and $a\approx b$ abbreviates $a\lesssim b\lesssim a$. Also, let the constant ${C_{{\beta}/{\alpha}}}$ depend on the minimum and maximum bound bound (${\alpha}$ and ${\beta}$) of the diffusion matrix ${A}$ \eqref{eq:ba}.
+
+\section{Fine scale discretization}\label{s:discretesetting}
+
+\subsection{Finite element meshes and spaces}
+
+Let ${\mathcal{T}}$ denote a subdivision of $\Omega$ into (closed) regular simplices or into quadrilaterals (for $d=2$) or hexahedra (for $d=3$), i.e., $\bar{\Omega}=\cup_{T\in{\mathcal{T}}} T$. We assume that ${\mathcal{T}}$ is regular in the sense that any two elements are either disjoint or share exactly one face or share exactly one edge or share exactly one vertex. 
+
+Let ${\mathcal{E}}$ denote the set of edges (or faces for $d=3$) of ${\mathcal{T}}$; ${\mathcal{E}}(\Omega)$ denotes the set of interior edges, ${\mathcal{E}}(\Gamma)$, ${\mathcal{E}}(\Gamma_D)$ and ${\mathcal{E}}(\Gamma_N)$) refer to the set of edges on the boundary of $\Omega$, on the Dirichlet and on the Neumann boundary, respectively.
+Let $\hat{T}$, denote the reference simplex or (hyper)cube and let $\mathcal{P}_p(\hat{T})$ and $\mathcal{Q}_p(\hat{T})$ denote the spaces of polynomials of degree less than or equal to $p$ in all or on each variable, respectively. Then, we define the set of piecewise polynomials
+\begin{equation*}
+P_p({\mathcal{T}}) := \{v:\Omega\rightarrow \mathbb{R}\;\vert \;\forall T\in{\mathcal{T}},v\vert_T\circ F_{T}\in\mathcal{R}_p(\hat{T})\},
+\end{equation*}
+with $\mathcal{R}_p\in\{\mathcal{P}_p,\mathcal{Q}_p\}$, where $F_T:\hat{T}\to T$, $T\in{\mathcal{T}}$ is a family of element maps. Let also $\Pi_p({\mathcal{T}}):L^2(\Omega)\rightarrow P_p({\mathcal{T}})$ denote the $L^2$-projection onto ${\mathcal{T}}$-piecewise polynomial functions of order $p$. In particular, we have ${(\Pi_0({\mathcal{T}}) f)\vert_T=|T|^{-1}\int_T f{\operatorname*{d}\hspace{-0.3ex}x}}$, $T\in{\mathcal{T}}$ for all $f\in L^2(\Omega)$. 
+Note that $v\in P_p({\mathcal{T}})$ does not necessarily belong to $H^1(\Omega)$. The ${\mathcal{T}}$-piecewise gradient $\nabla_{\mathcal{T}} v$, with $(\nabla_{\mathcal{T}} v)\vert_T=\nabla (v\vert_T)$ for all $T\in{\mathcal{T}}$, is well-defined and $\nabla_{\mathcal{T}} v\in (P_{p-1}({\mathcal{T}}))^d$.
+
+For any interior edge/face $e\in{\mathcal{E}}(\Omega)$ there are two adjacent elements $T^-$ and $T^+$ with $e=\partial T^-\cap\partial T^+$. We define $\nu$ to be the normal vector of $e$ that points from $T^-$ to $T^+$. For boundary edges/faces $e\in\mathcal{E}(\Gamma)$ let $\nu$ be the outward unit normal vector of $\Omega$.
+
+Define the jump of $v\in P_k({\mathcal{T}})$ across $e\in{\mathcal{E}}(\Omega)$ by $[v]:=v\vert_{T^-}-v\vert_{T^+}$ and define $[v]:=v\vert_{e}$ for $e\in{\mathcal{E}}(\Gamma)$. The average of $v\in P_p({\mathcal{T}})$ across $e\in{\mathcal{E}}(\Omega)$ is defined by $\{ v\}:=(v\vert_{T^-}+v\vert_{T^+})/2$ and for boundary edges $e\in{\mathcal{E}}(\Gamma)$ by $\{ v\}:=v\vert_e$.
+
+In the remaining part of this work, we consider two different meshes: a coarse mesh ${\mathcal{T}}_H$ and a fine mesh ${\mathcal{T}}_h$, with respective definitions for the edges/faces ${\mathcal{E}}_H$ and ${\mathcal{E}}_h$. We denote the ${\mathcal{T}}_H$-piecewise gradient by $\nabla_Hv:=\nabla_{{\mathcal{T}}_H}v$ and, respectively, $\nabla_hv:=\nabla_{{\mathcal{T}}_h}v$ for the ${\mathcal{T}}_h$-piecewise gradient . We assume that the fine mesh ${\mathcal{T}}_h$ is the result of one or more refinements of the coarse mesh ${\mathcal{T}}_H$. The subscripts $h,H$ refer to the corresponding mesh sizes; in particular, we have $H\in P_0({\mathcal{T}}_H)$ with $H\vert_T={\operatorname*{diam}}(T)=:H_T$ for all $T\in{\mathcal{T}}_H$, $H_e={\operatorname*{diam}}{e}$, for all $e\in{\mathcal{E}}_H$, $h\in P_0({\mathcal{T}}_h)$, with $h\vert_T={\operatorname*{diam}}(T)=:h_T$ for all $T\in{\mathcal{T}}_h$, and $h_e={\operatorname*{diam}}{e}$ for all $e\in{\mathcal{E}}_h$. Obviously, $h\leq H$. 
+
+\subsection{Discretization by the symmetric interior penalty method}
+We consider the symmetric interior penalty method (SIP) discontinuous Galerkin method \cite{MR0440955,MR664882,MR2290408}. We seek an approximation in the space ${\mathcal{V}_h}:=P_1({\mathcal{T}}_h)$. 
+ Given some positive penalty parameter $\sigma>0$, we define the symmetric bilinear form $a_h:{\mathcal{V}_h}\times {\mathcal{V}_h}\rightarrow\mathbb{R}$ by
+\begin{equation}\label{e:bilindg}
+  \begin{aligned}
+  a_h(u,v) := &(A\nabla_h u,\nabla_h v)_{L^2(\Omega)} - \sum_{e\in{\mathcal{E}}_h(\Omega)\cup{\mathcal{E}}_h(\Gamma_D)}\Big((\{\nu\cdot{A}\nabla u\},[v])_{L^2(e)} \\
+  &  +(\{\nu\cdot{A}\nabla v\},[u])_{L^2(e)}-\frac{\sigma}{h_e}([u],[v])_{L^2(e)}\Big).
+  \end{aligned}
+\end{equation}
+The jump-seminorm associated with the space ${\mathcal{V}_h}$, is defined by 
+\begin{equation}\label{e:dgjumpnorm}
+|\bullet|_{h}^2:=\sum_{e\in{\mathcal{E}}_h(\Omega)\cup{\mathcal{E}}_h(\Gamma_D)} \frac{\sigma}{h_e}\|[\bullet]\|_{L^2(e)}^2,
+\end{equation}
+while the energy norm in ${\mathcal{V}_h}$ is then given by
+\begin{equation}\label{e:dgnorm}
+{||| {\bullet} |||_h}:=(\|A^{1/2}\nabla_h\bullet\|_{L^2(\Omega)}^2+|\bullet|_{h}^2)^{1/2}.
+\end{equation}
+If the penalty parameter is chosen sufficiently large, the dG bilinear form \eqref{e:bilindg} is coercive and bounded with respect to the energy norm \eqref{e:dgnorm}. Hence, there exists a (unique) dG approximation $u_h\in{\mathcal{V}_h}$, satisfying
+\begin{equation}\label{e:DGweak}
+a_h(u_h,v) = F(v) \quad\text{ for all }v\in {\mathcal{V}_h}.
+\end{equation}
+
+We assume that  \eqref{e:DGweak} is computationally intractable for practical problems, so we shall never seek to solve for $u_h$ directly. Instead, $u_h$ will serve as a reference solution to compare our coarse grid multiscale dG approximation with. The underlying assumption is that the mesh ${\mathcal{T}}_h$ is chosen sufficiently fine so that $u_h$ is sufficiently accurate. The aim of this work is to devise and analyse a multiscale dG discretization with coarse scale $H$, in such a way that the accuracy of $u_h$ is preserved up to an ${\mathcal}{O}(H)$ perturbation independent of the variation of the coefficient $A$.
+
+\section{Discontinuous Galerkin multiscale method}\label{s:multiscale}
+
+As mentioned above, the choice of the reference mesh ${\mathcal{T}}_h$ is not directly related to the desired accuracy, but is instead strongly affected by the roughness and variation of the coefficient $A$. The corresponding coarse mesh ${\mathcal{T}}_H$, with mesh width function $H\geq h$, is assume to be completely independent of $A$. To encapsulate the fine scale information in the coarse mesh, we shall design coarse generalized finite element spaces based on ${\mathcal{T}}_H$. 
+
+\subsection{Multiscale decompositions}
+We introduce a scale splitting for the space ${\mathcal{V}_h}$. To this end, let ${\Pi_H}:=\Pi_1({\mathcal{T}}_H)$ and define ${\mathcal{V}_H}:={\Pi_H}{\mathcal{V}_h}=P_1({\mathcal{T}}_H)$ and
+\begin{equation*}
+{\mathcal{V}^{\operatorname*{f}}}:=(1-{\Pi_H}){\mathcal{V}_h}=\{v\in{\mathcal{V}_h}\;\vert\;{\Pi_H} v= 0\}.
+\end{equation*}
+\begin{lemma}[$L^2$-orthogonal multiscale decomposition]\label{l:odl2}
+The decomposition
+$${\mathcal{V}_h}={\mathcal{V}_H}\oplus {\mathcal{V}^{\operatorname*{f}}},$$
+is orthogonal in $L^2(\Omega)$.
+\end{lemma}
+\begin{proof}
+The proof is immediate, as any $v\in{\mathcal{V}_h}$ can be
+decomposed uniquely into a coarse finite element function $v_H:={\Pi_H} v\in {\mathcal{V}_H}$ and a (possibly highly oscillatory) remainder $v^{\operatorname*{f}}:=(1-{\Pi_H})v\in {\mathcal{V}^{\operatorname*{f}}}$, with $\|v\|_{L^2(\Omega)}^2=\|v_H\|_{L^2(\Omega)}^2+\|v^{\operatorname*{f}}\|_{L^2(\Omega)}^2$.
+\end{proof}
+We now orthogonalize the above splitting with respect to the dG scalar product $a_h$; we keep 
+the space of fine scale oscillations ${\mathcal{V}^{\operatorname*{f}}}$ and simply replace ${\mathcal{V}_H}$ with the orthogonal complement of ${\mathcal{V}^{\operatorname*{f}}}$ in ${\mathcal{V}_h}$. We define the fine scale projection ${\mathfrak{F}}:{\mathcal{V}_h}\rightarrow {\mathcal{V}^{\operatorname*{f}}}$ by 
+\begin{equation}\label{eq:multiscale-map}
+  a_h({\mathfrak{F}} v,w) = a_h(v,w)\quad \text{for all }w\in{\mathcal{V}^{\operatorname*{f}}}.
+\end{equation}
+Using the fine scale projection, we can define the coarse scale approximation space by
+\begin{equation*}
+ {\mathcal{V}^{ms}_{H}}:= (1-{\mathfrak{F}}){\mathcal{V}_H}.
+\end{equation*}
+
+\begin{lemma}[$a_h$-orthogonal multiscale decomposition]\label{l:odh1}
+The decomposition
+$$ {\mathcal{V}_h}={\mathcal{V}^{ms}_{H}}\oplus {\mathcal{V}^{\operatorname*{f}}}, $$
+is orthogonal with respect to $a_h$, i.e., any function $v$ in ${\mathcal{V}_h}$ can be
+decomposed uniquely into some function $v^{ms}_H\in {\mathcal{V}^{ms}_{H}}$ plus $v^{\operatorname*{f}}\in {\mathcal{V}^{\operatorname*{f}}}$ with ${||| {v} |||_h}^2\approx{||| {v^{ms}_H} |||_h}^2+{||| {v^{\operatorname*{f}}} |||_h}^2$.
+The functions $v^{ms}_H\in {\mathcal{V}^{ms}_{H}}$ and $v^{\operatorname*{f}}\in {\mathcal{V}^{\operatorname*{f}}}$ are the Galerkin projections of $v\in {\mathcal{V}}_h$ onto the subspaces ${\mathcal{V}^{ms}_{H}}$ and ${\mathcal{V}^{\operatorname*{f}}}$, i.e.,
+\begin{align*}
+ a_h(v^{ms}_H,w)&=a_h(v,w)=F(w)\quad \text{for all }w\in{\mathcal{V}^{ms}_{H}},\\
+ a_h(v^{\operatorname*{f}},w)&=a_h(v,w)=F(w)\quad \text{for all }w\in{\mathcal{V}^{\operatorname*{f}}}.
+\end{align*}
+\end{lemma}
+The unique Galerkin approximation ${u^{ms}_{H}}\in {\mathcal{V}^{ms}_{H}}$ of $u\in {\mathcal{V}}$ solves
+\begin{equation}\label{eq:GMM}
+  {a_h({u^{ms}_{H}},{v})} = F(v)\quad \text{for all }v\in{\mathcal{V}^{ms}_{H}}.
+\end{equation}
+We shall see in the error analysis (cf. Theorem~\ref{thm:umshH}) that the orthogonality yields error estimates for the Galerkin approximation ${u^{ms}_{H}}\in {\mathcal{V}^{ms}_{H}}$ of \eqref{eq:GMM} that are independent of the regularity of the solution and of the diffusion coefficient $A$. 
+However, the space ${\mathcal{V}^{ms}_{H}}$ is not suitable for practical computations as a local basis for this space is not easily available. 
+Indeed, given a basis of ${\mathcal{V}_H}$, e.g., the element-wise Lagrange basis functions $\{\lambda_{T,j}\;|\;T\in{\mathcal{T}}_H,\;j=1,\ldots,r\}$ where $r=(1+d)$ for regular simplices or $r=2^d$ for quadrilaterals/hexahedra.
+ The space ${\mathcal{V}^{ms}_{H}}$ may be spanned by the
+corrected basis functions $(1-{\mathfrak{F}})\lambda_{T,j}$, $T\in{\mathcal{T}}_H,\;j=1,\ldots,r$. 
+Although $\lambda_{T,j}$ has local support ${\text{supp}}{\lambda_{T,j}}=T$, its corrected version $(1-{\mathfrak{F}})\lambda_{T,j}$ may have global support in $\Omega$, as \eqref{eq:multiscale-map} is a variational problem on the whole domain $\Omega$. Fortunately, as we shall prove later, the corrector functions $\phi_{T,j}$ decay quickly away from $T$ (cf. previous numerical results in \cite{EGM12} and a similar observation for the corresponding conforming version of the method \cite{MP11}). This decay motivates the local approximation of the corrector functions, at the expense of introducing small perturbations in the method's accuracy. 
+
+\subsection{Discontinuous Galerkin multiscale method}
+The localized approximations of the corrector functions are supported on element patches in the coarse mesh ${\mathcal{T}}_H$.
+\begin{definition} For all $T\in{\mathcal{T}}_H $, define element patches with size $L$ as
+  \begin{equation}\notag
+    \begin{aligned}
+      \omega^1_T & := \text{int}(T), \\
+      \omega^{L}_T & := \text{int}(\cup\{T'\in {\mathcal{T}}_H\;\vert\; T'\cap\bar{\omega}_T^{L-1}\neq\emptyset\}),\quad k=1,2,\ldots .
+    \end{aligned}
+  \end{equation}
+  We refer to {Figure~\ref{{fig:mesh}}} for an illustration.
+\end{definition}
+\begin{figure}\label{fig:mesh}
+  \centering
+  \includegraphics[scale=0.7]{mesh.eps}
+  \caption{Example of a one layer patch $\omega^1_T$, two layer patch $\omega^2_T$, and a three layer patch $\omega^3_T$, on a quadrilateral mesh.}
+\end{figure}
+We introduce a new discretization parameter $L>0\in\mathbb{N}$ and define localized corrector functions $\phi^L_{T,j}\in{\mathcal{V}^{\operatorname*{f}}}(\omega^L_T):=\{v\in{\mathcal{V}}^{\operatorname*{f}} \mid v|_{\Omega\setminus\omega^L_T}=0\}$ by
+\begin{equation}\label{eq:corrector}
+  a_h(\phi^L_{T,j},w) = a_h(\lambda_{T,j},w)\quad \text{for all }w\in{\mathcal{V}^{\operatorname*{f}}}(\omega^L_T).
+\end{equation}
+Further, we define the multiscale approximation space
+\begin{equation*}
+ {\mathcal{V}^{ms,L}_{H}}=\text{span}\{\lambda_{T,j}-\phi^L_{T,j}\;\vert\; T\in{\mathcal{T}}_H,\;j=1,\ldots,r\},
+\end{equation*}
+
+The dG multiscale method seeks ${u^{ms,L}_{H}}\in{\mathcal{V}^{ms,L}_{H}}$ such that
+\begin{equation}\label{eq:DGMM}
+  {a_h({u^{ms,L}_{H}},{v})} = F(v)\quad \text{for all }v\in{\mathcal{V}^{ms,L}_{H}}.
+\end{equation}
+Since ${\mathcal{V}^{ms,L}_{H}}\subset {\mathcal{V}_h}$, this method is a Galerkin method in the Hilbert space ${\mathcal{V}_h}$ (with scalar product $a_h$) and, hence, inherits well-posedness from the reference discretization \eqref{e:DGweak}.
+
+Moreover, the proposed basis $\{\lambda_{T,j}-\phi^L_{T,j}\;\vert\; T\in{\mathcal{T}}_H,\;j=1,\ldots,r\}$ is stable with respect to the fine scale parameter $h$, as we shall see in Lemma~\ref{l:stabbasis} below.
+
+\subsection{Compressed discontinuous Galerkin multiscale method}\label{ss:compressed}
+The basis functions in the above multiscale method have enlarged supports (element patches) when compared with standard dG methods (elements). We can decompose the corrector functions into its element contributions
+\begin{equation*}
+ \phi^L_{T,j}=\sum_{T'\in{\mathcal{T}}_H:T'\subset\omega_T^L} \phi^L_{T,j}\chi_{T'},
+\end{equation*}
+where $\chi_{T'}$ is the indicator function of the element $T'\in{\mathcal{T}}_H$. 
+
+This motivates the coarse approximation space
+\begin{align*}
+ {\mathcal{W}^{ms,L}_{H}}=&\text{span}\bigl(\{\lambda_{T,j}\;\vert T\in{\mathcal{T}}_H,\;j=1,\ldots,r\}\\&\cup
+\{\phi^L_{T,j}\chi_{T'}\;\vert T,T'\in{\mathcal{T}}_H,\;T'\subset\omega_T^L,\;j=1,\ldots,r\},
+\end{align*}
+This space offers the advantage of a known basis with element-wise support which leads to improved (localized) connectivity in the corresponding stiffness matrix. This is at the expense of a slight increase in the dimension of the space
+$${\operatorname*{dim}({\mathcal{W}^{ms,L}_{H}})} \approx L^d{\operatorname*{dim}({\mathcal{V}^{ms,L}_{H}})}.$$
+
+The corresponding localized dG multiscale method seeks ${w^{ms,L}_{H}}\in{\mathcal{W}^{ms,L}_{H}}$ such that
+\begin{equation}\label{eq:DGMMc}
+  {a_h({w^{ms,L}_{H}},{v})} = F(v)\quad \text{for all }v\in{\mathcal{W}^{ms,L}_{H}}.
+\end{equation}
+
+Since ${\mathcal{V}^{ms,L}_{H}}\subset{\mathcal{W}^{ms,L}_{H}}\subset {\mathcal{V}_h}$, Galerkin orthogonality yields
+\begin{equation}\label{e:DGMMcbest}
+{||| {u_h-{w^{ms,L}_{H}}} |||_h}\leq{||| {u_h-{u^{ms,L}_{H}}} |||_h},
+\end{equation}
+i.e., the new localized version \eqref{eq:DGMMc} is never worse than the previous multiscale approximation in terms of accuracy. However, it may lead to very ill-conditioned element stiffness matrices (cf. Lemma~\ref{lem:decay_layers} which shows that $\phi^L_{T,j}\xi_{T'}$ may be very small if the distance between $T$ and $T'$ relative to their sizes is large). 
+
+To circumvent ill-conditioning, one may choose a reduced local approximation space on the basis of a singular value decomposition. Since the dimension of the local approximation space is small (at most proportional to $L^d$), the cost for this additional preprocessing step is comparable with the cost for the solution of the local problems for the corrector functions.
+
+To determine an acceptable level of truncation of the localized basis functions, we can use the the a posteriori error estimator contribution of the local problem from \cite{EGM12}, which is an estimation of the local fine scale error. This procedure may additionally lead to large reduction of the dimension of the local approximation spaces. 
+
+\section{Error analysis}\label{s:apriori}
+We present an a priori error analysis for the proposed multiscale method \eqref{eq:DGMM}. In view of \eqref{e:DGMMcbest}, this analysis applies immediately to the modified versions presented in Section  \ref{ss:compressed}. The error analysis will be split into a number of steps.
+First, in Section \ref{projection_properties}, we present some properties of the coarse scale projection operator ${\Pi_H}$.
+In Section \ref{Mdiscretization}, an error bound for dG multiscale method ${u^{ms}_{H}}$ from \eqref{eq:GMM} ({Theorem~\ref{{thm:umshH}}}) is shown, whereby the corrected basis functions are solved globally. Results for the decay of the localized corrected basis function ({Lemma~\ref{{lem:decay_layers}}} and {Lemma~\ref{{lem:discrete_finescale_decay}}}) are shown, along with an error bound for the dG multiscale method ${u^{ms,L}_{H}}$ from \eqref{eq:DGMM} ({Theorem~\ref{{thm:discrete}}}) ,where the corrected basis functions are solved locally on element patches. Finally, in Section \ref{ss:quantity}, we show an error bound given a quantity of interest ({Theorem~\ref{{thm:qoi}}}), leading to an error bound in $L^2$-norm ({Corollary~\ref{{cor:L2bound}}}).
+
+We shall make use of the following (semi)norms.
+The jump-seminorm and energy norms, associated with the coarse space ${\mathcal{V}_H}$, are defined by
+\begin{equation}\notag
+  \begin{aligned}
+    |\bullet|_{H}^2&:=\sum_{e\in{\mathcal{E}}_H(\Omega)\cup{\mathcal{E}}_H(\Gamma_D)} \frac{\sigma}{H_e}\|[\bullet]\|_{L^2(e)}^2, \\
+{||| {\bullet} |||_H}&:=(\|A^{1/2}\nabla_H\bullet\|_{L^2(\Omega)}^2+|\bullet|_H^2)^{1/2},
+\end{aligned}
+\end{equation}
+respectively, along with a localized version of the local jump and energy norms \eqref{e:dgjumpnorm} and \eqref{e:dgnorm} on a patch $\omega\subseteq\Omega$, where $\omega$ is aligned with the mesh ${\mathcal{T}}_h$, given by
+\begin{equation}\notag
+\begin{aligned}
+|\bullet|_{h,\omega}^2&:=\sum_{\substack{e\in{\mathcal{E}}(\Omega)\cup{\mathcal{E}}(\Gamma_D):\{\mathscr{E}}\cap\bar{\omega}\neq0}} \frac{\sigma}{h_e}\|[\bullet]\|_{L^2(e)}^2, \\
+{||| {\bullet} |||_{h,{\omega}}}&:=(\|A^{1/2}\nabla_h\bullet\|_{L^2(\omega)}^2+|\bullet|_{h,\omega}^2)^{1/2}.
+\end{aligned}
+\end{equation}
+The shape-regularity assumptions $h_T\approx h_e$ for all $e\in\partial T:T\in{\mathcal{T}}_h$ and $H_T\approx H_e$ for all $T\in\partial T:T\in{\mathcal{T}}_H$ will also be used. 
+
+\subsection{Properties of the coarse scale projection operator ${\Pi_H}$}\label{projection_properties}
+The following lemma gives stability and approximation properties of the operator ${\Pi_H}$.
+\begin{lemma}\label{lem:Lp_approx}
+  For any $v\in{\mathcal{V}_h}$, the estimate
+  \begin{align}\notag
+    
+    H^{-1}\|v-{\Pi_H} v\|_{L^2(T)}  \lesssim{\alpha}^{-1/2}{||| {v} |||_{h,{T}}},
+  \end{align}
+  is satisfied for all $T\in{\mathcal{T}}_H$. Moreover, it holds
+  \begin{align}\notag
+    {\beta}^{-1/2}{||| {{\Pi_H} v} |||_H}+\|H^{-1}(v-{\Pi_H} v)\|_{L^2(\Omega)}  \lesssim{\alpha}^{-1/2}{||| {v} |||_h}.
+  \end{align}
+\end{lemma}
+\begin{proof}
+  Theorem 2.2 in \cite{Karakashian2003}, implies that for each $v\in {\mathcal{V}_h}$, there exists a bounded linear operator ${\mathcal{I}^{\operatorname*{c}}_h}:{\mathcal{V}_h}\rightarrow{\mathcal{V}_h}\cap H^1(\Omega)$ such that
+\begin{equation}\label{e:DGGudiN3_h}
+  {\beta}^{-1/2}\|{A}^{1/2}\nabla_H(v-{\mathcal{I}^{\operatorname*{c}}_h} v)\|_{L^2(\Omega)} + \|h^{-1}(v-{\mathcal{I}^{\operatorname*{c}}_h} v)\|_{L^2(\Omega)}\lesssim {\alpha}^{-1/2} |v|_h.
+\end{equation}  
+Split $v=v^{\operatorname*{c}}+v^{\operatorname*{d}}\in{\mathcal{V}}_h$ into a conforming, $v^{\operatorname*{c}}={\mathcal{I}^{\operatorname*{c}}_h} v$, and non-conforming, $v^{\operatorname*{d}}=v-{\mathcal{I}^{\operatorname*{c}}_h} v$, part. We obtain
+  \begin{equation}\label{eq:approxLP}
+    \begin{aligned}
+      H^{-1}\|v-{\Pi_H} v\|_{L^2(T)} &\leq H^{-1}(\|v^{\operatorname*{c}}-{\Pi_H} v^{\operatorname*{c}}\|_{L^2(T)}+\|v^{\operatorname*{d}}-{\Pi_H} v^{\operatorname*{d}}\|_{L^2(T)}) \\
+      & \lesssim \|\nabla_h v\| +\|\nabla_h(v-v^{\operatorname*{c}})\|_{L^2(T)} + H^{-1}\|v^{\operatorname*{d}}\|_{L^2(T)}) \\
+      & \lesssim {\alpha}^{-1/2}{||| {v} |||_{h,{T}}}
+    \end{aligned}      
+  \end{equation}
+  using the triangle inequality, stability of the $L^2$-projection, and \eqref{e:DGGudiN3_h}.
+  Also,
+  \begin{equation}\notag
+    \begin{aligned}
+      {||| {{\Pi_H} v} |||_H}^2 =& \sum_{T\in{\mathcal{T}}_H}\|\sqrt{A}\nabla ({\Pi_H} v -\Pi_0({\mathcal{T}}_H)v)\|^2_{L^2(T)}+\sum_{e\in\Gamma}\frac{\sigma}{H}\|[v_c-{\Pi_H} v]\|^2_{L^2(e)} \\
+       \lesssim& \sum_{T\in{\mathcal{T}}_H}{\beta}\left(\frac{1}{H^2}\|v-\Pi_0({\mathcal{T}}_H)v\|^2_{L^2(T)}+\frac{1}{H^2}\|v_c-{\Pi_H} v\|^2_{L^2(T)}\right)\\
+      \lesssim & {C_{{\beta}/{\alpha}}}^2{||| {v} |||_h}^2,
+    \end{aligned}
+  \end{equation}
+using the triangle inequality, \eqref{e:DGGudiN3_h}, and \eqref{eq:approxLP} which concludes the proof.
+\end{proof}
+
+The operator ${\Pi_H}$ is surjective. The next lemma shows that, given some $v_H\in {\mathcal{V}_H}$ in the image of ${\Pi_H}$ there exists a $H^1$-conforming pre-image $v\in {\Pi_H}^{-1}v_H\subset {\mathcal{V}_h}$ with comparable support.
+\begin{lemma}\label{lem:property_Lp}
+  For each $v_H\in{\mathcal{V}_H}$, there exists a $v\in {\mathcal{V}_h}\cap H^1(\Omega)$ such that ${\Pi_H} v = v_H$, ${||| {v} |||_h}\lesssim {C_{{\beta}/{\alpha}}}{||| {v_H} |||_H}$, and $\text{supp}(v)\subseteq\text{supp}(v_H)$.
+\end{lemma}
+\begin{proof}
+Using \eqref{e:DGGudiN3_h} but on space ${\mathcal{V}_H}$ gives, for each $v\in {\mathcal{V}_H}$, there exists a bounded linear operator ${\mathcal{I}^{\operatorname*{c}}_H}:{\mathcal{V}_H}\rightarrow{\mathcal{V}_H}\cap H^1(\Omega)$ such that
+\begin{equation}\label{e:DGGudiN3}
+{\beta}^{-1/2}\|{A}^{1/2}\nabla_H(v-{\mathcal{I}^{\operatorname*{c}}_H} v)\|_{L^2(\Omega)} + \|H^{-1}(v-{\mathcal{I}^{\operatorname*{c}}_H} v)\|_{L^2(\Omega)}\lesssim {\alpha}^{-1/2} |v|_H.
+\end{equation}
+We define
+  \begin{equation}\notag
+    v := {\mathcal{I}^{\operatorname*{c}}_H} v_H+\hspace{-3ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-3ex}\left( v_H(x_j)-{\mathcal{I}^{\operatorname*{c}}_H} v_H(x_j) \right)\theta_{T,j},
+  \end{equation}
+  where $\theta_{T,j}\in {\mathcal{V}_h}\cap H^1_0(T)$ are bubble functions, supported on each element $T$, with ${\Pi_H} \theta_{T,j} = \lambda_{T,j}$ and ${||| {\theta_{T,j}} |||_h}\lesssim{\beta}(T)H^{d-2}$. Observe that $\text{supp}(v)\subseteq\text{supp}(v_H)$.  The interpolation property follows from
+  \begin{equation}
+    \begin{aligned}\notag
+      {\Pi_H} v &= {\mathcal{I}^{\operatorname*{c}}_H} v_H+{\Pi_H}\hspace{-3ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-3ex}\left( v_H(x_j)-{\mathcal{I}^{\operatorname*{c}}_H} v_H(x_j) \right)\theta_j, \\
+      & =  {\mathcal{I}^{\operatorname*{c}}_H} v_H   +  v_H -  {\mathcal{I}^{\operatorname*{c}}_H} v_H = v_H.
+    \end{aligned}
+  \end{equation}
+
+To prove stability, we estimate ${||| {v} |||_h}$ as follows:
+  \begin{equation}
+    \begin{aligned}\notag
+      {||| {v} |||_h}^2 & \leq \|{A}^{1/2}\nabla{\mathcal{I}^{\operatorname*{c}}_H} v_H\|^2_{L^2(\Omega)}+\hspace{-3ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-3ex}\left| v_H(x_j)-{\mathcal{I}^{\operatorname*{c}}_H} v_H(x_j) \right|^2{||| {\theta_j} |||_h}^2\\
+      &\lesssim \|{A}^{1/2}\nabla_H{\mathcal{I}^{\operatorname*{c}}_H} v_H\|^2_{L^2(\Omega)}+{\beta}\|H^{-1}( v_H-{\mathcal{I}^{\operatorname*{c}}_H} v_H) \|^2_{L^2(\Omega)}\\
+      &\lesssim {C_{{\beta}/{\alpha}}}^2 {||| {v_H} |||_H}^2
+    \end{aligned}
+  \end{equation}
+  using the inverse estimate $\|v\|_{L^\infty(T)}\leq H^{-d/2}\|v\|_{L^2(T)}$ for all $v\in{\mathcal{V}_H}$, and the estimate \eqref{e:DGGudiN3}.
+\end{proof}
+\begin{rem}
+  Note that $\theta_{T,j}\in{\mathcal{V}_h}\cap H^1_0(T)$ for all $T\in{\mathcal{T}}_H$ (fulfilling the conditions in {Lemma~\ref{{lem:property_Lp}}}) can be constructed using two (or more) refinements of the coarse scale parameter $H$. We can let $\theta_{T,j}\in{\mathcal{V}}_{h'}\cap H^1_0(T)$ where ${\mathcal{V}}_{h'}\subset{\mathcal{V}}_h$ and $h\leq h'\leq 2^{-2}H$. This does not put a big restriction on $h$ since the mesh ${\mathcal{T}}_h$ is assumed to be sufficiently fine to resolve the variation in the coefficient ${A}$, while the parameter $H$ does not need to resolve ${A}$.
+\end{rem}
+
+The following lemma says that the corrected basis is stable with respect to the fine scale parameter $h$ in the energy norm \eqref{e:dgnorm}, this is not a trivial result since the basis function $\{\lambda_{T,j}|T\in{\mathcal{T}}_H,\;j=1,\ldots,r\}$ are discontinuous.
+\begin{lemma}[Stability of the corrected basis functions]\label{l:stabbasis}
+  For all, $T\in{\mathcal{T}}_H,\;j=1,\ldots,r$ and $L>0\in\mathbb{N}$, the estimate
+  \begin{equation}\notag
+    {||| {\lambda_{T,j}-\phi^L_{T,j}} |||_h} \lesssim {C_{{\beta}/{\alpha}}}{||| {\lambda_{T,j}} |||_H},
+  \end{equation}
+  is satisfied, independently of the fine scale parameter $h$.
+\end{lemma}
+\begin{proof} For any $T\in{\mathcal{T}}_H,\;j=1,\ldots,r$, by {Lemma~\ref{{lem:property_Lp}}} there exists a $b$ such that $v=\lambda_{T,j}-b\in{\mathcal{V}^f_h({\omega_T^L})}$, and ${||| {b} |||_h}\lesssim{C_{{\beta}/{\alpha}}}{||| {\lambda_{T,j}} |||_H}$. We have
+  \begin{equation}\notag
+    \begin{aligned}
+    {||| {\lambda_{T,j}-\phi^L_{T,j}} |||_h}^2 &\lesssim {a_h({\lambda_{T,j}-\phi^L_{T,j}},{\lambda_{T,j}-\phi^L_{T,j}})}={a_h({\lambda_{T,j}-\phi^L_{T,j}},{\lambda_{T,j}-v})}, \\
+&\lesssim {a_h({\lambda_{T,j}-\phi^L_{T,j}},{b})}\lesssim {C_{{\beta}/{\alpha}}}{||| {\lambda_{T,j}-\phi^L_{T,j}} |||_h}{||| {\lambda_{T,j}} |||_H},
+    \end{aligned}
+  \end{equation}
+  which concludes the proof.
+\end{proof}
+
+\subsection{A priori estimates}\label{Mdiscretization}
+The following theorem gives an error bound for the idealized dG multiscale method, whereby the correctors for the basis are solved globally.
+\begin{theorem}\label{thm:umshH}
+  Let $u_h\in{\mathcal{V}_h}$ solve \eqref{e:DGweak} and ${u^{ms}_{H}}\in{\mathcal{V}^{ms}_{H}}$ solve \eqref{eq:DGMM}, then the estimate
+  \begin{equation}\notag
+    {||| {u_h-{u^{ms}_{H}}} |||_h} \leq C_1{\alpha}^{-1/2}|| H(f-{\Pi_H} f ) ||_{L^2(\Omega)},
+  \end{equation}
+  is satisfied, where $C_1$ neither depends on the mesh ($h$ or $H$) size nor the diffusion matrix ${A}$.
+\end{theorem}
+\begin{proof}
+  Let $e := u_h-{u^{ms}_{H}}=u_f\in {\mathcal{V}^{\operatorname*{f}}}$, then
+  \begin{equation}\notag
+    \begin{aligned}
+    {||| {e} |||_h}^2 &\lesssim {a_h({e},{e})}= (f,e)_{L^2(\Omega)} = (f-{\Pi_H} f,e-{\Pi_H} e)_{L^2(\Omega)} \\
+    & \leq ||H(f-{\Pi_H} f)||_{L^2(\Omega)}||H^{-1}(e-{\Pi_H} e)||^2_{L^2(\Omega)}\\
+    & \lesssim \frac{1}{\sqrt{\alpha}}||H (f-{\Pi_H} f)||_{L^2(T)}{||| {e} |||_h},
+    \end{aligned}
+  \end{equation}
+  using {Lemma~\ref{{l:odh1}}}, {Lemma~\ref{{l:odl2}}}, Cauchy-Schwarz inequality, and {Lemma~\ref{{lem:Lp_approx}}}, respectively.
+\end{proof}
+
+\begin{definition}
+  The cut off functions $\zeta_T^{d,D}\in P_0({\mathcal{T}}_h)$ are defined by the conditions
+  \begin{equation}\notag
+    \begin{aligned}
+      \zeta_T^{d,D}|_{\omega_T^d} &= 1, \\
+      \zeta_T^{d,D}|_{\Omega\setminus\omega^D_T} &= 0, \\
+      \|[\zeta_T^{d,D}]\|_{L^\infty(T)}& \lesssim \frac{h_T}{(D-d)H_T}\quad\text{for all }T\in{\mathcal{T}}_H,
+    \end{aligned}
+  \end{equation}
+  and that $\zeta_T^{d,D}$ is constant on the boundary $\partial(\omega^D_T\setminus\omega^d_T)$.
+\end{definition}
+
+The next lemma shows the exponential decay in the corrected basis, which is a key result in the analysis.
+\begin{lemma}\label{lem:decay_layers}
+   For all $T\in{\mathcal{T}}_H,\;j=1,\ldots,r$, the estimate
+  \begin{equation}\notag
+    {||| {(\lambda_j-\phi_{T,j})-(\lambda_j-\phi^L_{T,j})} |||_h} ={||| {\phi_{T,j}-\phi^L_{T,j}} |||_h} \leq  C_3\gamma^L{||| {\phi_{T,j}-\lambda} |||_h},
+  \end{equation}
+  is satisfied, with $C_3=C{C_{{\beta}/{\alpha}}}^3$, $0<\gamma<1$ given by $\gamma := (\frac{ C_2}{\ell})^{\frac{k-1}{2\ell}}$, $C_2=C'{C_{{\beta}/{\alpha}}}^2$, and $L = k\ell$, $k,\ell\geq2\in\mathbb{N}$, noting that $C$ and $C'$ are positive constants that are independent of the mesh ($h$ or $H$), of the patch size $L$, and of the diffusion matrix ${A}$.
+\end{lemma} 
+\begin{proof}
+  Define $e:=\phi_{T,j}-\phi^L_{T,j}=\phi_{T,j}-\phi^{\ell k}_{T,j}$. We have
+  \begin{equation}\label{eq:decay1}
+    \begin{aligned}
+      {||| {e} |||_h}^2 &\lesssim {a_h({e},{\phi_{T,j}-\phi^{\ell k}_{T,j}})} = {a_h({e},{\phi_{T,j}-v})} \lesssim {||| {e} |||_h}\cdot{||| {\phi_{T,j}-v} |||_h},
+    \end{aligned}
+  \end{equation}
+  for $v\in{\mathcal{V}^f_h({\omega^{\ell k}_T})}$.
+  Let $\zeta:=\zeta_{T}^{\ell k-1,\ell k}$; then by {Lemma~\ref{{lem:property_Lp}}} there exists a $b$ such that $v=\zeta\phi_{T,j} - b\in{\mathcal{V}^f_h({\omega^{\ell k}_T})}$,  ${\Pi_H} b = {\Pi_H}\zeta\phi_{T,j}$, ${||| {b} |||_h}\lesssim{C_{{\beta}/{\alpha}}}{||| {{\Pi_H}\zeta\phi_{T,j}} |||_H}$, and $\text{supp}(b)\subseteq\text{supp}({\Pi_H}\zeta\phi_{T,j})$. Then, we have 
+  \begin{equation}\label{eq:decay2}
+    \begin{aligned}
+      {||| {\phi_{T,j}-v} |||_h} &= {||| {\phi_{T,j} - (\zeta\phi_{T,j} - b)} |||_h} \\ 
+      &\leq{||| {\phi_{T,j} - \zeta\phi_{T,j}} |||_h} + {||| {b} |||_h} \\
+      &\lesssim {||| {\phi_{T,j} - \zeta\phi_{T,j}} |||_h} + {C_{{\beta}/{\alpha}}}{||| {{\Pi_H} (\zeta\phi_{T,j}-\phi_{T,j})} |||_H}\\
+      &\lesssim {C_{{\beta}/{\alpha}}}^2{||| {\phi_{T,j} - \zeta\phi_{T,j}} |||_h}.
+    \end{aligned}
+  \end{equation}
+ Furthermore, using the properties of $\zeta$ we have
+  \begin{align}\label{eq:decay3}
+    \|\sqrt{A}\nabla_h(1-\zeta)\phi_{T,j}\|_{L^2(\Omega)}, 
+\leq \|\sqrt{A} \nabla_h\phi_{T,j} \|_{L^2(\Omega\setminus\omega^{\ell k-1}_T)},
+  \end{align}
+  and
+  \begin{equation}\label{eq:decay4}
+    \begin{aligned}
+      & |(1-\zeta)\phi_{T,j} |^2_{h} = \sum_{e\in{\mathcal{E}}(\Omega)\cup{\mathcal{E}}(\Gamma_D)} \frac{\sigma}{h_e}\|[(1-\zeta)\phi_{T,j}]\|^2_{L^2(e)}  \\
+      &\quad\leq \sum_{e\in{\mathcal{E}}(\Omega)\cup{\mathcal{E}}(\Gamma_D)}\frac{\sigma}{h_e}\left(\|\{1-\zeta\}[\phi_{T,j}]\|^2_{L^2(e)} + \|\{\phi_{T,j}\}[1-\zeta]\|^2_{L^2(e)} \right)\\
+      &\quad\leq \sum_{\substack{e\in{\mathcal{E}}(\Omega)\cup{\mathcal{E}}(\Gamma_D):\{\mathscr{E}}\cap\Omega\setminus\omega^{\ell k-1}_T\neq0}}\left(\frac{\sigma}{h_e}\|[\phi_{T,j}]\|^2_{L^2(e)} +  \frac{\sigma h_T}{h_eH_T^2}\|\{\phi_{T,j}\}\|^2_{L^2(e)}\right) \\
+      &\quad\leq \sum_{\substack{e\in{\mathcal{E}}(\Omega)\cup{\mathcal{E}}(\Gamma_D):\{\mathscr{E}}\cap\Omega\setminus\omega^{\ell k-1}_T\neq0}}\frac{\sigma}{h_e}\|[\phi_{T,j}]\|^2_{L^2(e)} + \frac{\sigma}{H_T^2}\|\phi_{T,j}-{\Pi_H}\phi_{T,j}\|^2_{L^2(\Omega\setminus\omega^{\ell k-1}_T)} \\
+      &\quad\lesssim {C_{{\beta}/{\alpha}}}^2{||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{\ell k-1}_T}}},
+    \end{aligned}
+  \end{equation}
+  using a trace inequality and {Lemma~\ref{{lem:Lp_approx}}}, respectively. Combining \eqref{eq:decay1}, \eqref{eq:decay2}, \eqref{eq:decay3}, and \eqref{eq:decay4} yields
+  \begin{align}\label{eq:decay_11}
+    {||| {\phi_{T,j} - \zeta\phi_{T,j}} |||_h} \lesssim  {C_{{\beta}/{\alpha}}}^3{||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{\ell k-1}_T}}}.
+  \end{align}
+To simplify notation, let $m:=\ell (k-1)-1$ and $M:=\ell k -1$.
+For $\eta_T:=1-\zeta_T^{m,M}$, we obtain
+  \begin{equation}\label{eq:decay5}
+    {||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{M}_T}}}^2 \leq {||| {\eta_T\phi_{T,j}} |||_h}^2\lesssim {a_h({\eta_T\phi_{T,j}},{\eta_T\phi_{T,j}})},
+  \end{equation}
+where
+  \begin{equation}\label{eq:decaycutofbilinear}
+    \begin{aligned}
+      &{a_h({\eta_T \phi_{T,j}},{\eta_T \phi_{T,j}})} = ({A}\nabla_h \eta_T \phi_{T,j},\nabla_h \eta_T \phi_{T,j})_{L^2(\Omega)} \\ &\qquad + \sum_{e\in {\mathcal{E}}(\Omega)\cup{\mathcal{E}}(\Gamma_D)}\left(-2(\{\nu\cdot{A}\nabla \eta_T\phi_{T,j}\},[\eta_T\phi_{T,j}])+\frac{\sigma}{h_e}([\eta_T \phi_{T,j}],[\eta_T \phi_{T,j}])\right).
+    \end{aligned}
+  \end{equation}
+  For the first term on the right-hand side of \eqref{eq:decaycutofbilinear}, we have
+  \begin{equation}\label{eq:decay6}
+    ({A}\nabla_h \eta_T \phi_{T,j},\nabla_h \eta_T \phi_{T,j})_{L^2(\Omega)} = ({A}\nabla_h \phi_{T,j},\nabla_h \eta_T^2 \phi_{T,j})_{L^2(\Omega)},
+  \end{equation}
+  since $\eta_T$ is constant on each element $T\in{\mathcal{T}}_h$; for the other terms we use \eqref{eq:A3} and \eqref{eq:A4} (with $v=\eta_T$, $w=\nu\cdot{A}\nabla\phi_{T,j}$ and $u=\phi_{T,j}$). 
+  We can, thus, arrive to
+  \begin{equation}\label{eq:decay7}
+    \begin{aligned}
+      & {||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{M}_T}}}^2 \leq {a_h({\eta_T\phi_{T,j}},{\eta_T\phi_{T,j}})} = {a_h({\phi_{T,j}},{\eta_T^2\phi_{T,j}})} \\
+      &\quad+ \sum_{e\in{\mathcal{E}}(\Omega)}\big(1/2(\{\nu\cdot{A}\nabla\phi_{T,j}\},[\eta_T]^2[\phi_{T,j}])_{L^2(e)}-1/4 ([\nu\cdot{A}\nabla\phi_{T,j}],[\eta_T]^2\{\phi_{T,j}\})_{L^2(e)} \\
+      &\quad -\frac{\sigma}{4h_e}([\eta_T]^2,[\phi_{T,j}]^2)_{L^2(e)} +\frac{\sigma}{h_e}([\eta_T]^2,\{\phi_{T,j}\}^2)_{L^2(e)} \big), 
+    \end{aligned}
+  \end{equation}
+  using \eqref{eq:decay5}, \eqref{eq:decaycutofbilinear}, and \eqref{eq:decay6}.
+  Note that,
+  \begin{equation}\label{eq:decay8}
+    \begin{aligned}
+      &\sum_{e\in{\mathcal{E}}(\Omega)}\big(1/2(\{\nu\cdot{A}\nabla\phi_{T,j}\},[\eta_T]^2[\phi_{T,j}])_{L^2(e)}-1/4 ([\nu\cdot{A}\nabla\phi_{T,j}],[\eta_T]^2\{\phi_{T,j}\})_{L^2(e)} \\
+      &\qquad -\frac{\sigma}{4h_e}([\eta_T]^2,[\phi_{T,j}]^2)_{L^2(e)} + \frac{\sigma}{h_e}([\eta_T]^2,\{\phi_{T,j}\}^2)_{L^2(e)} \big) \\
+      & \lesssim \hspace{-10pt}\sum_{\substack{e\in{\mathcal{E}}(\Omega):\{\mathscr{E}}\cap\omega^{M}_T\setminus\omega^{m}_T\neq 0}}\hspace{-10pt}\frac{h_T^2}{\ell^2 H_T^2}\Big(\|\{\nu\cdot{A}\nabla\phi_{T,j}\}\|_{L^2(e)}\|[\phi_{T,j}]\|_{L^2(e)}+\|[\nu\cdot{A}\nabla\phi_{T,j}]\|_{L^2(e)}\|\{\phi_{T,j}\}\|_{L^2(e)} \\
+       &\qquad +\sigma\left(\|[\phi_{T,j}]\|^2_{L^2(e)}+\|\{\phi_{T,j}\}\|^2_{L^2(e)}\right) \Big) \\
+      & \lesssim \hspace{-10pt}\sum_{\substack{e\in{\mathcal{E}}(\Omega):\{\mathscr{E}}\cap\omega^{M}_T\setminus\omega^{m}_T\neq 0 }}\hspace{-10pt}\big(\frac{h_T}{\ell^2 H_T^2}\|{A}\nabla\phi_{T,j}\|_{L^2(T^+\cup T^-)}\|\phi_{T,j}\|_{L^2(T^+\cup T^-)} +\frac{\sigma}{\ell^2 H_T^2}\|\phi_{T,j}\|_{L^2(T^+\cup T^-)}^2 \big) \\
+      & \lesssim {\beta} \ell^{-2} \|H^{-1}_T(\phi_{T,j}-{\Pi_H}\phi_{T,j})\|^2_{L^2(\omega^{M}_T\setminus\omega^{m}_T)} \leq {C_{{\beta}/{\alpha}}}^2\ell^{-2}{||| {\phi_{T,j}} |||_{h,{\omega^{M}_T\setminus\omega^{m}_T}}}^2.
+     \end{aligned}
+   \end{equation}
+  Now we bound the term
+   \begin{equation}\label{eq:decay9}
+     \begin{aligned}
+       {a_h({\phi_{T,j}},{\eta_T^2\phi_{T,j}})} & = {a_h({\phi_{T,j}},{\eta_T^2\phi_{T,j}-b})}+{a_h({\phi_{T,j}},{b})}= {a_h({\phi_{T,j}},{b})} \\
+  
+  
+  
+  
+       &\lesssim {||| {\phi_{T,j}} |||_{h,{\omega^{M}_T\setminus\omega^{m}_T}}}{||| {b} |||_{h,{\omega^{M}_T\setminus\omega^{m}_T}}}\\
+      & \leq {C_{{\beta}/{\alpha}}}{||| {\phi_{T,j}} |||_{h,{\omega^{M}_T\setminus\omega^{m}_T}}}{||| {{\Pi_H} \eta^2_T\phi_{T,j}} |||_{H,{\omega^{M}_T\setminus\omega^{m}_T}}}. \\
+    \end{aligned}
+  \end{equation}
+Furthermore, we have that
+\begin{equation}
+  \begin{aligned}\label{eq:decay10}
+    &{||| {{\Pi_H} \eta^2_T\phi_{T,j}} |||_{H,{\omega^{M}_T\setminus\omega^{m}_T}}} = {||| {{\Pi_H} (\eta^2_T-\Pi_0({\mathcal{T}}_H)\eta^2_T)\phi_{T,j}} |||_{H,{\omega^{M}_T\setminus\omega^{m}_T}}}\\
+  &\quad =  \|\sqrt{A}\nabla_H {\Pi_H}(\eta^2_T-\Pi_0({\mathcal{T}}_H)\eta^2_T)\phi_{T,j}\|^2_{L^2(\omega^{M}_T\setminus\omega^{m}_T)} \\ 
+  & \qquad+ \sum_{\substack{e\in{\mathcal{E}}(\Omega)\cup{\mathcal{E}}(\Gamma_D):\{\mathscr{E}}\cap\overline{\omega^{M}_T\setminus\omega^{m}_T}\neq 0 }} \frac{\sigma}{H_e}\|[{\Pi_H}(\eta^2_T-\Pi_0({\mathcal{T}}_H)\eta^2_T)\phi_{T,j}]\|^2_{L^2(e)} \\
+  &\quad\lesssim  {\beta}\|H_e^{-1}{\Pi_H}(\eta^2_T-\Pi_0({\mathcal{T}}_H)\eta^2_T)\phi_{T,j}\|^2_{L^2(\omega^{M}_T\setminus\omega^{m}_T)} \\
+  &\quad\lesssim  {\beta}\|H_e^{-1}(\eta^2_T-\Pi_0({\mathcal{T}}_H)\eta^2_T)\|_{L^\infty(T)}\|\phi_{T,j}\|^2_{L^2(\omega^{M}_T\setminus\omega^{m}_T)} \\
+  &\quad\lesssim {\beta}\ell^{-2}\|H_e^{-1}(\phi_{T,j}-{\Pi_H}\phi_{T,j})\|^2_{L^2(\omega^{M}_T\setminus\omega^{m}_T)}  \\
+  &\quad\lesssim {C_{{\beta}/{\alpha}}}^2\ell^{-2}{||| {\phi_{T,j}} |||_{h,{\omega^{M}_T\setminus\omega^{m}_T}}}^2 ,
+  \end{aligned}
+\end{equation}
+using a trace inequality, inverse inequality, and {Lemma~\ref{{lem:Lp_approx}}}, respectively. Combining the inequalities \eqref{eq:decay7}, \eqref{eq:decay8}, \eqref{eq:decay9}, and \eqref{eq:decay10} yields
+\begin{equation}\notag
+  {||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{M}_T}}}^2 \leq \frac{ C_2}{\ell}{||| {\phi_{T,j}} |||_{h,{\omega^{M}_T\setminus\omega^{m}_T}}}^2 \leq \frac{ C_2}{\ell} {||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{m}_T}}}^2.
+  \end{equation}
+where $ C_2 = C'{C_{{\beta}/{\alpha}}}^2$. Substituting back to $\ell$ and $k$ and using a cut off function with a slightly different argument, yields
+  \begin{equation}\notag
+    \begin{aligned}
+    &{||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{\ell k -1}_T}}}^2 \leq  \frac{ C_2}{\ell}{||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{\ell (k-1)-1}_T}}}^2 \leq (\frac{ C_2}{\ell})^2{||| {\phi_{T,j}} |||_{h,{\Omega\setminus\omega^{\ell (k-2)-1}_T}}}^2 \\
+    &\quad\leq \dots \leq (\frac{ C_2}{\ell})^{k-1}{||| {\phi_{T,j}} |||_{h,{\omega^{\ell}\setminus\omega^{\ell-1}_T}}}^2.
+    \end{aligned}
+  \end{equation}
+which concludes the proof together with \eqref{eq:decay_11}.
+\end{proof}
+\begin{lemma}\label{lem:discrete_finescale_decay}
+  For all, $T\in{\mathcal{T}}_H,\;j=1,\ldots,r$, the estimate
+  \begin{equation}\notag
+    {||| {\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}v_j(\phi_{T,j}-\phi^L_{T,j})} |||_h}^2 \leq  C_4L^d\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|v_j|^2{||| {\phi_{T,j}-\phi^L_{T,j}} |||_h}^2.
+  \end{equation}
+  is satisfied, with $C_4 = C{C_{{\beta}/{\alpha}}}^3$ and $C$ positive constant independent of the mesh ($h$ or $H$), of the patch size $L$, and of the diffusion matrix ${A}$.
+\end{lemma}
+\begin{proof}
+ Let $w = \sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}v_j(\phi_{T,j}-\phi^L_{T,j})$, and note that
+  \begin{equation}\label{eq:discrete_finescale_decay1}
+    \begin{aligned}
+      {a_h({\phi_{T,j}-\lambda_{T,j}},{w-\zeta_Tw+b})} &= 0, \\
+      {a_h({\phi^L_{T,j}-\lambda_{T,j}},{w-\zeta_Tw+b})} &= 0,
+    \end{aligned}
+  \end{equation}
+  where $\zeta_{T}:=\zeta_T^{L+1,L+2}$, using {Lemma~\ref{{lem:property_Lp}}} and the property of the cut-off function.
+  From \eqref{eq:discrete_finescale_decay1} follows that ${a_h({w},{(1-\zeta_T)w+b_{T}})}=0$ for all $w\in{\mathcal{V}^{\operatorname*{f}}}$.
+  We obtain
+  \begin{equation}\label{eq:decayfunc1}
+    \begin{aligned}
+      &{||| {\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}v_j(\phi_{T,j}-\phi^L_{T,j})} |||_h} \lesssim \hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}v_j{a_h({\phi_{T,j}-\phi^L_{T,j}},{w})} \\
+      &\quad = \hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}v_j{a_h({\phi_{T,j}-\phi^L_{T,j}},{\zeta_{T} w-b})} \\
+      &\quad \lesssim \hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|v_j|\cdot{||| {\phi_{T,j}-\phi^L_{T,j}} |||_h}\left({||| {\zeta_{T} w} |||_h}+{||| {b} |||_h}\right)\\
+      &\quad \lesssim \hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|v_j|\cdot{||| {\phi_{T,j}-\phi^L_{T,j}} |||_h}\left({||| {\zeta_{T} w} |||_h}+{C_{{\beta}/{\alpha}}}{||| {{\Pi_H} \zeta_{T}w} |||_H}\right)\\
+      &\quad \lesssim \hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|v_j|\cdot{||| {\phi_{T,j}-\phi^L_{T,j}} |||_h}{C_{{\beta}/{\alpha}}}^2{||| {\zeta_{T}w} |||_h}\\
+    \end{aligned}
+  \end{equation}
+  From \eqref{eq:decay3} and \eqref{eq:decay4}, we have
+  \begin{equation}\label{eq:decayfunc2}
+    \begin{aligned}
+      {||| {\zeta_T w} |||_h}={||| {\zeta_T w} |||_{h,{\omega^{L+2}_T}}}\lesssim {C_{{\beta}/{\alpha}}}{||| { w} |||_{h,{\omega^{L+2}_T}}}.
+    \end{aligned}
+  \end{equation}
+  Then, further estimation of \eqref{eq:decayfunc1} can be achieved using \eqref{eq:decayfunc2} and the discrete Cauchy-Schwarz inequality:
+  \begin{equation}\notag
+    \begin{aligned}
+      &{||| {\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}v_j(\phi_{T,j}-\phi^L_{T,j})} |||_h}  \\
+      & \quad\leq  {C_{{\beta}/{\alpha}}}^3\left(\hspace{-0ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-4ex}|v_j|^2{||| {\phi_{T,j}-\phi^L_{T,j}} |||_h}^2\right)^{\hspace{-1ex}1/2}\hspace{-1.7ex}\left(\hspace{-0ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-4ex}{||| {w} |||_{h,{\omega^{L+2}_T}}}^2\right)^{\hspace{-1ex}1/2} \\
+      & \quad\leq  {C_{{\beta}/{\alpha}}}^3L^{d/2} \cdot\left(\hspace{-0ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-4ex}|v_j|^2{||| {\phi_{T,j}-\phi^L_{T,j}} |||_h}^2\right)^{1/2}\cdot{||| { w} |||_h}.
+    \end{aligned}
+  \end{equation}
+Dividing by $w$ on both sides concludes the proof.
+\end{proof}
+
+The following theorem gives an error bound for the dG multiscale method.
+\begin{theorem}\label{thm:discrete}
+Let $u\in H^1_D(\Omega)$ solve \eqref{e:modelvar} and ${u^{ms,L}_{H}}\in{\mathcal{V}^{ms,L}_{H}}$ solve \eqref{eq:DGMM}. Then, the estimate
+  \begin{equation}\notag
+    \begin{aligned}
+    {||| {u-{u^{ms,L}_{H}}} |||_h} \leq &{||| {u-u_h} |||_h} + C_1{\alpha}^{-1/2}|| H(f-{\Pi_H} f ) ||_{L^2(\Omega)} \\ &+C_5\|H^{-1}\|_{L^\infty(\Omega)}L^{d/2}\gamma^L\|f\|_{L^2(\Omega)},
+    \end{aligned}
+  \end{equation}
+  is satisfied, with $0<\gamma<1$, $L$ from {Lemma~\ref{{lem:decay_layers}}}, $C_1$ from {Theorem~\ref{{thm:umshH}}}, $C_5=C{C_{{\beta}/{\alpha}}}^2C_4^{1/2}C_3$ where $C_3$ is from {Lemma~\ref{{lem:decay_layers}}} and $C_4$ is from {Lemma~\ref{{lem:discrete_finescale_decay}}}. $C$ a positive constant independent of the mesh ($h$ or $H$), of the patch size $L$, and of the diffusion matrix ${A}$. 
+\end{theorem}
+\begin{rem}
+  To counteract the factor $\|H^{-1}\|_{L^\infty(\Omega)}$ in the error bound in {Theorem~\ref{{thm:discrete}}}, we can choose the localization parameter as $L = \lceil C\log(||H^{-1}||_{L^\infty(\Omega)})\rceil$. On adaptively refined meshes it is recommended to choose $L=\lceil C\log(H^{-1})\rceil$.
+\end{rem}
+\begin{proof} We define $\tilde{u}^{ms,L}_{H}:=\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}{u^{ms}_{H,T}}(x_j)\phi^L_{T,j}$. Then, we obtain
+  \begin{equation}\label{eq:discrete1}
+    \begin{aligned}
+      &{||| {u-{u^{ms,L}_{H}}} |||_h} \leq {||| {u-\tilde{u}^{ms,L}_{H}} |||_h} \\
+      & \leq {||| {u-u_h} |||_h}+{||| {u_h-{u^{ms}_{H}}} |||_h}+{||| {{u^{ms}_{H}}-\tilde{u}^{ms,L}_{H}} |||_h} \\
+       & \leq {||| {u-u_h} |||_h}+{||| {u_h-{u^{ms}_{H}}} |||_h}+{||| {\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}{u^{ms}_{H,T}}(x_j)(\phi_{T,j}-\phi^L_{T,j})} |||_h}.
+    \end{aligned}
+  \end{equation}   
+  Now, estimating the terms in \eqref{eq:discrete1}, we have 
+  \begin{equation}\notag
+    {||| {u_h-{u^{ms}_{H}}} |||_h} \leq C_1{\alpha}^{-1/2}\|H(f-{\Pi_H} f)\|_{L^2(\Omega)},
+  \end{equation}
+  using {Theorem~\ref{{thm:umshH}}}, and
+  \begin{equation}
+    \begin{aligned}\label{eq:discrete2}
+      &{||| {\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex} {u^{ms}_{H,T}}(x_j)(\phi_{T,j} - \phi^L_{T,j})} |||_h}^2 \\ 
+      &\leq  C_4L^d\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|{u^{ms}_{H,T}}(x_j)|^2{||| {\phi_{T,j}-\phi^L_{T,j}} |||_h}^2. \\
+      & \leq C_4C_3^2L^d\gamma^{2L}\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|{u^{ms}_{H,T}}(x_j)|^2{||| {\phi_{T,j}-\lambda_{j}} |||_h}^2,
+    \end{aligned}
+  \end{equation}
+  using {Lemma~\ref{{lem:discrete_finescale_decay}}} and {Lemma~\ref{{lem:decay_layers}}}, respectively.
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  Further estimation, using {Lemma~\ref{{l:stabbasis}}}, yields
+  \begin{equation}
+    \begin{aligned}\label{eq:discrete3}
+      &\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|{u^{ms}_{H,T}}(x_j)|^2{||| {\phi_{T,j}-\lambda_{T,j}} |||_h}^2\\%{\omega_{T,2}}^2 \\
+      &\quad\lesssim{C_{{\beta}/{\alpha}}}^2\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|{u^{ms}_{H,T}}(x_j)|^2{||| {\lambda_{T,j}} |||_H}^2 \\
+      &\quad\lesssim{C_{{\beta}/{\alpha}}}^2{\beta}\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}|{u^{ms}_{H,T}}(x_j)|^2H_T^{-2}\|\lambda_{T,j}\|_{L^2(T)}^2 \\
+      &\quad= {C_{{\beta}/{\alpha}}}^2{\beta}\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}\|H^{-1}_T{u^{ms}_{H,T}}(x_j)\lambda_{T,j}\|_{L^2(T)}^2 \\
+      &\quad\lesssim {C_{{\beta}/{\alpha}}}^2{\beta}\|\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}H^{-1}_T{u^{ms}_{H,T}}(x_j)\lambda_{T,j}\|_{L^2(\Omega)}^2. \\
+    \end{aligned}
+  \end{equation}
+  Furthermore, using a Poincare-Friedrich inequality for piecewise $H^1$ functions, we deduce
+  \begin{equation}\label{eq:discrete4}
+    \begin{aligned}
+      &\|\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}H_T^{-1}{u^{ms}_{H,T}}(x_j)\lambda_{T,j}\|_{L^2(\Omega)}^2 \\
+      &\lesssim\|\hspace{-2ex}\sum_{T\in{\mathcal{T}}_H,\;j=1,\ldots,r}\hspace{-2ex}H_T^{-1}{u^{ms}_{H,T}}(x_j){\Pi_H}(\lambda_{T,j}-\phi_{T,j})\|_{L^2(\Omega)}^2 \\
+      & \lesssim {\alpha}^{-1}{||| {H^{-1}{u^{ms}_{H}}} |||_h}^2 \\
+      &\lesssim \alpha^{-1}\|H^{-1}\|^2_{L^\infty(\Omega)}\|f\|_{L^2(\Omega)}^2.
+    \end{aligned}
+  \end{equation}
+  Combining \eqref{eq:discrete2}, \eqref{eq:discrete3} and \eqref{eq:discrete4}, we arrive to
+  \begin{equation}\notag
+    {||| {{u^{ms}_{H}}-{u^{ms,L}_{H}}} |||_h} \lesssim {C_{{\beta}/{\alpha}}}^2C_4^{1/2}C_3\|H^{-1}\|_{L^\infty(\Omega)}L^{d/2}\gamma^L\|f\|_{L^2(\Omega)}.
+  \end{equation}
+\end{proof}
+\subsection{Error in a quantity of interest}\label{ss:quantity}
+In engineering applications, we are often interested in a quantity of interest, usually a functional $g\in L^2(\Omega)$ of the solution. To this end, consider the dual reference solution \eqref{e:DGweak}: find $\phi_h\in{\mathcal{V}_h}$ such that
+\begin{equation}\label{eq:dual_DGweak}
+  a_h(v,\phi_h) = g(v)\quad\text{for all }v\in{\mathcal{V}}_h,
+\end{equation}
+and the dual multiscale solution \eqref{eq:DGMM}: find $\phi_{H,h}^L\in{\mathcal{V}}_{H,h}^L$ such that
+\begin{equation}\label{eq:dual_DGMM}
+  a_h(v,\phi_{H,h}^{ms,L}) = g(v)\quad\text{for all }v\in{\mathcal{V}}_{H,h}^L.
+\end{equation}
+\begin{theorem}\label{thm:qoi}
+  Let $u\in H^1_D(\Omega)$ solve \eqref{e:modelvar}, $u_H^{ms,L}\in {\mathcal{V}}_H^{ms,L}$ solve \eqref{eq:DGMM}, and let $g\in L^2(\Omega)$ be the quantity of interest. Then, the estimate
+  \begin{equation}\notag
+    |g(u)-g(u_{H,h}^L)|\lesssim |g(u)-g(u_h)| + {||| {u_h - u_H^{ms,L}} |||_h}{||| {\phi_h - \phi_H^{ms,L}} |||_h},
+  \end{equation}
+  is satisfied.
+\end{theorem}
+\begin{proof}
+From \eqref{eq:dual_DGweak} and \eqref{eq:dual_DGMM}, we obtain the Galerkin orthogonality
+\begin{equation}\label{eq:dual_Galerkin_orthogonality}
+  a_h(v,\phi_h-\phi_{H}^{ms,L}) = 0\quad\text{for all }v\in{\mathcal{V}}_H^{ms,L}.
+\end{equation}
+Using the triangle inequality, we have
+\begin{equation}\notag
+  |g(u)-g(u_H^{ms,L})|\leq|g(u)-g(u_h)|+|g(u_h)-g(u_H^{ms,L})|.
+\end{equation}
+Finally, observing that
+\begin{equation}\notag
+  \begin{aligned}
+    |g(u_h - u_{h,H}^L)|&= |a_h(u_h - u_{h,H}^L,\phi_h)| \\
+    & = |a_h(u_h - u_{h,H}^L,\phi_h - \phi_{H,h}^L)| \\
+    & \lesssim {||| {u_h - u_{h,H}^L} |||_h}{||| {\phi_h - \phi_{H,h}^L} |||_h}, \\
+  \end{aligned}
+\end{equation}
+using \eqref{eq:dual_Galerkin_orthogonality}, concludes the proof.
+\end{proof}
+\begin{corollary}\label{cor:L2bound}
+ For $g(v)=(u_h-u_{H,h}^L,v)_{L^2(\Omega)}$, the following $L^2$-norm error estimates hold:
+ \begin{equation}\notag
+  \|u-u_{H,h}^L\|_{L^2(\Omega)} \lesssim \|u-u_h\|_{L^2(\Omega)}+{||| {u_h - u_H^{ms,L}} |||_h}^{1/2}{||| {\phi_h - \phi_H^{ms,L}} |||_h}^{1/2},
+\end{equation}
+and
+ \begin{equation}\label{eq:L2est_2}
+  \|u-u_{H,h}^L\|_{L^2(\Omega)} \lesssim \|u-u_h\|_{L^2(\Omega)}+H{||| {u_h - u_H^{ms,L}} |||_h},
+\end{equation}
+for $L=\lceil C\log(H^{-1})\rceil$ with $C$ sufficiently large positive constant independent of the mesh parameters.
+\end{corollary}
+\begin{rem}
+As expected, if we are interested in a smoother functional, a higher convergence rate is obtained for $|g(u_h-u_H^{ms,L})|$. For example, given the forcing function for the primal problem $f\in H^m({\mathcal{T}}_H)$, a quantity of interest $g\in H^n({\mathcal{T}}_H)$ (with $H^0({\mathcal{T}}_H)$ denoting the standard $L^2(\Omega)$ space), and choosing $L=\lceil C\log(H^{-1}) \rceil$ with large enough $C$, gives
+\begin{equation}\notag
+  \begin{aligned}
+    |g(u - u_{H}^{ms,L})| \lesssim |g(u)-g(u_h)| +  H^{2+m+n}(\sum_{T\in{\mathcal{T}}_H}|f|_{H^m(T)})(\sum_{T\in{\mathcal{T}}_H}|g|_{H^n(T)}).
+  \end{aligned}
+\end{equation}
+\end{rem}
+\section{Numerical Experiments}\label{s:numexp}
+Let $\Omega$ where be an $L$-shaped domain (constructed by removing the lower right quadrant in the unit square) and let the forcing function be $f=1+\cos(2\pi x)\cos(2\pi y)$ for $(x,y)\in\Omega$. The boundary $\Gamma$ is divided into the Neumann boundary $\Gamma_N:=\Gamma\cap(\{(x,y): y=0\}\cup \{(x,y):  x=1\})$ and the Dirichlet boundary $\Gamma_D=\Gamma\setminus\Gamma_N$. We shall consider three different permeabilities: constant ${A}_1=1$, ${A}_2={A}_2(x)$, which is piecewise constant with periodic values of $1$ and $0.01$ with respect to a Cartesian grid of width $2^{-6}$ in the $x$-direction, and ${A}_3 = {A}_3(x,y)$ which piecewise constant with respect to a Cartesian grid of width $2^{-6}$ both in the $x$- and $y$-directions and has a maximum ratio ${\beta}/{\alpha} = 4\cdot 10^{6}$. The data for ${A}_3$ are taken from layer $64$ in the $SPE$ benchmark problem, see \texttt{http://www.spe.org/web/csp/}. The permeabilities $A_2$ and $A_3$ are illustrated in {Figure~\ref{{fg:LshapeP}}}.
+\begin{figure}[th!]
+  \centering
+  \subfigure[$\beta/\alpha = 10^2$]{
+    \includegraphics[width=0.45\textwidth]{period}
+  }
+  \subfigure[$\beta/\alpha \approx 4\cdot 10^6$]{
+    \includegraphics[width=0.45\textwidth]{spe}
+  }
+  \caption{The permeability structure of $A_2$ (a) and $A_3$ (b) in log scale.}
+  \label{fg:LshapeP}
+\end{figure}
+For the periodic problem many of the corrected basis functions will be identical. For instance, all the local corrected basis in the interior are solved on identical patches, thereby reducing the computational effort considerably. In the extreme case of a problem with periodic coefficients on a unit hypercube, with period boundary conditions, the correctors $\phi_{T,j}$, $j=1,\dots,r$, will be identical for all $T\in{\mathcal{T}}_H$.
+
+Consider the uniform (coarse) quadrilateral mesh ${\mathcal{T}}_H$ with size $H=2^{-i}$, $i=1,\dots,6$. The convergence rate $-p/2$ corresponds to $\mathcal{O}(H^p)$ since the number degrees of freedom $\approx H^{-2}$.
+The corrector functions \eqref{eq:corrector} are solved on a subgrid of a (fine) quadrilateral mesh ${\mathcal{T}}_h$ with mesh size $2^{-8}$. The mesh ${\mathcal{T}}_h$ will also act as a reference grid for which we shall compute a reference solution $u_h\in{\mathcal{V}}_h$ \eqref{e:DGweak} on. Note that the mesh ${\mathcal{T}}_h$ is chosen so that it resolves the fine scale features for ${A}_i$, $i=1,2,3$, hence we assume that the solution $u_h$ is sufficiently accurate. 
+
+\subsection{Localization parameter}
+If $f \in H^{m}({\mathcal{T}}_H)$ we have the bound
+\begin{equation}\label{eq:reg_rhs}
+  ||H(f-{\Pi_H} f))||_{L^2(\Omega)} \lesssim \sum_{T\in{\mathcal{T}}_H} H^{k+1}|f|_{H^k(T)},
+\end{equation}
+where $k=0$ for $m=0$, $k=1$ for $m=1$, and $k=2$ for $m>1$. Hence, to balance the error in between the terms on the right-hand side of the estimate in {Theorem~\ref{{thm:discrete}}}, different constant $C$ has to be used for the localization parameter, $L=\lceil C\log(H^{-1})\rceil$, depending on the element-wise regularity of the forcing function $f$ on ${\mathcal{T}}_H$. 
+\begin{figure}[th!]
+  \centering
+  \includegraphics[width=0.75\textwidth]{localization_parameter}
+  \caption{Diffusion coefficient $A_1 = 1$. Relative energy-norm error against $N_{\text{dof}}$, for different values of $C$ for the localisation parameter $L$.}
+\label{fg:localization_parameter}
+\end{figure}
+\begin{figure}[th!]
+  \centering
+  \includegraphics[width=0.75\textwidth]{localization_parameter_L2}
+  \caption{Diffusion coefficient $A_1 = 1$. Relative $L^2$-norm error against $N_{\text{dof}}$, for different values of $C$ for the localisation parameter $L$.}
+\label{fg:localization_parameter_L2}
+\end{figure}
+{Figure~\ref{{fg:localization_parameter}}} shows the relative error in the energy norm ${||| {u_h-u_{H}^{ms,L}} |||_h}/{||| {u_h} |||_h}$ and {Figure~\ref{{fg:localization_parameter_L2}}} the relative error in the $L^2$-norm $\|u_h - u_{H}^{ms,L}\|_{L^2(\Omega)}/\|u_h\|_{L^2(\Omega)}$ between $u_h$ and $u_H^{ms,L}$ against the number of degrees of freedom $N_{\text{dof}}\approx O(H^{-2})$, using different constants $C=1,3/2,2,5/2$. With the chose $C=5/2$, the errors due to the localization can be neglected compared to the errors from the forcing function, both for the energy- and for the $L^2$-norm. For $f\not\in H^1({\mathcal{T}}_h)$, $C=3/2$ is sufficient since \eqref{eq:reg_rhs} gives linear convergence. In the following numerical experiments we shall use $C=2$, since this value seems to balance the error sufficiently. Note that the numerical overhead increases with $C$ as the sizes of the patches $\omega^L_T$ $T\in{\mathcal{T}}_H$, increases with $L=\lceil C\log(H^{-1})\rceil$. This results in both increased computational effort to compute the corrector functions and reduced sparseness in the coarse scale stiffness matrix.
+
+\subsection{Energy-norm convergence}
+Let the localization parameter be \\$L=\lceil 2\log(H^{-1})\rceil$. {Figure~\ref{{fg:conv}}} shows the relative error in the energy norm plotted against the number of degrees of freedom.
+The different permeabilities $A_i$, $i=1,2,3$, and the singularity arising from the $L$-shaped domain do not appear to have a substantial impact on the convergence rate, which is about  $3/2$, as expected. We note in passing that using standard dG on the coarse mesh only admits poor convergence behaviour for $A_2$ and for $A_3$. This is to be expected, since standard dG on the coarse mesh does not resolve the fine scale features. 
+\begin{figure}[th!]
+  \centering
+ \includegraphics[width=0.75\textwidth]{conv}
+ \caption{Relative energy-norm error against $N_{\text{dof}}$, for $C=2$ in the localisation parameter $L$ for the the diffusion coefficients $A_1$, $A_2$, and $A_3$.}
+ \label{fg:conv}
+\end{figure}
+
+\subsection{$L^2$-norm convergence}
+Again, set $L=\lceil 2\log(H^{-1})\rceil$. {Figure~\ref{{fg:conv_L2}}} and {Figure~\ref{{fg:conv_TL2}}}, shows the relative $L^2$-norm error again the number of degrees of freedom between, $u_h$ and $u_{H,h}^L$ and between $u_h$ and ${\Pi_H} u_{H,h}^L$, viz., $\|u_h-{\Pi_H} u_{H}^{ms,L}\|_{L^2(\Omega)}/\|u_h\|_{L^2(\Omega)}$, respectively. In {Figure~\ref{{fg:conv_L2}}} we see that the $L^2$-norm error between $u_h$ and $u_H^{ms,L}$ converges at a faster rate than in the energy norm (convergence rate $-2$ compared to $-3/2$, respectively,) as expected from \eqref{eq:L2est_2}. In {Figure~\ref{{fg:conv_TL2}}} only the coarse part of $u_H^{ms,L}$ is used (i.e. ${\Pi_H} u_H^{ms,L}$); nevertheless it appears to have a faster convergence rate than $-1/2$,  except for the case of the permeability ${A}_3$.
+\begin{figure}[th!]
+  \centering
+ \includegraphics[width=0.75\textwidth]{conv_L2}
+ \caption{Relative $L^2$-norm error against $N_{\text{dof}}$, for $C=2$ in the localisation parameter $L$ for the the diffusion coefficients $A_1$, $A_2$, and $A_3$.}
+ \label{fg:conv_L2}
+\end{figure}
+\begin{figure}[th!]
+  \centering
+ \includegraphics[width=0.75\textwidth]{conv_TL2}
+ \caption{Relative $L^2$-norm error against $N_{\text{dof}}$, for $C=2$ in the localisation parameter $L$ for the the diffusion coefficients $A_1$, $A_2$, and $A_3$.}
+\label{fg:conv_TL2}
+\end{figure}
+
+\bibliographystyle{amsplain}
+\bibliography{references}
+
+\appendix
+
+\section{Equalities for averages and jump operators}
+We derive equalities for averages and jump operators across interfaces where the functions $v$ and $w$ have discontinuities.
+  Using $[vw] = \{v\}[w] + [v]\{w\}$ and $\{v\}\{w\} = \{vw\}-1/4[v][w]$, we have
+  \begin{equation}
+    \begin{aligned}\label{eq:A1}
+       \{v w\}[vu] = & \{w\}\{v\}[vu]+1/4[v][w][vu]\\
+       = &\{w\}[v^2u]-\{w\}[v]\{vu\}+1/4[v][w][vu] \\
+       = &\{w\}[vu]-[v]\{w\}\{v\}\{u\}-1/4[v]\{w\}[v][u] \\
+       &\quad +1/4[v]^2[w]\{u\}+1/4[v]\{v\}[w][u]
+    \end{aligned}
+  \end{equation}
+  and
+  \begin{equation}
+    \begin{aligned}\label{eq:A2}
+       \{vw\}[vu] =& \{v\}\{vw\}[u] + \{vw\}[v]\{u\} \\
+       = &\{v^2w\}[u]-1/4[v][vw][u] + \{vw\}[v]\{u\} \\
+       = &\{v^2w\}[u] -1/4[v]^2\{w\}[u]-1/4[v]\{v\}[w][u] \\
+       &\quad+ [v]\{v\}\{w\}\{u\}+1/4 [v]^2[w]\{u\} \\
+    \end{aligned}
+  \end{equation}
+  Combining \eqref{eq:A1} and \eqref{eq:A2} we obtain
+  \begin{equation}
+    \begin{aligned}\label{eq:A3}
+      2\{vw\}[vu] = \{w\}[v^2u]+\{v^2w\}[u]+1/2 [v]^2[w]\{u\}-1/2[v]^2\{w\}[u]
+    \end{aligned}
+  \end{equation}
+  Also,
+  \begin{equation}
+    \begin{aligned}\label{eq:A4}
+      [vu][vu] =& [u]\{v\}[vu]+[v]\{u\}[vu] \\
+      =& [u][v^2u]-[v][u]\{vu\}+[v]\{u\}[vu] \\
+      =& [u][v^2u]) -[v][u]\{v\}\{u\}-1/4[v][u][v][u] \\
+      & \quad +[v]\{u\}[v]\{u\}+[v]\{u\}\{v\}[u] \\
+      =& [u][v^2u] -1/4[v]^2[u]^2 +[v]^2\{u\}^2
+    \end{aligned}
+  \end{equation}
+\end{document}               

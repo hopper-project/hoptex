@@ -1,0 +1,548 @@
+\documentclass[12pt]{article} 
+\pdfoutput=1
+\usepackage[a4paper]{geometry}
+\emergencystretch = 5pt
+\oddsidemargin = 5mm 
+\topmargin =  -20mm
+\textwidth = 160mm 
+\textheight = 240mm 
+\usepackage[utf8]{inputenc} \usepackage[english]{babel} \usepackage[T2A]{fontenc}
+\usepackage{amsmath,amssymb} \usepackage{euler,eucal}
+\usepackage{myconcrete} 
+\usepackage[unicode=true,plainpages=false]{hyperref} 
+\hypersetup{colorlinks=true,linkcolor=magenta,anchorcolor=magenta,urlcolor=blue,citecolor=blue}
+\usepackage{algorithmic} 
+\usepackage[ruled]{algorithm} 
+\usepackage{graphicx}
+\usepackage{setspace}
+
+\renewenvironment{abstract}{\small \quotation {\bfseries {Abstract.}} }{\endquotation}
+
+\usepackage{caption}
+\captionsetup[figure]{labelsep=period}
+\captionsetup[table]{labelsep=period}
+\captionsetup[algorithm]{labelsep=colon}
+\usepackage{amsthm}
+
+\theoremstyle{definition}
+\newtheorem{remark}{Remark}
+\newtheorem{statement}{Statement}
+\newtheorem{corollary}{Corollary}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+
+\let{\varepsilon}=\varepsilon \let\ups=\upsilon
+\let\le=\leqslant  \let\ge=\geqslant
+\let\leq=\leqslant \let\geq=\geqslant
+
+\hypersetup{            pdfauthor={D. V. Savostyanov, E. E. Tyrtyshnikov, N. L. Zamarashkin},
+            pdftitle={Fast truncation of mode ranks for bilinear tensor operations},
+            pdfsubject={Research article on tensor approximations},
+            pdfkeywords={          Multidimensional arrays, structured tensors, Tucker approximation, 
+          fast compression, cross approximation
+          }
+            }
+
+ 
+
+ 
+
+  
+  
+  
+
+  
+   
+ 
+
+\begin{document}
+\bibliographystyle{hsiam}
+
+{\phantom{.}\vskip 5mm
+      \begin{center}\begin{doublespace}{ \LARGE\sc  {Fast truncation of mode ranks for bilinear tensor operations}}\end{doublespace}\end{center}}
+{\begin{center}\large{{D. V. Savostyanov, E. E. Tyrtyshnikov, N. L. Zamarashkin}}\end{center}}
+{\begin{center}\footnotesize\textit{{Institute of Numerical Mathematics, Russian Academy of Sciences, \\
+                     Russia, 119333 Moscow, Gubkina 8 \\ 
+                  {\texttt{{dmitry.savostyanov@gmail.com, [tee,kolya]@bach.inm.ras.ru}}}
+           }}\end{center}}
+{\footnotetext{{This work was supported by 
+         RFBR grants 08-01-00115, 09-01-12058, 10-01-00757, 10-01-09201, RFBR/DFG grant 09-01-91332,
+         Russian Federation Gov. contract $\Pi940$
+         and  Priority research program of Dep. Math. RAS.
+         }} }
+{\vskip 3mm\begin{center}\large{{\today}}\end{center}\vskip 10mm}
+
+\begin{abstract}
+We propose a fast algorithm for mode rank truncation of the result of a bilinear operation on 3-tensors given in the Tucker or canonical form. 
+If the arguments and the result have mode sizes $n$ and mode ranks $r,$ the computation costs~${\mathcal{O}}(nr^3 + r^4).$ 
+The algorithm is based on the cross approximation of Gram matrices, and the accuracy of the resulted Tucker approximation is limited by square root of machine precision.
+{\vskip 2mm\par\noindent{\small\emph{{Keywords}:} {          Multidimensional arrays, structured tensors, Tucker approximation, 
+          fast compression, cross approximation
+          }}}
+\par \noindent \emph{AMS classification:} 15A21, 15A69, 65F99
+\end{abstract}
+
+\section{Introduction}
+Data sparse representations of tensors and efficient operations in the corresponding formats play increasingly important role in many applications. 
+In the paper we consider a 3-\emph{tensor} ${\mathbf{A}} = {\mathbf{A}}[i,j,k]$ that is an array with three indices. 
+The number of allowed values of each index is called \emph{mode size}.
+To specify tensor indices explicitly, we use \emph{square brackets}. 
+This notation allows to easily specify different \emph{index transformations}.
+For instance, \emph{unfoldings} of ${{n_1 \times n_2 \times n_3}}$ tensor ${\mathbf{A}}[i,j,k],$ are \emph{matricizations} of sizes $n_1 {\mathbin{\times}} n_2n_3,$ $n_2 {\mathbin{\times}} n_1n_3 $ and $n_3 {\mathbin{\times}} n_1n_2$ that consist of columns, rows and tube fibers of ${\mathbf{A}},$ 
+\begin{equation}\label{eq:un}
+A^{(1)} = A[i, jk], \qquad A^{(2)} = A[j, ki], \qquad A^{(3)} = A[k, ij].
+\end{equation}
+Here we set row/column/fiber index of the tensor ${\mathbf{A}}[i,j,k]$ as row index and join the two others in one multiindex for columns of the unfolding. 
+The result is considered as a two-index object (matrix), with row and column indices separated by comma. 
+The difference between matrices and tensors is additionally stressed by use of uppercase letter instead of bold uppercase.
+The \emph{reshape} of tensor elements assumes as well a change of the index ordering. 
+For example, transposition of matrix reads $(A[i,j])^{T} = A[j,i],$ vectorization reads ${\mathbf{a}}[ij] = A[i,j].$ 
+We see that the square bracket notation is rather self-explaining and suits for description of algorithms working with multidimensional data. 
+We also will use the MATLAB-style \emph{round bracket} notation $a(i,j,k)$ to point to individual element of ${\mathbf{A}}[i,j,k]$ and ${\mathbf{a}}(i,:,k)$ to select a mode vector (i.e. row) from tensor ${\mathbf{A}}.$ 
+Scalars and vectors are denoted by lowercase and bold lowercase letters.
+
+In numerical work with tensors of large \emph{mode size} it is crucial to use data sparse formats. 
+For 3-tensors, the most useful are the following.
+
+The \emph{canonical decomposition}  \cite{hitchcock-sum-1927,cc-parafac-1970,harshman-parafac-1970} (or \emph{canonical approximation} to some other tensor) reads
+\begin{equation}\label{eq:c}
+{\mathbf{A}}[i,j,k] = {\sum\limits}_{s=1}^R {\mathbf{u}}_s[i] {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} {\mathbf{v}}_s[j] {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} {\mathbf{w}}_s[k], \qquad   a(i,j,k) = {\sum\limits}_{s=1}^R u(i,s) v(j,s) w(k,s).
+\end{equation}
+The minimal possible number of summands is called \emph{tensor rank} or \emph{canonical rank} of the given tensor ${\mathbf{A}}.$
+However, canonical decomposition/approximation of a tensor with minimal value of $R$ is a rather ill-posed and computationally unstable problem \cite{desilva-2008}. 
+This explains why among many algorithms of canonical approximation (cf.~\cite{comon-2000,lathauwer-schur-2004,esgras-bb-2009,ost-sorto-2009}) none is known as absolutely reliable, and no robust tools for linear algebra operations maintaining the canonical format (linear combinations, etc.)  are proposed.
+
+The (truncated
+) \emph{Tucker decomposition/approximation} \cite{Tucker} reads 
+\begin{equation}\label{eq:t}
+ \begin{split}
+      {\mathbf{A}}[i,j,k] & = {\mathbf{G}}[p,q,s] {\mathbin{\times}}_1 U[i,p] {\mathbin{\times}}_2 V[j,q] {\mathbin{\times}}_3 W[k,s], \\
+       a(i,j,k) & = {\sum\limits}_{p=1}^{r_1}{\sum\limits}_{q=1}^{r_2} {\sum\limits}_{s=1}^{r_3} g(p,q,s) u(i,p) v(j,q) w(k,s).
+ \end{split} 
+\end{equation}
+The quantities $r_1,r_2,r_3$ are referred to as \emph{Tucker ranks} or \emph{mode ranks},
+the tensor ${\mathbf{G}}={\mathbf{G}}[p,q,s]$ of size $r_1 {\mathbin{\times}} r_2 {\mathbin{\times}} r_3$ is called the \emph{Tucker core},
+the symbol ${\mathbin{\times}}_l$ designates the multiplication of a tensor by a matrix along the $l$-th mode, 
+the \emph{mode factors} $U, V, W$ have orthonormal columns.
+In $d$ dimensions, the memory to store $r{\mathbin{\times}} r{\mathbin{\times}} \ldots {\mathbin{\times}} r$ core is $r^d,$ that is usually beyond affordable for large $d$ and even for very small $r$  (so-called \emph{curse of dimensionality}). For $d=3, \: r\sim 100$ the storage is small and Tucker decomposition can be used efficiently.
+
+In~\cite{ost-latensor-2009} the efficient operations with 3-tensors in canonical and Tucker formats are discussed, with approximation of the result in the Tucker format.
+Simple operations like linear combination of small number of structured tensors can be done using \emph{multilinear SVD} \cite{lathauwer-svd-2000} (or high-order SVD, HOSVD), with quasi-optimal ranks and guaranteed accuracy.
+Linear combination of many tensors, convolution, Hadamard (pointwise) product of tensors and many other bilinear operations reduce to recompression of the following structured tensor
+\begin{equation}\label{eq:f}
+ \begin{split}
+  {\mathbf{F}}[i,j,k] = & {\mathop{\mathbf{Kron}}\nolimits}({\mathbf{G}}, {\mathbf{H}})[ap,bq,cs] {\mathbin{\times}}_1 U[i,ap] {\mathbin{\times}}_2 V[j,bq] {\mathbin{\times}}_3 W[k,cs], \\
+  f(i,j,k)  = & \sum_{pqs} \sum_{abc} g(p,q,s) h(a,b,c) u(i,ap) v(j,bq) w(k,cs),
+ \end{split}
+\end{equation}
+with ${{r_1 \times r_2 \times r_3}}$ core ${\mathbf{G}}[p,q,s],$  ${{p_1 \times p_2 \times p_3}}$ core ${\mathbf{H}}[a,b,c]$ and non-orthogonal factors $U, V$ and $W.$
+Formally~\eqref{eq:f} is a Tucker-like format with larger mode ranks $p_1r_1, p_2r_2, p_3r_3,$ that should be reduced (truncated) maintaining the desired accuracy.
+Due to memory limitations, ${\mathbf{F}}[i,j,k]$  can not be assembled for mode sizes $n \gtrsim 10^3$ and auxiliary $p_1r_1 {\mathbin{\times}} p_2r_2 {\mathbin{\times}} p_3r_3$ core can not be assembled for ranks $r \gtrsim 30$ (see Tab.~\ref{tab:mem}).\footnote{We always assume $n_1=n_2=n_3=n$ and $r_1=r_2=r_3=p_1=p_2=p_3=r$ in complexity estimates}
+The structure of ${\mathbf{F}}$ should be exploited without explicit evaluation of large temporary arrays.
+
+\begin{table}[t]
+\caption{Memory for $r^d$ elements, MB} \label{tab:mem}
+\begin{center}
+\begin{tabular}{c|cccc}
+       &  $d=3$     &  $d=4$         & $d=5$      & $d=6$    \\ \hline
+$r=15$ &  $0.026$   &  $0.4$         & $5.8$      & $87$     \\
+$r=30$ &  $0.2$     &  $6.2$         & $185$      & $5560$   \\
+$r=50$ &  $0.95$    &  $47$          & $2384$     & $119210$  \\
+$r=100$&  $7.7$     &  $763$         & $76300$    & $\approx 8$ TB  \\
+\end{tabular}
+\end{center}
+\end{table}
+
+A practical rank-reduction algorithm proposed in \cite{ost-latensor-2009} is a rank revealing version of iterative Tucker-ALS~\cite{tuckerals-1980,lathauwer-rank1-2000} requiring ${\mathcal{O}}(nr^4 + r^6)$ operations. 
+However, the number of iterations in Tucker-ALS depends on the initial guess, and fast approximate evaluation of Tucker factors of~\eqref{eq:f} is important. 
+
+In Sec.~2 we propose to approximate dominant mode subspaces of ${\mathbf{F}}[i,j,k]$ by the ones of simpler tensors.
+In Sec.~3 we compute dominant mode subspaces by a cross approximation of Gram matrices of the unfoldings.
+The resulted algorithm requires ${\mathcal{O}}(nr^3 + r^4)$ operations in three-dimensional case and can be easily generalized to higher dimensions using ${\mathcal{O}}(dnr^3 + dr^{d+1})$ operations. Since it uses decomposition of Gram matrices, the accuracy  is limited by square root of machine precision. 
+In Sec.~4 we apply the proposed method to Hadamard product of electron densities of simple molecules and show that using the result as an initial guess, Tucker-ALS converges to almost machine precision in one iteration.
+
+In the paper we use Frobenius norm of tensors, that is defined as follows
+$$
+\|{\mathbf{A}} \|_F^2 {\mathrel{\stackrel{\mathrm{def}}{=}}} {\left\langle {{\mathbf{A}}},\:{{\mathbf{A}}} \right\rangle}, \qquad {\left\langle {{\mathbf{A}}},\:{{\mathbf{B}}} \right\rangle} {\mathrel{\stackrel{\mathrm{def}}{=}}} {\sum\limits}_{i=1}^{n_1} {\sum\limits}_{j=1}^{n_2} {\sum\limits}_{k=1}^{n_3} a_{ijk} b_{ijk}
+$$
+and spectral norm of tensor (cf.~\cite{defant-1993})
+$$
+\|{\mathbf{A}}\|_{\mathbf{2}} {\mathrel{\stackrel{\mathrm{def}}{=}}} \max_{\|{\mathbf{u}}\|=\|{\mathbf{v}}\|=\|{\mathbf{w}}\|=1} {\mathbf{A}} {\mathbin{\times}}_1 {\mathbf{u}}^{T} {\mathbin{\times}}_2 {\mathbf{v}}^{T} {\mathbin{\times}}_3 {\mathbf{w}}^{T} = \max_{\|{\mathbf{u}}\|=\|{\mathbf{v}}\|=\|{\mathbf{w}}\|=1} {\left\langle {{\mathbf{A}}},\:{{{\mathbf{u}} {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} {\mathbf{v}} {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} {\mathbf{w}}}} \right\rangle},
+$$
+induced by standard vector norm $\|{\mathbf{u}}\|^2 {\mathrel{\stackrel{\mathrm{def}}{=}}} \|{\mathbf{u}}\|_2^2  =  ({\mathbf{u}},{\mathbf{u}}) = \sum_{i=1}^n |u_i|^2.$ 
+
+\section{Approximation of dominant subspaces}
+Our goal is to find approximate dominant subspaces of an ${{n_1 \times n_2 \times n_3}}$ tensor~\eqref{eq:f} producing an approximation in the Tucker format
+\begin{equation}\label{eq:appr}
+ \tilde{\mathbf{F}}[i,j,k] = {\mathbf{T}}[\alpha,\beta,\gamma] {\mathbin{\times}}_1 X[i,\alpha] {\mathbin{\times}}_2 Y[j,\beta] {\mathbin{\times}}_3 Z[k,\gamma], \qquad \|{\mathbf{F}} - \tilde {\mathbf{F}}\|_F \leq {\varepsilon} \|{\mathbf{F}}\|_F
+\end{equation}
+with a desired (not very high) accuracy and values of mode ranks for $\tilde{\mathbf{F}},$ close to optimal.
+
+Tucker factors $X[i,\alpha], Y[j,\beta]$ and $Z[k,\gamma]$ approximate dominant subspaces of rows, columns and fibers of ${\mathbf{F}}[i,j,k],$ respectively. 
+They can be computed by SVD of the unfoldings of ${\mathbf{F}},$ as proposed in~\cite{lathauwer-svd-2000}, but this method requires evaluation of all elements of tensor and is not feasible for large mode sizes. 
+We can compute~\eqref{eq:appr} interpolating a given tensor on carefully selected set of elements. 
+This is done in Cross3D algorithm~\cite{ost-tucker-2008}, that requires evaluation of  ${\mathcal{O}}(nr + r^3)$ tensor elements and uses ${\mathcal{O}}(nr^2 + r^4)$ additional operations. 
+For a structured tensor~\eqref{eq:f} this summarizes to ${\mathcal{O}}(nr^3 + r^6)$ operations, i.e. the complexity is~\emph{linear} in mode size.
+However, pivoting and error checking involves heuristics and in certain cases is slower than the approximation itself. 
+For example, computation of residual $({\mathbf{F}} - \tilde{\mathbf{F}})[i,j,k]$ on ${\mathcal{O}}(n)$ randomly picked elements uses ${\mathcal{O}}(nr^4)$ operations.
+
+To avoid heuristic approaches, we can evaluate dominant subspaces by proper decomposition of Gram matrices of the unfoldings. 
+In~\cite{sav-rr-2009} this idea was used for fast mode rank truncation of tensor given in the canonical form~\eqref{eq:c} with large number of terms.
+The proposed in~\cite{sav-rr-2009} cross approximation algorithm is equivalent to an unfinished Cholesky decomposition and computes rank-$r$ dominant basis using the diagonal and certain $r$ columns of the Gram matrix.
+However, for the unfolding $F[i,jk]$ of tensor ${\mathbf{F}}[i,j,k]$ the Gram matrix $(F F^{T})[i,i']$ reads
+\begin{equation}\label{eq:ff}
+ \begin{split}
+  (F F^{T})(i,i') = \sum_{pqs} \sum_{abc} \sum_{p'q's'} \sum_{a'b'c'} & g(p,q,s) h(a,b,c) g(p',q',s') h(a',b',c') \\
+                                                                     & (V^{T} V)(bq,b'q') (W^{T} W)(cs,c's') u(i,ap) u(i',a'p'),
+ \end{split}
+\end{equation}
+and it is easy to check, that evaluation of any element of~\eqref{eq:ff} requires ${\mathcal{O}}(r^6)$ operations.
+Therefore, the algorithm from~\cite{sav-rr-2009} applied to~\eqref{eq:ff} has ${\mathcal{O}}(nr^6)$ complexity, which is not promising even for moderate $r.$
+To perform faster, we propose to change the computational objective and look for dominant subspaces of tensors with a simpler structure.
+
+Rewrite the tensor~\eqref{eq:f} as follows
+\begin{equation}\label{eq:split}
+ \begin{split}
+ {\mathbf{F}}[i,j,k] = & {} {\mathbf{U}}'[i,bq,cs] {\mathbin{\times}}_2 V[j,bq] {\mathbin{\times}}_3 W[k,cs], \\
+             & {} {\mathbf{U}}'[i,bq,cs] = {\mathop{\mathbf{Kron}}\nolimits}({\mathbf{G}},{\mathbf{H}})[ap,bq,cs] {\mathbin{\times}}_1 U(i,ap).
+ \end{split}
+\end{equation}
+It is clear that the Tucker approximation of ${\mathbf{U}}'[i,bq,cs]$  gives a Tucker approximation of ${\mathbf{F}}[i,j,k]$ with the same mode-$1$ rank. 
+Therefore, we can approximate dominant mode-$1$ subspace of ${\mathbf{F}}$ by the one of ${\mathbf{U}}'.$  
+The accuracy of resulted approximation is estimated by the following theorem.
+
+\begin{theorem}\label{thm1}
+For tensor ${\mathbf{F}}[i,j,k]$ given by~\eqref{eq:split} it holds
+\begin{equation}\nonumber
+  \|{\mathbf{F}}\|_F        \leq \|{\mathbf{U}}'\|_F          \|V\|_2 \|W\|_2, \quad 
+  \|{\mathbf{F}}\|_{\mathbf{2}}      \leq \|{\mathbf{U}}'\|_{\mathbf{2}}        \|V\|_2 \|W\|_2,
+\end{equation}
+and for mode-$1$ unfoldings $F=F[i,jk]$ and $U'=U'[i,pqcs]$ it holds
+\begin{equation}\nonumber
+  \|F\|_2   \leq \|U'\|_2   \|V\|_2 \|W\|_2.
+\end{equation}
+\begin{proof}
+The first and last parts follow directly from matrix inequalities
+\begin{equation}\nonumber
+ \begin{split}
+  \|{\mathbf{F}}[i,j,k]\|_F & = \|F[i, jk]\|_F \leq \|U'[i,bqcs]\|_F \| W[k,cs] {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} V[j,bq] \|_2 = \|{\mathbf{U}}'\|_F \|V\|_2 \|W\|_2, \\
+  \|F[i,jk]\|_2   &                  \leq \|U'[i,bqcs]\|_2 \| W[k,cs] {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} V[j,bq] \|_2 = \|U'[i,bqcs]\|_2 \|V\|_2 \|W\|_2.
+ \end{split}
+\end{equation}
+Second part reads
+\begin{equation}\nonumber
+ \begin{split}
+ \|{\mathbf{F}}[i,j,k]\|_{\mathbf{2}} & = \max_{\|{\mathbf{u}}\|=\|{\mathbf{v}}\|=\|{\mathbf{w}}\|=1} {\left\langle {{{\mathbf{U}}'[i,pq,cs] {\mathbin{\times}}_2 V[j,pq] {\mathbin{\times}}_3 W[k,cs]}},\:{{{\mathbf{u}}[i] {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} {\mathbf{v}}[j] {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} {\mathbf{w}}[k]}} \right\rangle} = \\
+               {}  & = \max_{\|{\mathbf{u}}\|=\|{\mathbf{v}}\|=\|{\mathbf{w}}\|=1} ({\mathbf{v}}^{T} V)[bq]  ({\mathbf{U}}' {\mathbin{\times}}_1 {\mathbf{u}}^{T})[bq,cs] (W^{T} {\mathbf{w}})[cs] \leq \\
+               {}  & \leq \max_{\|{\mathbf{u}}\|=\|{\mathbf{v}}\|=\|{\mathbf{w}}\|=1} \|V^{T} {\mathbf{v}}\| \|{\mathbf{U}}' {\mathbin{\times}}_1 {\mathbf{u}}^{T}\|_2 \|W^{T} {\mathbf{w}}\| = \\
+               {}  & = \left(\max_{\|{\mathbf{u}}\|=1} \|{\mathbf{U}}' {\mathbin{\times}}_1 {\mathbf{u}}^{T}\|_2\right) \left(\max_{\|{\mathbf{v}}\|=1} \|V^{T} {\mathbf{v}}\|\right) \left(\max_{\|{\mathbf{w}}\|=1} \|W^{T} {\mathbf{w}}\|\right) 
+                     = \|{\mathbf{U}}'\|_{\mathbf{2}} \|V\|_2 \|W\|_2.
+ \end{split}
+\end{equation}
+\end{proof}
+\end{theorem}
+\begin{corollary}
+For certain perturbation $\Delta{\mathbf{U}}'$ of tensor ${\mathbf{U}}',$ the corresponding perturbation  $\Delta{\mathbf{F}}$ can be estimated as follows
+\begin{equation}\label{eq:acc}
+ \begin{split}
+  \frac{\| \Delta{\mathbf{F}}\|_F  }{\|{\mathbf{F}}\|_F}   \leq c_F   \frac{\| \Delta{\mathbf{U}}'\|_F  }{\|{\mathbf{U}}'\|_F},  & \qquad c_F  =\frac{\|{\mathbf{U}}'\|_F   \|V\|_2 \|W\|_2 }{\|{\mathbf{F}}\|_F}; \\
+  \frac{\| \Delta F\|_2  }{\| F\|_2}   \leq c_2   \frac{\| \Delta U'\|_2  }{\| U'\|_2},  & \qquad c_2  =\frac{\| U'\|_2   \|V\|_2 \|W\|_2 }{\| F\|_2}; \\
+  \frac{\| \Delta{\mathbf{F}}\|_{\mathbf{2}}}{\|{\mathbf{F}}\|_{\mathbf{2}}} \leq c_{\mathbf{2}} \frac{\| \Delta{\mathbf{U}}'\|_{\mathbf{2}}}{\|{\mathbf{U}}'\|_{\mathbf{2}}},& \qquad c_{\mathbf{2}}=\frac{\|{\mathbf{U}}'\|_{\mathbf{2}} \|V\|_2 \|W\|_2 }{\|{\mathbf{F}}\|_{\mathbf{2}}}.
+ \end{split}
+\end{equation}
+\end{corollary}
+\begin{remark} 
+For any tensor, $\|{\mathbf{A}}[i,j,k]\|_{\mathbf{2}} \leq \|A[i,jk]\|_2 \leq \|A[i,j,k]\|_F.$
+\end{remark}
+
+To find a dominant mode-$1$ subspace of ${\mathbf{U}}'[i,bq,cs],$ we can use proper decomposition of Gram matrix of the unfolding $U'[i,bqcs],$ that reads
+\begin{equation}\label{eq:gram}
+ \begin{split}
+ A[i,i'] = (U' {U'}^{T})[i,i'] = U[i,ap] \left( {\mathaccent"705E } G[p,p'] {\mathbin{\raise1pt\hbox{$\scriptscriptstyle\mathord\otimes$}}} {\mathaccent"705E } H[a,a']  \right) U[a'p',i'], \\
+ {\mathaccent"705E } G[p,p'] = G[p,qs] G[qs,p'], \quad {\mathaccent"705E } H[a,a'] = H[a,bc] H[bc,a'].
+ \end{split}
+\end{equation}
+Tensor ${\mathbf{U}}'$ has a simpler structure than ${\mathbf{F}},$ and computation of the Gram matrix~\eqref{eq:gram} is faster than~\eqref{eq:ff}. 
+However, evaluation of $A[i,i']$ as full $n_1 \times n_1$ array leads to ${\mathcal{O}}(n^2r^3)$ complexity. 
+Looking for the methods with linear in mode size complexity, we are to use the cross approximation algorithms.
+
+\section{Cross approximation of Gram matrices}
+Truncated singular/proper decomposition is used in cases where  low-rank approximation is required.
+This problem can be solved by faster methods, for example, those based on \emph{cross approximation} 
+$A[i,j] \approx \tilde A[i,j] = U[i,J](A[I,J])^{-1}A[I,j],$ where $I$ and $J$ contain indices of certain rows and columns of $A.$ 
+This approximation is exact on the \emph{cross} formed by rows $I$ and columns $J,$ but the overall accuracy depends heavily on the properties of $A[I,J].$ 
+In~\cite{gt-psa-1995,gtz-psa-1997,gt-maxvol-2001} it is shown that a good choice for $A[I,J]$  is  \emph{maximum volume} (modulus of determinant) submatrix. 
+Search of this submatrix in general case is NP-hard problem~\cite{bartholdi-1982}, and alternatives should be used, see~\cite{tee-cross-2000,gostz-maxvol-2010}. 
+If the supported cross is iteratively widened at each step by one row and column that intersect on element where residual is maximum in modulus, cross approximation method is equivalent to Gau{\ss}ian decomposition with complete pivoting. 
+For Gram matrix the pivot is always on the diagonal and cross approximation is equivalent to unfinished Cholesky decomposition. 
+The resulted algorithm exploiting structure of~\eqref{eq:gram} is summarized in Alg.~\ref{alg}.
+
+\begin{algorithm}[ht]
+\caption{Cross approximation for Gram matrix~\eqref{eq:gram}} \label{alg}
+\begin{algorithmic}[1]
+\REQUIRE Structured tensor ${\mathbf{F}} = {\mathop{\mathbf{Kron}}\nolimits}({\mathbf{G}}, {\mathbf{H}}) {\mathbin{\times}}_1 U {\mathbin{\times}}_2 V {\mathbin{\times}}_3 W,$ see~\eqref{eq:f}
+\ENSURE  Approximation $\tilde A = X \Lambda X^{T}$ for Gram matrix~\eqref{eq:gram}, such that $\|A - \tilde A\|_F \lesssim {\varepsilon}\|A\|_F$
+\item[\textbf{Initialization:}]   $p=0, \quad \tilde A = 0$ 
+\STATE  ${\mathaccent"705E } G[p,p'] = G[p,qs] G[qs,p'], \quad {\mathaccent"705E } H[a,a'] = H[a,bc] H[bc,a']$    \hfill {${\mathcal{O}}(r^{4})$}
+\FOR[Compute diagonal of matrix]{$i=1,\ldots,n$}
+      \STATE $U_i[a,p] = U[i,ap], \quad d(i) = {\left\langle {{U_i[a,p] G[p,p']}},\:{{H[a,a']U_i[a',p']}} \right\rangle}$   \hfill {${\mathcal{O}}(r^3)$}
+\ENDFOR
+\STATE ${\mathop{\mathtt{nrm}}\nolimits} := \|{\mathbf{d}}\|_1$
+\REPEAT
+\STATE $i_\star := \arg \max_i |d(i)| $ \COMMENT{Find new pivot}                          \hfill {${\mathcal{O}}(n)$}
+\STATE ${\mathbf{a}}(:,i_\star) := U[:,ap] (H[a,a'] U_{i_\star}[a',p'] G[p',p])[ap]$                \hfill {${\mathcal{O}}(nr^2 + r^3)$}
+\STATE $\tilde{\mathbf{a}}(:,i_\star) = X \Lambda ({\mathbf{x}}(i_\star, :))^{T}$                             \hfill {${\mathcal{O}}(np)$}
+\STATE ${\mathbf{x}}_\star := ({\mathbf{a}}-\tilde{\mathbf{a}}) / \sqrt{(a - \tilde a)(i_\star,i_\star)}$              \hfill {${\mathcal{O}}(n)$}
+\STATE ${\mathbf{d}}[i] := {\mathbf{d}}[i] - |{\mathbf{x}}_\star[i]|^2$ \COMMENT{Update diagonal of residual}          \hfill {${\mathcal{O}}(n)$}
+\STATE ${\mathbf{x}}_\star =: [X \: {\mathbf{x}}'] {\mathbf{b}}$  \COMMENT{Orthogonalize ${\mathbf{x}}_\star$ to ${\mathop{\mathrm{span}}\nolimits} X$}    \hfill ${\mathcal{O}}(np)$ 
+\STATE $\Lambda + {\mathbf{b}}^{T}{\mathbf{b}} =: V D V^{T}$ \COMMENT{Re-diagonalize decomposition}             \hfill ${\mathcal{O}}(p^3)$
+\STATE $X := [X \: {\mathbf{x}}'] V, \quad \Lambda := D, \quad \tilde A = X \Lambda X^{T}, \quad {\mathop{\mathtt{err}}\nolimits} := \|{\mathbf{d}}\|_1$          \hfill ${\mathcal{O}}(np^2)$
+\UNTIL{${\mathop{\mathtt{err}}\nolimits} \leq {\varepsilon}{\mathop{\mathtt{nrm}}\nolimits}$ \textbf{or} $r = {r_\mathrm{max}}$ }
+\end{algorithmic}
+\end{algorithm}
+
+It is easy to see that evaluation of ${\mathaccent"705E } G$ and ${\mathaccent"705E } H,$ i.e. Gram matrices of the unfoldings $G[p,qs]$ and $H[a,bc],$ requires ${\mathcal{O}}(r^4)$ operations in three-dimensional case and ${\mathcal{O}}(r^{d+1})$ in $d$-dimension case. With precomputed ${\mathaccent"705E } G$ and ${\mathaccent"705E } H$ every element $a(i,i')$ is computed in ${\mathcal{O}}(r^3)$ operations and a column ${\mathbf{a}}(:,i')$ is computed in ${\mathcal{O}}(nr^2 + r^3)$ operations for three and $d$-dimensional case.  
+For the rediagonalization of $\Lambda + {\mathbf{b}}^{T}{\mathbf{b}}$ matrix we can use algorithm proposed by Demmel (see~\cite{demmel}, Alg.~5.3) that is implemented by the LAPACK procedure \texttt{slaed3} and has complexity~${\mathcal{O}}(p^3).$
+We conclude that approximation of rank-$r$ dominant mode subspace of Gram matrix~\eqref{eq:gram} in  $d$-dimensional case requires ${\mathcal{O}}(nr^3 + r^{d+1})$ operations.
+
+The relation between accuracy of cross approximation of Gram matrices and corresponding low-rank approximation of initial matrices is given by the following theorem.
+\begin{theorem}\label{thm2}
+Consider a matrix $U = \left[\begin{array}{cc} U_1 & U_2 \end{array}\right].$ 
+If the corresponding Gram matrix 
+$$
+A = U^{T} U = \left[ \begin{array}{cc} A_{11} & A_{12} \\ A_{21} & A_{22}  \end{array}   \right]
+$$ 
+allows the cross approximation 
+\begin{equation}\nonumber
+\left\| A - \left[ \begin{array}{c} A_{11} \\ A_{21} \end{array} \right]  A_{11}^{-1} \left[\begin{array}{cc} A_{11} & A_{12} \end{array} \right]  \right\|_2 \leq {\varepsilon} \|A\|_2,
+\end{equation}
+then there exists a matrix $B$ such that
+\begin{equation}\label{eq:cu}
+\|U - U_1 B^{T} \|_2 \leq \sqrt{\varepsilon} \|U\|_2.
+\end{equation}
+\begin{proof}
+Consider $V = - U_1 A_{11}^{-1} A_{12} + U_2$ and write
+$$
+V^{T} V = A_{21} A_{11}^{-1} A_{11} A_{11}^{-1} A_{12} - A_{21} A_{11}^{-1} A_{12} - A_{21} A_{11}^{-1} A_{12} + A_{22} = A_{22} - A_{21} A_{11}^{-1} A_{12}.
+$$
+Cross approximation is exact on the selected rows and columns
+\begin{equation}\label{eq:res}
+A - \left[ \begin{array}{c} A_{11} \\ A_{21} \end{array} \right]  A_{11}^{-1} \left[\begin{array}{cc} A_{11} & A_{12} \end{array} \right] =
+      \left[ \begin{array}{cc} 0 & 0 \\ 0 & A_{22} - A_{21} A_{11}^{-1} A_{12} \end{array} \right] = 
+      \left[ \begin{array}{cc} 0 & 0 \\ 0 & V^{T} V \end{array} \right],
+\end{equation}
+and it follows that $\|V^{T} V\|_2 \leq {\varepsilon} \|U^{T} U\|_2$ and $\|V\|_2 \leq \sqrt{\varepsilon} \|U\|_2.$
+We conclude that $B^{T} = \left[\begin{array}{cc}I & A_{11}^{-1} A_{12}\end{array}\right]$ provides~\eqref{eq:cu}.
+\end{proof}
+\end{theorem}
+\begin{remark}
+For $U$ with $U_1^{T} U_1 = I, \: U_2^{T} U_2 = {\varepsilon} I, \: U_1^{T} U_2 = 0,$ inequality~\eqref{eq:cu} is sharp.
+\end{remark}
+\begin{remark}
+For fixed $U_1,$ matrix  $B^{T} = \left[\begin{array}{cc}I & A_{11}^{-1} A_{12}\end{array}\right] = (U_1^{T} U_1)^{-1} U_1^{T} U$  provides minimal residual $U - U_1 B^{T}$  in Frobenius and spectral norms. See~\cite{gor-cross-2008}, where a nice estimates for accuracy of cross approximation of matrices and tensors are also given.
+\end{remark}
+\begin{remark}
+${\mathop{\mathrm{span}}\nolimits} B = {\mathop{\mathrm{span}}\nolimits} X$ is the subspace of columns of the Gram matrix that support the cross approximation in Alg.~\ref{alg}.
+\end{remark}
+
+Since the spectral norm of the residual is not easy to evaluate, the stopping criteria in a practical algorithm is based on the Frobenius norm.
+On each step of Alg.~\ref{alg} vector ${\mathbf{d}}$ contains the diagonal of residual~\eqref{eq:res} and
+$$
+\|{\mathbf{d}}\|_1 =  \sum_{i=1}^n |d(i)| = \sum_{i} (V^{T} V)(i,i) = \|V[i,j]\|_F^2.
+$$
+We can also implement stopping criteria based on eigenvalues stored in $\Lambda.$ To do this, we can split them in `dominant' and `smaller' parts basing on desired tolerance ${\varepsilon},$ and stop the process if during several iterations new eigenvalues fall into the smaller part.  
+This criteria will approximate spectral norm more precisely, but as we see in numerical experiments, it generally does not differ from the Frobenius-based one.
+
+Obviously, Alg.~\ref{alg} can be applied in the same way to estimate other Tucker factors of~\eqref{eq:f}. 
+Due to roundoff errors, accuracy ${\varepsilon}$ of Alg~\ref{alg} is limited by machine precision ${\mathtt{tol}},$ and for ${\varepsilon}={\mathtt{tol}}$, accuracy of~\eqref{eq:appr} can be estimated by Thm.~\ref{thm2} as
+$$
+\|{\mathbf{F}} - \tilde{\mathbf{F}}\|_2 \leq \sqrt{\mathtt{tol}} \sqrt{c_2^2(U) + c_2^2(V) + c_2^2(W)} \|{\mathbf{F}}\|_2,
+$$
+where $c_2(U)$ is defined in~\eqref{eq:acc} and similar definition applies to $V, W.$
+
+\section{Numerical examples}
+Multidimensional data often appear in modern modelling programs. 
+For example, in chemical packages, e.g. PC GAMESS, MOLPRO, the \emph{electron density function} is given in canonical form~\eqref{eq:c} as a sum of tensor product of Gaussians, but with number of terms, that may be too large for practically feasible computations even for moderate molecules. 
+In order to make computations efficient,  further approximation (recompression) to the Tucker format can be performed. 
+This problem was approached in~\cite{mpi-chem3d-2009} using Tucker-ALS algorithm, in \cite{khor-ml-2009} by Tucker-ALS with initial guess obtained from the coarser grids, in~\cite{fkst-chem-2008} by Cross3D algorithm, in~\cite{ost-chem-2009} by individual cross approximation of canonical factors, in~\cite{sav-rr-2009} by cross approximation of Gram matrices of unfoldings and in~\cite{gos-kryl-2010} by algorithms based on Wedderburn rank reduction.
+
+As an example, we apply the discussed algorithm for Hadamard multiplication of electron density given in Tucker format to themselves. 
+This operation can be a building block for algorithm that computes pointwise cubic root of density, that is used in the Kohn-Sham model. 
+A good initial guess for such methods can be evaluated by mimic algorithm~\cite{ost-chem-2009}. 
+
+The results of experiments are collected in Tab.~\ref{tab}. 
+They were performed on Intel Xeon Quad-Core E5504 CPU running at $2.00$~GHz using Intel Fortran compiler version 11.1 and BLAS/LAPACK routines provided by MKL library.
+For each molecule, we show time in seconds $T(\mbox{Alg.~\ref{alg}})$ for evaluation of three dominant subspaces 
+$X[i,\alpha], Y[j,\beta]$ and $Z[k,\gamma]$  by Alg.~\ref{alg} with accuracy of approximation of Gram matrices set to ${\varepsilon}=10^{-12}.$ 
+Then we compute best core by convolution
+\begin{equation}\nonumber
+ {\mathbf{T}}[\alpha,\beta,\gamma] = {\mathbf{F}}[i,j,k] {\mathbin{\times}}_1 X[\alpha,i] {\mathbin{\times}}_2 Y[\beta,j] {\mathbin{\times}}_3 Z[\gamma,k].
+\end{equation}
+and check relative accuracy ${\varepsilon}(\mbox{Alg.~\ref{alg}})$ of approximation~\eqref{eq:appr} in Frobenius norm. 
+The direct computation of all elements of residual requires a lot of computational time and the accuracy $\|{\mathbf{F}}-\tilde{\mathbf{F}}\|_F$ was verified by comparing the result with Tucker approximation computed by Cross3D algorithm~\cite{ost-tucker-2008} with accuracy set to ${\varepsilon}=10^{-12}.$ The Cross3D algorithm was verified in~\cite{ost-tucker-2008,fkst-chem-2008} by exhaustive check on parallel memory platforms, and can be considered as reliable answer. The residual between two Tucker formats is computed as proposed in~\cite{ost-latensor-2009}.
+
+Then we compute approximation of the same accuracy~${\varepsilon}(\mbox{Alg.~\ref{alg}})$ by Cross3D~\cite{ost-tucker-2008} and WsvdR~\cite{gos-kryl-2010} algorithms and show the corresponding timings as $T(\mbox{c3d})$ and $T(\mbox{wsvdr})$. 
+We also show time $T(\mbox{tals})$ for one iteration of Tucker-ALS~\cite{tuckerals-1980,lathauwer-rank1-2000} with ranks fixed equal to the ranks of bases $X, Y, Z,$ returned by Alg.~\ref{alg}.  
+Then we apply one iteration of rank-revealing Tucker-ALS~\cite{ost-chem-2009} with accuracy parameter set to ${\varepsilon}=10^{-12}$ using bases $X, Y, Z$ as initial guess, and show the accuracy of improved approximation by~${\varepsilon}(\mbox{tals}).$
+
+\begin{table}[t]
+\caption{Hadamard square of electron density, $n_1=n_2=n_3=5121$} \label{tab}
+ \begin{center}
+  \begin{tabular}{cc|cc|ccc|c}
+   molecule & $r_1, r_2, r_3$ & $T(\mbox{Alg.~\ref{alg}})$ & ${\varepsilon}(\mbox{Alg.~\ref{alg}})$ & $T(\mbox{c3d})$ & $T(\mbox{wsvdr})$ & $T(\mbox{tals})$ & ${\varepsilon}(\mbox{tals})$ \\ \hline
+   methane & $(74,74,74)$    & $4.0$ & $3{_{\cdot 10}{{-7}}}$ & $78.6$ & $12.4$ & $37$  & $7{_{\cdot 10}{{-13}}}$ \\
+   ethane  & $(67,94,83)$    & $5.3$ & $6{_{\cdot 10}{{-7}}}$ & $76.8$ & $15.1$ & $42$  & $8{_{\cdot 10}{{-13}}}$ \\
+   ethanol & $(128,127,134)$ & $20$  & $5{_{\cdot 10}{{-7}}}$ & $1050$ & $210$  & $473$ & $9{_{\cdot 10}{{-13}}}$  \\
+   glycine & $(62,176,186)$  & $38$  & $8{_{\cdot 10}{{-7}}}$ & $1260$ & $237$  & $442$ & $9{_{\cdot 10}{{-13}}}$ \\
+  \end{tabular}
+ \end{center}
+\end{table}
+
+We conclude that proposed algorithm is faster that other methods for this purpose and return approximation of dominant subspaces that allows to construct approximation with accuracy about square root of machine precision. Using the subspaces, computed by Alg.~\ref{alg} as initial guess, rank revealing Tucker-ALS converges to almost machine precision in one iteration. 
+
+\section*{Acknowledgements}
+This work was supported by RFBR grants 08-01-00115, 09-01-12058, 10-01-00757, RFBR/DFG grant 09-01-91332, Russian Federation Gov. contract $\Pi940$ and  Priority research program of Dep. Math. RAS.
+The first author was supported by RFBR travel grant 10-01-09201 to present the results of this paper on ICSMT (Hong Kong, January 2010).
+Part of this work was done during the stay of the first author in Max-Plank Institute for Mathematics in Sciences in Leipzig (Germany). 
+Authors are grateful to Heinz-J\"urgen Flad and Rao Chinnamsettey for providing input data for the electron density functions.
+
+\begin{thebibliography}{29}
+
+\bibitem{bartholdi-1982}
+{\sc J.~J. Bartholdi}, {\em {A good submatrix is hard to find}}, School of
+  industrial and systems engineering, Georgia Institute of technology, 1982.
+
+\bibitem{cc-parafac-1970}
+{\sc J.~D. Caroll and J.~J. Chang}, {\em {Analysis of individual differences in
+  multidimensional scaling via n-way generalization of Eckart-Young
+  decomposition}}, Psychometrika, 35 (1970), pp.~283--319.
+
+\bibitem{mpi-chem3d-2009}
+{\sc S.~R. Chinnamsetty, H.-J. Flad, V.~Khoromskaia, and B.~N. Khoromskij},
+  {\em {Tensor decomposition in electronic structure calculations on 3D
+  Cartesian grids}}, J. Comp. Phys., 228 (2009), pp.~5749--5762.
+
+\bibitem{comon-2000}
+{\sc P.~Comon}, {\em {Tensor decomposition: state of the art and
+  applications}}, in {IMA Conf. Math. in Sig. Proc., Warwick, UK}, 2000.
+
+\bibitem{lathauwer-svd-2000}
+{\sc L.~de~Lathauwer, B.~de~Moor, and J.~Vandewalle}, {\em {A multilinear
+  singular value decomposition}}, SIAM J. Matrix Anal. Appl., 21 (2000),
+  pp.~1253--1278.
+
+\bibitem{lathauwer-rank1-2000}
+\leavevmode\vrule height 2pt depth -1.6pt width 23pt, {\em {On best rank-1 and
+  rank-($R_1, R_2, ..., R_N$) approximation of high-order tensors}}, SIAM J.
+  Matrix Anal. Appl., 21 (2000), pp.~1324--1342.
+
+\bibitem{lathauwer-schur-2004}
+\leavevmode\vrule height 2pt depth -1.6pt width 23pt, {\em {Computing of
+  Canonical decomposition by means of a simultaneous generalized Schur
+  decomposition}}, SIAM J. Matrix Anal. Appl., 26 (2004), pp.~295--327.
+
+\bibitem{desilva-2008}
+{\sc V.~de~Silva and L.~Lim}, {\em {Tensor rank and the ill-posedness of the
+  best low-rank approximation problem}}, SIAM J. Matrix Anal. Appl., 30 (2008),
+  pp.~1084--1127.
+
+\bibitem{defant-1993}
+{\sc A.~Defant and K.~Floret}, {\em {Tensor norms and operator ideals}}, North
+  Holland, 1993.
+
+\bibitem{demmel}
+{\sc J.~Demmel}, {\em {Applied numerical linear algebra}}, Society for
+  Industrial Mathematics, 1997.
+
+\bibitem{esgras-bb-2009}
+{\sc M.~Espig, L.~Grasedick, and W.~Hackbusch}, {\em Black box low tensor rank
+  approximation using fibre-crosses}, Constr. appr., 30 (2009), pp.~557--597.
+
+\bibitem{fkst-chem-2008}
+{\sc H.-J. Flad, B.~N. Khoromskij, D.~V. Savostyanov, and E.~E. Tyrtyshnikov},
+  {\em {Verification of the cross 3D algorithm on quantum chemistry data}},
+  Rus. J. Numer. Anal. Math. Model., 23 (2008), pp.~329--344.
+
+\bibitem{gostz-maxvol-2010}
+{\sc S.~Goreinov, I.~Oseledets, D.~Savostyanov, E.~Tyrtyshnikov, and
+  N.~Zamarashkin}, {\em {How to find a good submatrix}}, in Matrix Methods:
+  Theory, Algorithms, Applications, V.~Olshevsky and E.~Tyrtyshnikov, eds.,
+  World Scientific Publishing, 2010, pp.~247--256.
+
+\bibitem{gor-cross-2008}
+{\sc S.~A. Goreinov}, {\em {On cross approximation of multi-index array}},
+  Doklady Math., 420 (2008), pp.~404--406.
+
+\bibitem{gos-kryl-2010}
+{\sc S.~A. Goreinov, I.~V. Oseledets, and D.~V. Savostyanov}, {\em {Wedderburn
+  rank reduction and Krylov subspace method for tensor approximation. Part 1:
+  Tucker case}}, Preprint 2010-01, INM RAS, Moscow, 2010.
+
+\bibitem{gt-maxvol-2001}
+{\sc S.~A. Goreinov and E.~E. Tyrtyshnikov}, {\em {The maximal-volume concept
+  in approximation by low-rank matrices}}, Contemporary Mathematics, 208
+  (2001), pp.~47--51.
+
+\bibitem{gt-psa-1995}
+{\sc S.~A. Goreinov, E.~E. Tyrtyshnikov, and N.~L. Zamarashkin}, {\em
+  {Pseudo--skeleton approximations of matrices}}, Reports of Russian Academy of
+  Sciences, 342 (1995), pp.~151--152.
+
+\bibitem{gtz-psa-1997}
+\leavevmode\vrule height 2pt depth -1.6pt width 23pt, {\em {A theory of
+  pseudo--skeleton approximations}}, Lin. Algebra Appl., 261 (1997), pp.~1--21.
+
+\bibitem{harshman-parafac-1970}
+{\sc R.~A. Harshman}, {\em {Foundations of the Parafac procedure: models and
+  conditions for an explanatory multimodal factor analysis}}, UCLA Working
+  Papers in Phonetics, 16 (1970), pp.~1--84.
+
+\bibitem{hitchcock-sum-1927}
+{\sc F.~L. Hitchcock}, {\em {The expression of a tensor or a polyadic as a sum
+  of products}}, J. Math. Phys, 6 (1927), pp.~164--189.
+
+\bibitem{khor-ml-2009}
+{\sc B.~N. Khoromskij and V.~Khoromskaia}, {\em {Multigrid accelerated tensor
+  approximation of function related multidimensional arrays}}, SIAM J. Sci.
+  Comp., 31 (2009), pp.~3002--3026.
+
+\bibitem{tuckerals-1980}
+{\sc P.~Kroonenberg and J.~de~Leeuw}, {\em {Principal component analysis of
+  three-mode data by means of alternating least squares algorithms}},
+  Psychometrika, 45 (1980), pp.~69--97.
+
+\bibitem{ost-tucker-2008}
+{\sc I.~V. Oseledets, D.~V. Savostianov, and E.~E. Tyrtyshnikov}, {\em {Tucker
+  dimensionality reduction of three-dimensional arrays in linear time}}, SIAM
+  J. Matrix Anal. Appl., 30 (2008), pp.~939--956.
+
+\bibitem{ost-chem-2009}
+{\sc I.~V. Oseledets, D.~V. Savostyanov, and E.~E. Tyrtyshnikov}, {\em Cross
+  approximation in tensor electron density computations}, Numer. Lin. Alg.
+  Appl.,  (2009).
+
+\bibitem{ost-sorto-2009}
+\leavevmode\vrule height 2pt depth -1.6pt width 23pt, {\em {Fast simultaneous
+  orthogonal reduction to triangular matrices}}, SIAM J. Matrix Anal. Appl., 31
+  (2009), pp.~316--330.
+
+\bibitem{ost-latensor-2009}
+\leavevmode\vrule height 2pt depth -1.6pt width 23pt, {\em {Linear algebra for
+  tensor problems}}, Computing, 85 (2009), pp.~169--188.
+
+\bibitem{sav-rr-2009}
+{\sc D.~V. Savostyanov}, {\em Fast revealing of mode ranks of tensor in
+  canonical formal}, Numer. Math. Theor. Meth. Appl., 2 (2009), pp.~439--444.
+
+\bibitem{Tucker}
+{\sc L.~R. Tucker}, {\em {Some mathematical notes on three-mode factor
+  analysis}}, Psychometrika, 31 (1966), pp.~279--311.
+
+\bibitem{tee-cross-2000}
+{\sc E.~E. Tyrtyshnikov}, {\em Incomplete cross approximation in the
+  mosaic--skeleton method}, Computing, 64 (2000), pp.~367--380.
+
+\end{thebibliography}
+
+\end{document}
+

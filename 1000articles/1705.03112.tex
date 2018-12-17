@@ -1,0 +1,649 @@
+\documentclass{amsart}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage[table]{xcolor}
+\usepackage{makecell}
+\usepackage{hyperref}
+\usepackage[xetex,a4paper,margin=2cm]{geometry}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{coro}{Corollary}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{dfn}{Definition}
+\newtheorem{example}{Example}
+
+\title{Synergistic parallel multi-objective integer programming}
+
+\author{William Pettersson}
+\address{School of Science, RMIT University, Victoria, 3000, \textsc{AUSTRALIA}}
+\email{william@ewpettersson.se}
+
+\author{Melih Ozlen}
+\address{School of Science, RMIT University, Victoria, 3000, \textsc{AUSTRALIA}}
+
+\thanks{This study was supported by the Australian Research Council (DP140104246)}
+\begin{document}
+
+\keywords{multi-objective optimisation, parallel computing, integer programming, combinatorial optimisation}
+\subjclass[2010]{Primary: 90C29; Secondary: 90C10, 68W10}
+\begin{abstract}
+  Exactly solving multi-objective integer programming problems is often a very time consuming process.
+  This paper presents a new way of developing parallel multi-objective algorithms.
+  We develop theory that utilises elements of the symmetric group to apply a permutation to the objective functions to assign different workloads.
+  This theory applies to algorithms that order the objective functions lexicographically.
+  Each permutation can be solved in parallel, and we describe how each worker on a given permutation may communicate with other workers to reduce the overall running time.
+  
+  By allowing workers to share data in real-time, rather than only at completion of a task, we are able to take advantage of the synergy between these different tasks.
+  We implement these ideas into a practical parallel MOIP solver, and analyse the running time of various problems, with various parallelisation techniques.
+  Results show remarkable performance improvements, with running times decreased by a factor of three with the use of four threads across all problem types and sizes.
+  This differs from existing techniques which often have start-up costs that dominate their running times on smaller problems.
+  Even with all larger problems tested, our algorithm outperforms state of the art parallel algorithms.
+  We also note some interesting performance patterns based on the distribution of permutations that may warrant further study.
+  This new algorithm, and the implementation we provide, allows users to solve MOIP problems with many more variables or objective functions.
+  
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+Multi-objective optimisation problems have a set of objective functions, some of which often conflict with each other.
+Solving such a problem can involve computing the complete set of non-dominated solutions, where
+dominance is defined in terms of the objective functions.
+A solution $x$ dominates a solution $y$ if $f(x)$ is at least as good as $f(y)$ for each objective function $f$, and if $f(x)$ is better than $f(y)$ for at least one objective function $f$.
+In this paper we will only consider minimisation problems, so we will take ``at least as good as'' and ``better'' to mean ``less than or equal to'' and ``less than'' respectively.
+As is usual in the field, the results generalise to maximisation problems by negating objective functions.
+
+This paper looks at multi-objective integer programming (MOIP) problems, where variables are restricted to integer values.
+These include the class of multi-objective combinatorial optimisation problems, which are notoriously hard to solve.
+We will only consider exact MOIP algorithms in this paper. That is, we only look closely at algorithms that can guarantee that the exact solution set will be calculated.
+Other techniques for solving MOIP problems, that do not guarantee exact results but rather approximate the solution set, include swarming algorithms \cite{Parsopoulos2002ParticleSwarm}, evolutionary algorithms \cite{EvolutionaryAlgorithmsForMOP,Figueira2010ParallelEvolutionary} and heuristic approaches \cite{Laumanns2006EfficientAdaptive}.
+For a more broad background on multi-objective optimisation we point the reader to \cite{ehrgott2005multicriteria},
+and for a summary of exact multi-objective branch and bound algorithms, see \cite{Przybylski2017}.
+
+Recent advances in exact MOIP algorithms have often come from the use of parallel processing, where multiple calculations can be run simultaneously\cite{Lemesre2007PPM,Dhaenens2010KPPM}.
+This allows algorithms to take advantage of modern hardware in consumer electronics as well as purpose-built supercomputing facilities.
+Algorithms in the literature use two distinct phases to achieve parallelisation.
+The first phase involves some algorithm-specific heuristic or method to partition the search space into smaller divisions.
+The second phase will define independent workers which are set to find all solutions to the MOIP  problem within each division created.
+Some algorithms will even alternate between these two phases, creating more divisions as new solutions are found \cite{Guo:2014:ScalingExactMOCO,Mezmaz2007GridBased}.
+
+We propose a new parallelisation method for MOIP algorithms, based on the work in \cite{OzlenPettersson2016BiObjective}.
+Our approach has minimal start-up cost: all parallel workers are immediately launched.
+Each worker is given a unique approach to the problem (as determined by an element of the symmetric group $S_n$), and then shares information with all other workers in real time to reduce the elapsed running time of the algorithm.
+This is given as a theoretical background so that it may be used in other parallel algorithms.
+
+Our algorithm is implemented and compared against state-of-the-art algorithms, and the
+results clearly show that the new algorithm outperforms these.
+We also discover some interesting phenomena relating to our theory.
+The algorithm cannot necessarily assign all elements of $S_n$ to threads, and we show that the manner in which these elements are assigned to threads can have a significant effect on the running time of the algorithm.
+
+The new theory in this paper presents a paradigm shift in the parallelisation of MOIP algorithms.
+Both the use of elements of $S_n$ to assign work and the constant sharing of data between workers are new techniques in this field.
+Our new algorithm takes advantage of both of these ideas to solve MOIP problems faster than existing algorithms, and we offer our implementation of this algorithm for further use.
+This opens up many new opportunities to solve new problems in optimisation not only where more variables or more objective functions need to be considered, but also in more time-critical scenarios.
+
+\subsection{Paper organisation}
+Section \ref{sec:background} gives a background and details the notation we use to describe the symmetric group, symmetries and lexicographically constrained MOIP problems.
+In Section \ref{sec:sharing} we give the theory that demonstrates the sharing of results between still-running workers.
+Section \ref{sec:newalgo} describes our new algorithm, and Section \ref{sec:impl} discusses some implementation details.
+The results of our testing are presented and discussed in Section \ref{sec:discussion}.
+Finally we conclude in Section \ref{sec:conclusion}.
+
+\section{Background}\label{sec:background}
+
+Parallel computing is the idea that computers can perform many tasks simultaneously.
+Each task will be performed by a {\em thread}, so an algorithm can use $n$ threads to do $n$ computations in parallel.
+Note that we will only use thread to refer to truly distinct operations; we do not use any sort of time-sharing or ``hyper-threading'' in our timing results.
+
+\subsection{Permutations}
+
+In our work, threads will be assigned an element of the symmetric group, and the work performed by said thread will be determined by this element.
+We will use $S_n$ to denote the symmetric group on the $n$ elements $\{1,2,\ldots,n\}$.
+Given a permutation $s \in S_n$, let $s(i)$ be the image of $i$ under $s$.
+For example, let $s = (3,2,4,1) \in S_4$. Then $s(1) = 3$, $s(2) = 2$, $s(3) = 4$ and $s(4) = 1$.
+
+In our new theory, workers will be able to share information under specified conditions.
+One of these conditions is that the permutations must have the same image for the last $a$ elements, as defined below.
+\begin{dfn}[$s =_a s'$]
+  Given two elements $s, s' \in S_n$, if $s(i) = s'(i)$ for all $(n-a) < i \leq n$, we say that $s =_a s'$.
+\end{dfn}
+For example, if $s = (4,1,2,3)$ and $s' = (1,4,2,3)$ then $s =_2 s'$ as both permutations end with ``$\left. 2,3\right)$''.
+
+\subsection{Multi objective optimisation}
+
+Letting $X = \{x | x \in {\ensuremath{\mathbb{Z}}}^n \text{ and } Ax \leq b\}$ be the feasible space, we define
+a MOIP problem with $n$ objective functions as ${I\!P}^n = \text{ND}_{x\in X} \{f_1(x),\dots,f_n(x)\}$,
+where ND is the usual definition of non-dominated.
+Note that if $n=1$ this would be a single-objective problem, but all of our work applies to multi-objective problems with an arbitrary number of objective functions.
+For more details on multi-objective optimisation see e.g.\ \cite{Przybylski2017,Ehrgott2000Survey}.
+
+The algorithm of Ozlen, Burton and MacRae \cite{Ozlen2014moipaira} repeatedly solves constrained lexicographic versions of the given ${I\!P}^n$, which we now define.
+In Section \ref{sec:sharing} we define new variants of these which we use for our new algorithms.
+
+\begin{dfn}[${LI\!P}^n(k, (a_{k+1},\dots,a_n))$]\label{dfn:lip}
+The values $(a_{k+1},\dots,a_n)$ are individual upper bounds on the values of $f_{k+1}(x),\dots,f_n(x)$.
+Any solution which does not satisfy all these bounds is not feasible for the constrained lexicographic problem.
+The set of solutions to such a problem contains all feasible values which are not dominated in the first $k$ objectives.
+If two feasible values are identical in the first $k$ objectives, the final $n-k$ objectives are considered in lexicographic order and only the smaller feasible value is part of the solution set.
+\end{dfn}
+
+We will define an {\em ordered} integer program, written ${O\!I\!P}$, in Section \ref{sec:sharing}.
+An ${O\!I\!P}$ is similar to an ${LI\!P}$, except the ordering is defined by an element of $S_n$ rather than simple lexicographic ordering.
+If we let $e$ be the identity element of $S_n$, then 
+${LI\!P}^n(k, (a_{k+1},\dots,a_n)) = {O\!I\!P}^n_e(k, (a_{k+1}, \dots, a_n))$, so
+a more formal variant of Definition \ref{dfn:lip} can be found by taking $s=e$ in Definition \ref{dfn:lips}.
+
+\begin{example}[Calculating ${LI\!P}^3(2, (52))$]\label{ex:lip}
+Consider the following set of solutions 
+\[
+\begin{array}{ccc}
+  f_1 & f_2 & f_3 \\ \hline
+  (50 & 24 & 44) \\
+  (46 & 41 & 41) \\
+  (37 & 46 & 37) \\
+  (37 & 44 & 42) \\
+  (32 & 39 & 54).
+\end{array}
+\]
+The value $(52)$ say that we are only interested in solutions which satisfy $f_3 \leq 52$.
+This immediately rules out $(32,39,54)$, and we no longer use this solution for any domination tests, leaving us with the following.
+\[
+\begin{array}{cc|c}
+  f_1 & f_2 & f_3 \\ \hline
+  (50 & 24 & 44) \\
+  (46 & 41 & 41) \\
+  (37 & 46 & 37) \\
+  (37 & 44 & 42)
+\end{array}
+\]
+Next, the $2$ indicates that we want to discard any solution which is dominated in its first two objective values by some other solution which we have not discarded.
+This is represented in the table by the columns to the left of the vertical line.
+We see that $(37, 46, 37)$ is dominated over the first two objectives by $(37, 44, 42)$.
+Even though $37 < 42$, we discard $(37, 46, 37)$ as we only consider the first two objectives.
+All remaining solutions differ over their first two objective values, so we are done and the solution to ${LI\!P}^n(2, (52)$ is the set $\{ (50, 24, 44), (46,41,41), (37, 44, 42) \}$.
+\end{example}
+
+\begin{example}[Calculating ${LI\!P}^3(1, (48, 43))$]\label{ex:lip2}
+  Again we are working from 
+\[
+\begin{array}{ccc}
+  f_1 & f_2 & f_3 \\ \hline
+  (50 & 24 & 44) \\
+  (46 & 41 & 41) \\
+  (37 & 46 & 37) \\
+  (37 & 44 & 42) \\
+  (32 & 39 & 54).
+\end{array}
+\]
+  We can immediately discard $(50, 24, 44)$ and $(32, 39, 54)$ from the given upper bounds $(48, 43)$, leaving
+\[
+\begin{array}{c|cc}
+  f_1 & f_2 & f_3 \\ \hline
+  (46 & 41 & 41) \\
+  (37 & 46 & 37) \\
+  (37 & 44 & 42).
+\end{array}
+\]
+  We next consider dominance in the first objective only, letting us discard $(46, 41, 41)$.
+  This leaves us with
+\[
+\begin{array}{c|cc}
+  f_1 & f_2 & f_3 \\ \hline
+  (37 & 46 & 37) \\
+  (37 & 44 & 42).
+\end{array}
+\]
+  These are equal in their first objective, so neither dominates the other.
+  As we have two solutions that are equal in their first objective, we must discard all bar one of them.
+  We do this by considering the final two objectives lexicographically.
+  That is, we consider $f_2$ before $f_3$ and so-on.
+  As $44 < 46$, we discard $(37, 46, 37)$ and our solution set to ${LI\!P}^3(1, (48, 43))$ is $\{ (37, 44, 42)\}$.
+\end{example}
+
+Technically, these constrained lexicographic problems may more accurately be described as a partially constrained, partially lexicographic problems, but this wording gets cumbersome and is skipped in favour of simply constrained lexicographic.
+
+\section{Bound sharing}\label{sec:sharing}
+In our parallel algorithm, we assign different threads different tasks by means of a permutation $s \in S_n$.
+To this end, we define a variant of the constrained lexicographic problem, where the objective functions are not ordered lexicographically, but rather are ordered by an element $s$ of $S_n$.
+We call these problems {\em ordered} problems, and write them as ${O\!I\!P}$ rather than ${LI\!P}$ to clearly indicate that the objective functions, and bounds on the values of the objective functions, are considered in the order specified by $s$. 
+
+\begin{dfn}\label{dfn:lips}
+  Let $f_1, \ldots, f_n$ be $n$ objective functions for an ${I\!P}^n$ with feasible space $X$, let $s\in S_n$ and let $Y$ be the set of solutions to the associated constrained lexicographic problem ${O\!I\!P}_s^n(k, (a_{s(k+1)}, \ldots, a_{s(n)}))$.
+Then for any $y \in Y$
+
+\begin{enumerate}
+  \item for any $i$ with $k < i \leq n$, $f_{s(i)}(y) \leq a_{s(i)}$, \label{dfn:lips-constraint}
+  \item for any $y' \in Y$ with $y' \neq y$, there exists a $j \leq k {\text{ s.t. }} f_{s(j)}(y) < f_{s(j)}(y')$, and \label{dfn:lips-firstk}
+  \item for any $x \in X$ with $f_{s(i)}(x) = f_{s(i)}(y)$ for $i \leq k$, there exists a $j \leq n$ such that for all $j' < j$, $f_{s(j')}(y) = f_{s(j')}(x)$ and $f_{s(j)}(y) < f_{s(j)}(x)$. \label{dfn:lips-lastn-k}
+\end{enumerate}
+
+\end{dfn}
+
+In this definition, \emph{\ref{dfn:lips-constraint}.}\ indicates that all solutions meet the given bounds.
+\emph{\ref{dfn:lips-firstk}.}\ shows that any solution cannot be dominated by another in all of the first $k$ objectives.
+Lastly, \emph{\ref{dfn:lips-lastn-k}.}\ just says that the final $n-k$ objectives are considered in the order given by the permutation $s$.
+
+We now show how different permutations $s$ affect the ordered problems.
+\begin{example}[Calculating ${O\!I\!P}^3_{(2,1,3)}(1, (48,43))$]\label{ex:lips}
+  We work from the same initial solution set as the earlier examples.
+\[
+\begin{array}{ccc}
+  f_1 & f_2 & f_3 \\ \hline
+  (50 & 24 & 44) \\
+  (46 & 41 & 41) \\
+  (37 & 46 & 37) \\
+  (37 & 44 & 42) \\
+  (32 & 39 & 54).
+\end{array}
+\]
+To aid our understanding of how the permutation effects the problem, however, we rearrange the columns according to $s$ to give
+\[
+\begin{array}{ccc}
+  f_2 & f_1 & f_3 \\ \hline
+  (24 & 50 & 44) \\
+  (41 & 46 & 41) \\
+  (46 & 37 & 37) \\
+  (44 & 37 & 42) \\
+  (39 & 32 & 54).
+\end{array}
+\]
+  We now demonstrate which of these are also solutions to ${O\!I\!P}^3_{(2,1,3)}(1, (48, 43))$.
+  First, we discard solutions that break the given bounds.
+  As $s(2) = 1$, we discard solutions with $f_1 > 48$.
+  Note that the $48$ refers to an upper bound on $f_1$ due to the permutation $s$.
+  This causes us to discard $(50, 24, 44)$ (which appears as $(24, 50, 44)$ in the above table as we re-ordered the columns).
+  Also, as $s(3) = 3$, we discard solutions with $f_3 > 52$.
+  That is, we once again discard $(32,39,54)$.
+\[
+\begin{array}{c|cc}
+  f_2 & f_1 & f_3 \\ \hline
+  (41 & 46 & 41) \\
+  (46 & 37 & 37) \\
+  (44 & 37 & 42) 
+\end{array}
+\]
+  We now consider dominance on objective $f_2$.
+  We use $f_2$ as $s(1) = 2$, and see that $(46, 41,41 )$ is the unique solution to attain a minimum on $f_2$.
+  Our solution set is therefore $\{ (46, 41, 41)\}$.
+\end{example}
+
+\begin{example}[Calculating ${O\!I\!P}^3_{(1,3,2)}(1, (51, 50))$]\label{ex:lips2}
+  We work from the same initial solution set, and again permute the columns according to $s$.
+\[
+\begin{array}{ccc}
+  f_1 & f_3 & f_2 \\ \hline
+  (50 & 44 & 24) \\
+  (46 & 41 & 41) \\
+  (37 & 37 & 46) \\
+  (37 & 42 & 44) \\
+  (32 & 54 & 39)
+\end{array}
+\]
+  As $s(2) = 3$, we discard solutions that don't satisfy $f_3 < 51$, that is $(32, 39, 54)$.
+  And as $s(3) = 2$, we discard solutions that don't satisfy $f_2 < 50$, but all solutions satisfy this bound.
+  Next we consider dominance across objective $s(1) = 1$.
+\[
+\begin{array}{c|cc}
+  f_1 & f_3 & f_2 \\ \hline
+  (50 & 44 & 24) \\
+  (46 & 41 & 41) \\
+  (37 & 37 & 46) \\
+  (37 & 42 & 44)
+\end{array}
+\]
+  Once again we are left with $(37, 46, 36)$ and $(37, 44, 42)$, which are equal in their first objective.
+\[
+\begin{array}{c|cc}
+  f_1 & f_3 & f_2 \\ \hline
+  (37 & 37 & 46) \\
+  (37 & 42 & 44)
+\end{array}
+\]
+  However, we now consider the remaining two objectives in the order prescribed by $s$.
+  As $s(2) = 3$, we consider values of $f_3$ next and as $36 < 42$, we discard $(37, 44, 42)$.
+  Therefore the solution to ${O\!I\!P}^3_{(1,3,2)}(1, (51, 50))$ is the set $\{ (37, 46, 36) \}$.
+\end{example}
+
+\begin{lemma}\label{lemma:drop-k}
+  If $x$ is a solution to ${O\!I\!P}^n_s(k-1, (a_{s(k)},\dots,a_{s(n)}))$,
+  then $x$ is a solution to ${O\!I\!P}^n_s(k, (a_{s(k+1)},\allowbreak \dots,a_{s(n)}))$.
+\end{lemma}
+
+This result follows trivially from Definition \ref{dfn:lips}.
+The next theorem is a slight variant of Lemma 4.1 from \cite{Ozlen2009GeneralApproach} to allow for the different permutations.
+The original theorem states that if a solution to a $k$ objective problem attains the upper bound on one of these objectives, say $f_i$, then it is also optimal on the $k-1$ objectives where we no longer consider $f_i$.
+Here it is modified to also allow for the permutations which we apply.
+Recall that $s =_{n-k} s'$ means that the permutations $s$ and $s'$ agree in their final $n-k$ places.
+
+\begin{theorem}\label{thm:new-recurse}
+  Let $s$, $s'$ be two elements of $S_n$.
+  Let $Y$ be the set of solutions to ${O\!I\!P}_s^n(k-1, (a_{s(k)},\dots,a_{s(n)}))$, let $\hat a = \max\{f_{s(k)}(y) | y\in Y\}$, and
+  let $Y'$ be the set of solutions to ${O\!I\!P}_{s'}^n(k, (a_{s(k+1)},\dots,\allowbreak a_{s(n)}))$.
+Then for any $y' \in Y'$, either
+\begin{enumerate}
+  \item $y' \in Y$, or 
+  \item $f_{s(k)}(y') > a_{s(k)}$, or 
+  \item $f_{s(k)}(y') < \hat a$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+  This holds trivially if either $y' \in Y$ or $f_{s(k)}(y') > a_{s(k)}$ so assume $y' \not\in Y$ and $f_{s(k)}(y') \leq a_{s(k)}$.
+Then as $y'$ is dominated in $Y$, let $y \in Y$ be an element that dominates $y'$ in $Y$.
+Let $i$ be the smallest integer such that $f_{s(i)}(y') < f_{s(i)}(y)$.
+There must be such an $i$ as otherwise $y$ would also dominate $y'$ in $Y'$.
+We will take cases on $i$.
+
+If $i > k$ then $y$ and $y'$ obtain equal values for the first $k$ objectives.
+However, the last $n-k$ objectives are considered in lexicographic order, as determined by $s$.
+As $y$ and $y'$ are both feasible for ${O\!I\!P}^n_{s'}(k, (a_{s(k+1)},\dots,a_{s(n)}))$, there must be some $j$ such that for $j' < j$, $f_{s(j')}(y') = f_{s(j')}(y)$, and $f_{s(j)}(y') < f_{s(j)}(y)$.
+However, both $y$ and $y'$ are also feasible for ${O\!I\!P}^n_s(k-1, (a_{s(k)},\dots,a_{s(n)}))$, and $s =_{n-k} s'$.
+Then by the same argument we must find an $i$ such that for $i' < i$, $f_{s(i')}(y) = f_{s(i')}(y)$, and $f_{s(i)}(y) < f_{s(i)}(y')$. This is clearly a contradiction.
+
+If $i < k$, then clearly $y$ cannot dominate $y'$ in $Y$, leading to a contradiction.
+
+Lastly, if $i = k$ then $f_{s(k)}(y') < f_{s(k)}(y) \leq \hat a$.
+\end{proof}
+
+Note that both problems in this theorem do have identical bounds for their final $n-k$ places; this is not a typographical mistake. 
+This identity between bounds is exactly why threads can share data, and forms the basis of our algorithm.
+
+As previously mentioned, many algorithms in multi objective optimisation take a recursive approach with constantly updating bounds to find the complete solution set.
+Before giving our algorithm, we define exactly what it means to have found all solutions above some bounds.
+\begin{dfn}\label{dfn:above}
+  Given a problem $P = {O\!I\!P}^n_s(k, (a_{s(k+1)},\dots,a_{s(n)}))$, we will say that a thread $t$ has {\em found all solutions above $P$} if, for all $j > k$, $t$ has determined all solutions $x$ to ${O\!I\!P}^n_s(j, (a_{s(j+1)},\dots,a_{s(n)}))$ which also satisfy $f_{s(j)}(x) > a_{s(j)}$.
+\end{dfn}
+
+Our new work here explains exactly when threads are able to announce these updated bounds to other threads.
+We first present a simplified version of Theorem \ref{thm:sharing} to help introduce the reader to our approach.
+
+\begin{lemma}\label{lemma:sharing-simple}
+  Let $t$ represent a thread which
+  \begin{enumerate}
+    \item is currently solving 
+   $P = {O\!I\!P}^n_s(n-1,(a_{s(n)}))$, and
+ \item has found all solutions above $P$.
+  \end{enumerate}
+  Then all solutions to the original ${I\!P}$ with $f_{s(n)}(x') \geq a_{s(n)}$ are known.
+\end{lemma}
+
+The proof of this lemma follows trivially from Definition \ref{dfn:above}.
+This lemma tells us that if a thread is solving ${O\!I\!P}^n_s(n-1,(a_{s(n)}))$, and has found all solutions above this problem, then any other thread can also ignore solutions $x$ for which $f_{s(n)}(x) > a_{s(n)}$.
+Note that other threads will be using other permutations, so the bound on $f_{s(n)}$ may not be the ``last'' bound for other threads.
+This sharing of bounds across many objective functions creates a synergy between threads, where one thread can supply a bound to other threads, which in turn means that those threads also find new bounds faster and these new bounds can be shared back to the original thread.
+
+As mentioned, the above lemma is actually a simplified version of our result, and only shares the bounds on the ``last'' objective function.
+Theorem \ref{thm:sharing} is a more general result, describing exactly when bounds on {\em any} objective functions may be shared between threads.
+The theorem states that if two threads agree, in both permutations and bounds, in their last $j$ positions, then the bound that a given thread has on objective $n-j$ i.e., the objective just ``before'' the last $j$) can be shared to the other thread, and vice-versa.
+Note that Lemma \ref{lemma:sharing-simple} allows the bound on the last objective to be shared globally i.e., all threads can use the bound.
+In comparison Theorem \ref{thm:sharing} describes the sharing of bounds on any objective, but does place restrictions on which other threads can use this bound.
+
+We first give two examples of the usage of this sharing, before giving the theorem and proof below.
+\begin{example}
+  Let $s_1 = (5,1,4,2,3)$ and $s_2 = (1,4,5,2,3)$, and let 
+$P_1 = {O\!I\!P}^5_{s_1}(2,(13,15,18))$ and let $P_2 = {O\!I\!P}^5_{s_2}(2, (8,15,14))$.
+Note that $(5,1,4,\underline{2,3}) =_2 (1,4,5,\underline{2,3})$. That is, $s_1$ and $s_2$ have the same elements in the final two positions of each permutation.
+Since $P_1$ and $P_2$ do not have the same bounds on $f_{s_1(5)}$, we have to take $j=0$ in Theorem \ref{thm:sharing}.
+This means that the bound on $f_{s_2(5)}$ from $P_2$ can be shared to $P_1$.
+The end result is that thread running $P_1$ can immediately set the bound on $f_{s_1(5)}$ to $14$, so the new version of $P_1$ to be solved is $P'_1 = {O\!I\!P}^n_{s_1}(2,(13,15,14))$.
+\end{example}
+This example can be followed on to the next example.
+\begin{example}
+  Take $s_1 = (5,1,4,2,3)$ and $s_2 = (1,4,5,2,3)$ again, and let 
+$P_1 = {O\!I\!P}^5_{s_1}(2,(13,15,14))$ and let $P_2 = {O\!I\!P}^5_{s_2}(2, (8,15,14))$.
+Again, $s_1 =_2 s_2$.
+Now $P_1$ and $P_2$ agree on bounds $a_{s(4)}$ and $a_{s(5)}$, so we take $j=2$ in Theorem \ref{thm:sharing}.
+That means that the bound on objective $f_{s_1(3)}$ from $P'_1$ can be given to the thread solving $P_2$, and the bound on objective $f_{s_2(3)}$ from $P_2$ can be shared to the thread solving $P_1$.
+More specifically, as $s_2(3) = 5$, the thread solving $P'_1$ can use $f_5(x) \leq 8$ as an upper bound for any new solutions, and as $s_1(3) = 4$, the thread solving $P_2$ can use $f_4(x) \leq 13$ as an upper bound on for any new solutions.
+
+Note that these upper bounds apply even though $P'_1$ would otherwise not have any bound on $f_5$, and that if such a bound makes the problem infeasible then there are no new solutions to $P'_1$ which have not been found by $P_2$.
+\end{example}
+
+We now give the exact theorem and proof.
+\begin{theorem}\label{thm:sharing}
+  Let $t$ represent a thread which
+  \begin{enumerate}
+    \item is currently solving 
+   $P = {O\!I\!P}^n_s(k-1,(a_{s(k)},\dots,a_{s(n)}))$, and
+ \item has found all solutions above $P$.
+  \end{enumerate}
+  For any other thread $t'$ which is currently solving $P' = {O\!I\!P}^n_{s'}(k', (a_{s'(k'+1)},\dots,a_{s'(n)}))$, and for any integer $j \geq 0$ such that all the following hold
+  \begin{enumerate}
+    \item $j < n-k$,
+    \item $j < n-k'$,
+    \item $s =_{n-j} s'$, and
+    \item $a_{s(n-i)} = a'_{s'(n-i)}$ for $0 \leq i < j$,
+  \end{enumerate}
+  all solutions $x'$ to $P'$ with $f_{s'(n-j)}(x') \geq a_{s(n-j)}$ are known.
+\end{theorem}
+
+\begin{proof}
+ Let $x'$ be a solution to $P'$.
+ Then by Lemma \ref{lemma:drop-k} $x'$ is also a solution to ${O\!I\!P}^n_{s'}(n-j, (a'_{s'(n-j+1)},\dots,\allowbreak a'_{s'(n)}))$.
+ However by the conditions in this theorem, this problem is identical to ${O\!I\!P}^n_s(n-j, (a_{s(n-j+1)},\dots,\allowbreak a_{s(n)}))$, and by the definition of {\em all solutions above $P$}, $t$ has found all solutions to ${O\!I\!P}^n_s(n-j, (a_{s(n-j+1)},\dots,\allowbreak a_{s(n)}))$ with $f_{s'(n-j)}(x') \geq a_{s(n-j)}$.
+\end{proof}
+
+We can recover Lemma \ref{lemma:sharing-simple} from this theorem by letting $j=0$.
+
+\section{New algorithm}\label{sec:newalgo}
+We now present our new algorithm, which applies our permutation parallelisation technique to the algorithm of \cite{Ozlen2014moipaira}.
+First, Algorithm \ref{algo:new} is the algorithm which will initialise and launch all sub-problems.
+The initialisation process allows the threads to determine which other threads they might be sending information to, and from which threads they might be receiving information.
+Each parallel thread will be running Algorithm \ref{algo:sub}, where new solutions will be found and new bounds will be calculated and shared.
+
+Note that in Algorithm \ref{algo:new}, the method for selecting permutations is not specified.
+We discuss in Section \ref{sec:allocating-threads} how different selection methods can impact the running time of the algorithm.
+
+\begin{algorithm}\label{algo:new}
+  \DontPrintSemicolon
+  \KwData{The problem ${I\!P}^n$, and $t$ representing the number of threads to use}
+  \KwResult{The non-dominated solutions}
+  \Begin{
+    Let $L$ be a list of thread details, to be used to tell threads where they are sharing information\;
+    \For{Each thread $t$}{
+      Select a permutation $s \in S_n$\;
+      Create the problem $P_t = {O\!I\!P}^n_s(n, ())$\;
+      Store the details of this thread in $L$\;
+    }
+    \For{Each element $l$ in $L$}{
+      Launch Algorithm \ref{algo:sub} with the corresponding problem $P_t = {O\!I\!P}^n_s(n, ())$ taken from $l$, as well as a copy of $L$\;
+    }
+    Wait for all threads to complete\;
+    Let $ND = \bigcup_t \{\text{ solutions to } P_t\}$\;
+  }
+  \caption{Our new parallel algorithm. This particular algorithm will set up each thread with an appropriately selected permutation $s$. The actual work is done in Algorithm \ref{algo:sub} which is called from this algorithm.}
+\end{algorithm}
+
+\begin{algorithm}\label{algo:sub}
+  \DontPrintSemicolon
+  \KwData{The problem ${O\!I\!P}^n_s(k, (a_{s(k+1)},\dots,a_{s(n)}))$, and the details of all other threads solving the same original problem ${I\!P}^n$}
+  \KwResult{The non-dominated solutions}
+  \Begin{
+    Set $ND_k = \emptyset$.\;
+    
+    \eIf {a relaxation of this problem is already solved \KwSty{and} each solution to said relaxation satisfies the current bounds}{
+      Let $ND_k$ be this set of solutions\;
+    }{
+      \eIf{ $k=1$} {
+        Solve the single-objective problem.\;
+        \If {the problem is feasible, with solution $x$} {
+          Set $ND_k = \{x\}$\;
+        }
+      }{ 
+        Let $a_{s(k)} = \infty$\;
+        From ${O\!I\!P}^n_s(k, (a_{s(k+1)},\dots,a_{s(n)}))$, create $P = {O\!I\!P}^n_s(k-1, (a_{s(k)}, a_{s(k+1)}, \dots, a_{s(n)}))$.\;
+        Solve $P$ using this algorithm\;
+        \While{$P$ is feasible}{
+          Let $Y$ be the solutions to $P$, as determined by this algorithm\;
+          Let $ND_k = ND_k \cup Y$\;
+          Let $a_{s(k)} = \max \left\{ a_{s(k)}, \max\{f_k(x)| x \in Y\} \right\} $\;
+          \For{Each thread $t$ with permutation $s'$}{
+            Use Theorem \ref{thm:sharing} to update the bounds on $P$\;
+            \If{$s =_{n-k} s'$}{
+              \If{$t$ has found a higher value for $a_{s(k)}$}{
+                Update $a_{s(k)}$\;
+              }
+            }
+          }
+          Update $P$ with the new value of $a_{s(k)}$\;
+          Solve $P$ using this algorithm\;
+        }
+      }
+    }
+  }
+  \caption{This algorithm calculates actual solutions to the problem at hand. The setup for this algorithm is performed by Algorithm \ref{algo:new}.}
+\end{algorithm}
+
+Note that in Theorem \ref{thm:new-recurse}, we define $\hat a$ to be the maximum value of $f_{s(k)}(y)$ for any solution $y$.
+To allow each thread to apply Theorem \ref{thm:new-recurse} we must therefore share not only updated bounds, but the maximum value of $f_{s(k)}$ that is attained.
+Theorem \ref{thm:new-recurse} then trivially verifies correctness of this algorithm.
+
+\section{Implementation details}\label{sec:impl}
+
+The implementation of this new algorithm is based on MOIP\_AIRA as used in \cite{OzlenPettersson2016BiObjective}.
+The availability of the source code sped up the implementation process.
+The implementation is in C++11, and uses the shared memory and threading features of the Standard Template Library to handle all thread creation and data sharing.
+The code is published on Github \cite{moip_aira}, and test cases are also provided \cite{figshare:4obj} for others to utilise.
+
+\subsection{Allocation of threads}\label{sec:allocating-threads}
+Our algorithm allocates one element of $S_n$ to each available thread.
+As $S_n$ has $n!$ elements, we can use up to $n!$ threads when solving a MOIP problem with $n$ objectives.
+However, if we wish to utilise less than $n!$ threads, say $k$, we must choose some $k$ elements from $S_n$.
+
+We chose to test two competing methods of selecting $k$ elements, which we call \emph{clustering} and \emph{spreading}.
+
+The first option, called \emph{clustering}, assigns
+permutations to maximise $i$ where $s =_i s'$ for all selected $s$ and $s'$.
+For instance, we could assign $(1,2,3,4,5)$, $(2,1,3,4,5)$, $(1,3,2,4,5)$, $(3,1,2,4,5)$, $(2,3,1,4,5)$ and $(3,2,1,4,5)$ to six threads solving a 5-objective problem.
+In other words, all of these have 4 and 5 as their final two elements, and thus can share updates on 
+their third objectives.
+These six threads would be sharing updated bounds on deeper levels of the recursion, meaning the algorithms will share bounds more often.
+This reduces the time between the determination of a new bound, and when threads can use the new bound, potentially minimising the amount of redundant work completed.
+As a downside, though, these bounds might not be shareable with all other threads.
+
+The second option, which we call \emph{spreading}, assigns permutations to minimise $i$ where $s =_i s'$ for all selected $s$ and $s'$.
+For instance, this could mean assigning $(1,2,3,4,5)$, $(2,3,4,5,1)$, $(3,4,5,1,2)$, $(4,5,1,2,3)$, $(5,1,2,3,4)$ and $(2,3,4,1,5)$ to six threads solving a 5-objective problem.
+These are now sharing updates across all five objectives, but the sharing of these bounds would mainly happen at the earliest level of recursion i.e., not as often.
+However, these bounds can be shared to more threads.
+
+Both of these options are implemented.
+In the next section we give specifics, but our timing results show that the \emph{spreading} option is significantly faster than \emph{clustering}, although the difference lessens as more threads are added.
+We go into more detail on why this may be true in Section \ref{sec:discussion}.
+
+\subsection{Comparison algorithms}
+We compare the running time of both variants of our algorithm against the following two algorithms.
+MOIP\_AIRA \cite{Ozlen2014moipaira} is a state of the art MOIP solver, which uses CPLEX \cite{CPLEX} as an single-objective IP solver internally.
+One very simple method of parallelising is to allow CPLEX to utilise more threads.
+Note that we did not expect that CPLEX will be competitive in this setting, as CPLEX would not understand the whole MOIP problem.
+Instead, these numbers display the significant improvements that can be achieved by designing algorithms to suit parallelisation.
+
+The second comparison algorithm is K-PPM, as described in \cite{Dhaenens2010KPPM}.
+This is a state-of-the-art parallel optimisation algorithm.
+K-PPM utilises a 3-step process to create a number of sub-problems.
+The first phase calculates the ideal and nadir points of the given problem by recursively solving smaller problems.
+These points are used in the second phase to calculate some well-distributed solutions, which in turn are used to partition the solution space.
+This partitioning of the solution space creates a number of sub-problems.
+Each of these can be solved in parallel by either a generic serial MOIP solver, or potentially a specialised solver.
+We chose to use MOIP\_AIRA as the generic MOIP solver for K-PPM, as it is a modern and open source generic MOIP solver, and being very similar to Algorithm \ref{algo:new} this will reduce any differences caused by the MOIP solver chosen and will instead allow us to highlight the differences due to our new parallelisation technique.
+
+\subsection{Execution environment}
+
+We ran our implementation on the National Computing Infrastructure, which utilises Intel Xeon E5-2670 CPUs running at 2.60GHz.
+Our code was compiled with GCC 4.9.0, and we used CPLEX 12.7.0 as our single objective IP solver.
+The algorithm was run over a series of randomly generated 4-objective assignment, knapsack and travelling salesman problems.
+Five different instances of each type of problem were generated for a series of problem sizes.
+We tested each algorithm with 4, 8, and 12 threads, as well as one single threaded version of the algorithm, on these problems and show the averaged results for each problem size and type in Tables \ref{tab:ap}, \ref{tab:kp} and \ref{tab:tsp}.
+Note that we have excluded the running times for problems which were solved very quickly (under 10 seconds) as well as problems which did not complete in the given time limits (48 hours) across all algorithms.
+These test problems are available for further use at \cite{figshare:4obj}.
+
+\begin{table}\footnotesize
+\begin{tabular}{c|c|c|ccc|ccc|ccc|ccc}
+  & Average & & \multicolumn{3}{c|}{CPLEX}& \multicolumn{3}{c|}{KPPM}& \multicolumn{3}{c|}{CLUSTER} & \multicolumn{3}{c}{SPREAD}\\
+& no. of & Single & 4 & 8 & 12 & 4 & 8 & 12 & 4 & 8 & 12 & 4 & 8 & 12\\
+Vars. & sol'ns & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. \\
+\hline
+8 & 264 & 67.66 & 37.72 & 36.60 & 1097 & 121 & 61.52 & 45.35 & 48.80 & 28.64 & 26.82 & 24.27 & 22.45 & 17.54 \\ 
+10 & 1098 & 532 & 242 & 230 & 4493 & 732 & 328 & 241 & 322 & 182 & 153 & 185 & 147 & 109 \\ 
+11 & 1917 & 1095 & 513 & 476 & 7858 & 1411 & 642 & 471 & 636 & 353 & 285 & 397 & 285 & 212 \\ 
+12 & 2104 & 1284 & 621 & 571 & 5972 & 1567 & 732 & 533 & 744 & 415 & 340 & 450 & 332 & 251 \\ 
+15 & 8689 & 7018 & 3742 & 3061 & 21736 & 7149 & 3655 & 2757 & 3661 & 1983 & 1560 & 2572 & 1726 & 1239 \\ 
+20 & 40298 & 51505 & 31234 & 22761 & - & 29137 & 17060 & 14499 & 18392 & 11638 & 8841 & 16980 & 11285 & 7595 \\ 
+
+\end{tabular}
+\caption{Running times of each algorithm and various thread counts on a number of assignment problems with 4 objective functions.}
+\label{tab:ap}
+\end{table}
+\begin{table}\footnotesize
+\begin{tabular}{c|c|c|ccc|ccc|ccc|ccc}
+  & Average & & \multicolumn{3}{c|}{CPLEX}& \multicolumn{3}{c|}{KPPM}& \multicolumn{3}{c|}{CLUSTER} & \multicolumn{3}{c}{SPREAD}\\
+& no. of & Single & 4 & 8 & 12 & 4 & 8 & 12 & 4 & 8 & 12 & 4 & 8 & 12\\
+Objects & sol'ns & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. \\
+\hline
+40 & 590 & 177 & 169 & 153 & 1932 & 275 & 148 & 111 & 147 & 90.76 & 84.68 & 73.85 & 63.06 & 51.63 \\ 
+60 & 3903 & 2529 & 2223 & 2242 & 26434 & 2329 & 1205 & 1046 & 1564 & 861 & 689 & 840 & 651 & 487 \\ 
+80 & 9379 & 17265 & 6774 & 8429 & - & 15095 & 8326 & 6617 & 10413 & 5791 & 4528 & 5710 & 4332 & 3200 \\ 
+
+\end{tabular}
+\caption{Running times of each algorithm and various thread counts on a number of knapsack problems with 4 objective functions.}
+\label{tab:kp}
+\end{table}
+\begin{table}\footnotesize
+\begin{tabular}{c|c|c|ccc|ccc|ccc|ccc}
+  & Average & & \multicolumn{3}{c|}{CPLEX}& \multicolumn{3}{c|}{KPPM}& \multicolumn{3}{c|}{CLUSTER} & \multicolumn{3}{c}{SPREAD}\\
+& no. of & Single & 4 & 8 & 12 & 4 & 8 & 12 & 4 & 8 & 12 & 4 & 8 & 12\\
+Cities & sol'ns & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. & thr. \\
+\hline
+8 & 96 & 19.58 & 14.67 & 16.09 & 1830 & 48.50 & 27.39 & 19.87 & 19.09 & 10.97 & 11.42 & 7.54 & 7.20 & 6.21 \\ 
+10 & 530 & 301 & 212 & 190 & 3369 & 391 & 221 & 159 & 284 & 152 & 145 & 100 & 102 & 82.59 \\ 
+12 & 1541 & 1502 & 1138 & 928 & 8918 & 1662 & 990 & 751 & 1254 & 673 & 613 & 479 & 454 & 369 \\ 
+15 & 5613 & 12982 & 9255 & 7754 & - & 10558 & 6011 & 5473 & 8351 & 4490 & 3678 & 3742 & 2934 & 2257 \\ 
+
+\end{tabular}
+\caption{Running times of each algorithm and various thread counts on a number of travelling salesman problems with 4 objective functions.}
+\label{tab:tsp}
+\end{table}
+
+\section{Discussion}\label{sec:discussion}
+
+Both variants of our new algorithm display performance improvements as more threads are utilised, and that they both outperformed K-PPM.
+K-PPM has a much longer initialisation phase that involves calculating the ideal and nadir points.
+The authors of K-PPM even discussed the cost of this initialisation in \cite{Dhaenens2010KPPM}.
+However, our new algorithm has minimal start-up cost, but instead can almost instantly start calculating solutions to the MOIP problem in question.
+This is evidenced by the fact that, when compared against a single-threaded algorithm, both \emph{spreading} and \emph{clustering} showed improved running times across problems of all sizes, while K-PPM with 4 threads could only outperform the single-threaded algorithm on larger problems.
+
+The ideal goal when parallelising is to improve the running time by a factor of $t$ by using $t$ threads, but achieving this is no easy task, and is almost never possible for problems that are not trivially parallelisable.
+As we do not reach this ideal level of improvement, but do not see significant idle times for any threads, some threads must be computing repeated or unnecessary calculations in some manner.
+That is, these threads are computing some redundant information.
+However, the synergy between the threads as allowed by Theorem \ref{thm:sharing} outdoes the loss of performance caused by these redundant calculations.
+We note that as the problems become more difficult, the improvement in running time of both of our algorithms moves towards this ideal level of parallelisation.
+
+The timing results clearly show that \emph{spreading} is significantly faster than \emph{clustering}, although this difference does fall off as more threads are used.
+The fall-off is expected, as the difference between the two methods of selecting elements of $S_n$ is substantially reduced when more elements of $S_n$ are selected.
+A close analysis of the running of the algorithm gives one possible explanation for the difference in running times.
+When solving a biobjective problem (such as ${O\!I\!P}(2,(a_3,\dots,a_n))$), the algorithm often only finds one or two new solutions i.e., solutions which aren't found via a relaxation.
+However, if two threads are attempting to solve a biobjective problem from two different permutations, there is only ever a performance increase if they can solve for different solutions, which requires at least 3 new solutions in each biobjective problem.
+This was very rare in our randomly-generated problems.
+It is definitely plausible that there exist problems where each new biobjective problem has numerous solutions, and in these cases we believe that the \emph{clustering} algorithm may perform better, but we are not aware of any research into finding such problems.
+
+\subsection{Open questions and further work}
+There is significant disparity between the performance of \emph{spreading} and \emph{clustering}, especially when only a few threads are used.
+Whilst we have given one plausible explanation for this phenomena, it does still bear investigating.
+It is not inconceivable that the best set of permutations for a problem will actually depend on the problem itself, and may well be a useful tuning parameter.
+
+\section{Conclusion}\label{sec:conclusion}
+
+We demonstrate a new paradigm for approaching parallelisation in multi-objective optimisation problems.
+The new theory we develop allows the parallel solving of problems with minimal setup times, and can be combined with existing parallel algorithms, potentially allowing scaling far beyond what is currently possible.
+We implement such an algorithm, which achieves significant performance improvements on solving small problems with only a small number of threads, highlighting its usefulness even when deployed on consumer devices such as desktop PCs and potentially phones and tablets.
+This scaling efficiency is present as the problem sizes increase, and the new algorithm outperforms existing state-of-the-art algorithms across all tested problem types and sizes, as well as all parallel worker counts.
+The increases in performance gained by our algorithm mean that larger problems, both in terms of objective counts and variable counts, can now be solved by MOIP solvers.
+
+\section{Acknowledgements}
+This study was supported by the Australian Research Council under the Discovery Projects funding scheme (project DP140104246).
+
+\bibliographystyle{elsarticle-num}
+\bibliography{bibliography}
+\end{document}
+

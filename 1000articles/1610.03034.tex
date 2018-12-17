@@ -1,0 +1,439 @@
+\documentclass[letter]{amsart}
+\usepackage{amsmath, amsfonts, amssymb, amsthm}
+\usepackage[bookmarks, bookmarksdepth=2, colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\usepackage{color}
+\usepackage{cleveref}
+\usepackage{algorithm, algorithmicx}
+\usepackage[noend]{algpseudocode}
+\addtolength{\oddsidemargin}{-1in}
+\addtolength{\evensidemargin}{-1in}
+\addtolength{\topmargin}{-0.5in}
+\addtolength{\textwidth}{1.9in}
+\addtolength{\textheight}{0.5in}
+
+\newtheorem{prop}{Proposition}
+\newtheorem{theorem}[prop]{Theorem}
+\theoremstyle{definition}
+\newtheorem*{mydef}{Definition}
+\newtheorem{remark}[prop]{Remark}
+\newtheorem{example}[prop]{Example}
+\newtheorem{defprop}{Definition/Proposition}
+\everymath{\displaystyle}
+
+\begin{document}
+\title{\bf{Numerical Implicitization for Macaulay2}}
+
+\author{Justin Chen}
+\address{Department of Mathematics, University of California, Berkeley,
+California, 94720 U.S.A}
+\email{\{jchen,jkileel\}@math.berkeley.edu}
+
+\author{Joe Kileel}
+
+\subjclass[2010]{{14-04, 14Q99, 65H10, 65H20}}
+\keywords{implicitization, homotopy continuation, monodromy, interpolation}
+
+\begin{abstract}
+We present the {\textit{Macaulay2}} package {\textit{NumericalImplicitization}}, which allows for user-friendly computation of the basic invariants of the image of a polynomial map, such as dimension, degree, and Hilbert function values.  This package relies on methods of numerical algebraic geometry, such as homotopy continuation and monodromy.
+\end{abstract}
+
+\maketitle
+
+\noindent
+\textsc{Introduction.} Many varieties of interest in algebraic geometry and its applications are usefully described as images of polynomial maps, i.e. via a parametrization. Implicitization is the process of converting a parametric description of a variety into an intrinsic -- or implicit -- description. Classically, implicitization refers to the procedure of computing the defining equations of a parametrized variety, and in theory this is accomplished by finding the kernel of a ring homomorphism, via Gr\"obner bases. In practice however, symbolic Gr\"obner basis computations are often time-consuming, even for medium-scale problems, and do not scale well with respect to the size of the input.
+
+Despite this, one would often like to know basic information about a parametrized variety, even when symbolic methods are prohibitively expensive (in terms of computation time). The best examples of such information are discrete invariants such as the dimension, or degree and Hilbert function values if the variety is projective. Other examples include Boolean tests, e.g. whether or not a particular point lies on a parametrized variety. The goal of this \textit{Macaulay2} \cite{M2} package is to provide such information -- in other words, to \textit{numerically implicitize} a parametrized variety -- by using the methods of numerical algebraic geometry. \textit{NumericalImplicitization}\footnote{For up-to-date code and documentation, see \url{https://github.com/Joe-Kileel/Numerical-Implicitization}}
+builds on top of existing numerical algebraic geometry software, e.g. \textit{NAG4M2} \cite{Ley}, \textit{Bertini} \cite{Ber, BGLR} and \textit{PHCpack} \cite{PHC, GPV}.  Each of these can be used for path tracking
+and point sampling; by default, the native engine \textit{NAG4M2} is used.
+\vspace{0.3cm}
+
+\noindent
+\textsc{Notation.} The following notation will be used throughout the remainder of this article: 
+\begin{itemize}
+\item $X \subseteq {\mathbb{A}}^n$ is a \textit{source variety}, defined by an ideal $I = \langle g_{1}, \ldots, g_{r} \rangle$ in the polynomial ring ${\mathbb{C}}[x_1, \ldots, x_n]$
+\item $F = \{f_1, \ldots, f_m\}$, where $f_i \in {\mathbb{C}}[x_1, \ldots, x_n]$, is a list of polynomials specifying a map ${\mathbb{A}}^{n} \to {\mathbb{A}}^{m}$
+\item $Y$ is the Zariski closure of the image $\overline{F(X)} = \overline{F(V(I))} \subseteq {\mathbb{A}}^{m},$ the \textit{target variety} under consideration
+\item $\widetilde{Y} \subseteq {\mathbb{P}}^{m}$ is the projective closure of $Y$, with respect to the standard embedding ${\mathbb{A}}^{m} \subseteq {\mathbb{P}}^{m}$.
+\end{itemize}
+
+Currently, \textit{NumericalImplicitization} is implemented for integral (i.e. reduced and irreducible) varieties $X$.  Equivalently, the ideal $I$ is prime. Since numerical methods are used, we always work over the complex numbers with floating-point arithmetic. Moreover, $\widetilde{Y}$ is internally represented by its affine cone. This is because it is easier for computers to work with points in affine space; at the same time, this suffices to find the invariants of $\widetilde{Y}$.
+\vspace{0.3cm}
+
+\noindent
+\textsc{Sampling.} All the methods in this package rely crucially on the ability to sample general points on $X$. To this end, two methods are provided in this package, {\tt{numericalSourceSample}} and {\tt{numericalImageSample}}, which allow the user to sample as many general points on $X$ and $Y$ as desired. {\tt{numericalSourceSample}} will compute a witness set of $X$, unless $X = {\mathbb{A}}^n$, by taking a numerical irreducible decomposition of $X$.  This time-consuming step cannot be avoided. Once a witness set is known, points on $X$ can be sampled in negligible time. {\tt{numericalImageSample}} works by sampling points in $X$ via {\tt{numericalSourceSample}}, and then applying the map $F$.
+
+One way to view the difference in computation time between symbolic and numerical methods is that the upfront cost of computing a Gr\"obner basis is replaced with the upfront cost of computing a numerical irreducible decomposition, which is used to sample general points. However, if $X = {\mathbb{A}}^n$, then sampling is done by generating random tuples, and is essentially immediate. Thus, in this unrestricted parametrization case, the upfront cost of numerical methods becomes zero.
+\vspace{0.4cm}
+
+\noindent
+\textsc{Dimension.} The most basic invariant of an algebraic variety is its dimension. To compute the dimension of the image of a variety numerically, we use the following theorem:
+
+\begin{theorem} Let $F : X \rightarrow Y$ be a dominant morphism of irreducible varieties over ${\mathbb{C}}$. Then there is a Zariski open subset $U \subseteq X$ such that for all $x \in U$, the induced map on tangent spaces $dF_x : T_xX \to T_{F(x)}Y$ is surjective. 
+\end{theorem} \label{dimThm}
+
+\vspace{-0.8em}
+
+\begin{proof}
+This is an immediate corollary of \textit{generic smoothness} \cite[III.10.5]{Har} and the preceding \cite[III.10.4]{Har}.
+\end{proof}
+
+In the setting above, since the singular locus $\operatorname{Sing} Y$ is a proper closed subset of $Y$, for general $y = F(x) \in Y$ we
+have that $\dim Y = \dim T_yY = \dim dF_x(T_xX) = \dim T_xX - \dim \ker dF_x$. Now $T_xX$ is the kernel of the Jacobian
+matrix of $I$, given by $ \operatorname{Jac}(I) = \left(\partial g_i /\partial x_j \right)_{1 \le j \le n, \, 1 \le i \le r}$ where $I = \langle g_1, \ldots, g_r \rangle $, and $\ker dF_x$ is the kernel of the
+ Jacobian of $F$ evaluated at $x$, intersected with $T_xX$.  Explicitly, $\ker dF_x$ is the kernel of the $(r+m) \times n$ matrix:
+
+\begin{scriptsize}
+\[
+\begin{bmatrix}\\[-5.58pt]
+\frac{\partial g_1}{\partial x_1}(x) & \ldots & \frac{\partial g_1}{\partial x_n}(x) \\[2pt]
+\vdots & \ddots & \vdots \\[2pt]
+\frac{\partial g_r}{\partial x_1}(x) & \ldots & \frac{\partial g_r}{\partial x_n}(x) \\[8pt]
+\frac{\partial F_1}{\partial x_1}(x) & \ldots & \frac{\partial F_1}{\partial x_n}(x) \\[2pt]
+\vdots & \ddots & \vdots \\[2pt]
+\frac{\partial F_m}{\partial x_1}(x) & \ldots & \frac{\partial F_m}{\partial x_n}(x) \\[5pt]
+\end{bmatrix}
+\]
+\end{scriptsize}
+
+\noindent We compute these kernel dimensions numerically, as explained prior to \Cref{canonicalCurveEx} below, to get $\dim Y$.
+
+\begin{example}
+Let $Y \subseteq \textup{Sym}^{4}({\mathbb{C}}^{5}) \cong {\mathbb{A}}^{70}$ be the variety of $5 \times 5 \times 5 \times 5$ symmetric tensors of border rank $\leq 14$. Equivalently, $Y$ is the affine cone over $\sigma_{14}(\nu_{4}({\mathbb{P}}^{4}))$, the $14^{\textup{th}}$ secant variety of the fourth Veronese embedding of ${\mathbb{P}}^{4}$.  Naively, one expects $\textup{dim}(Y) = 14 \cdot 4 + 13 + 1 = 70$.  In fact, $\textup{dim}(Y) = 69$ as verified by the following code:
+
+\vspace{0.05cm}
+
+\begin{verbatim}
+Macaulay2, version 1.9.2
+i1 : needsPackage "NumericalImplicitization"
+i2 : R = CC[s_(1,1)..s_(14,5)];
+i3 : F = sum(1..14, i -> flatten entries basis(4, R, Variables => toList(s_(i,1)..s_(i,5))));
+i4 : time numericalImageDim(F, ideal 0_R)
+     -- used 0.106554 seconds
+o4 = 69
+\end{verbatim}
+
+\noindent This example is the largest exceptional case from the celebrated work \cite{AH}.  Note the timing printed above.
+\end{example}
+
+\vspace{0.2cm}
+
+\noindent
+\textsc{Hilbert function.} We now turn to the problem of determining the Hilbert function of $\widetilde{Y}$. Recall that if $\widetilde{Y} \subseteq {\mathbb{P}}^{m}$ is a projective variety, given by a homogeneous ideal $J \subseteq {\mathbb{C}}[y_{0}, \ldots, y_{m}]$, then the Hilbert function of $\widetilde{Y}$ at an argument $d \in {\mathbb{N}}$ is by definition the vector space dimension of the $d^\text{th}$ graded part of $J$, i.e. $H_{\widetilde{Y}}(d)=\dim J_d$. This counts the maximum number of linearly independent degree $d$ hypersurfaces in ${\mathbb{P}}^{m}$ containing $\widetilde{Y}$. 
+
+To compute the Hilbert function of $\widetilde{Y}$ numerically, we use \textit{multivariate polynomial interpolation}. For a fixed argument $d$, let $P = \{p_1, \ldots, p_N\}$ be a set of $N$ general points on $\widetilde{Y}$.  For $1 \le i \le N$, consider an $i \times \binom{m+d}{d}$ interpolation matrix $A^{(i)}$ with rows indexed by points $\{p_1, \ldots, p_i\}$ and columns indexed by degree $d$ monomials in ${\mathbb{C}}[y_{0}, \ldots, y_{m}]$, whose entries are the values of the monomials at the points. A vector in the kernel of $A^{(i)}$ corresponds to a choice of coefficients for a homogeneous degree $d$ polynomial that vanishes on $p_1, \ldots, p_i$. If $i$ is large, then one expects such a form to vanish on the entire variety $\widetilde{Y}$. The following theorem makes this precise:
+
+\begin{theorem} \label{hilbertFunctionThm}
+Let $\{p_1, \ldots, p_{s+1}\}$ be a set of general points on $\widetilde{Y}$, and let $A^{(i)}$ be the interpolation matrix above. If $\dim \ker A^{(s)} = \dim \ker A^{(s+1)}$, then $\dim \ker A^{(s)} = \dim J_d$.
+\end{theorem}
+\begin{proof}
+Identifying a vector $v \in \ker A^{(i)}$ with the form in ${\mathbb{C}}[y_{0}, \ldots, y_{m}]$ of degree $d$ having $v$ as its coefficients,
+it suffices to show that $\ker A^{(s)} = J_d$. 
+If $h \in J_d$, then $h$ vanishes on all of $\widetilde{Y}$, in particular on $\{p_1, \ldots, p_s\}$, so $h \in \ker A^{(s)}$. 
+For the converse $\ker A^{(s)} \subseteq J_d$, we consider the universal interpolation matrices over ${\mathbb{C}}[y_{0,1}, \, y_{1,1}, \, \ldots, \, y_{m, i}]$
+
+$$\mathcal{A}^{(i)} := \begin{bmatrix} y_{0,1}^{d} & y_{0,1}^{d-1}y_{1,1} & \ldots & y_{m,1}^{d} \\[3pt] 
+y_{0,2}^{d} & y_{0,2}^{d-1}y_{1,2} & \ldots & y_{m,2}^{d} \\[3pt]
+\vdots & \vdots & \ddots & \vdots \\[3pt]
+y_{0,i}^{d} & y_{0,i}^{d-1}y_{1,i} & \ldots & y_{m,i}^{d}
+\end{bmatrix}$$
+
+\vspace{0.15cm}
+\noindent Set $r_{i} := \min \, \{j \in {\mathbb{Z}}_{\geq 0} \, | \, \textup{every } (j+1) \times (j+1) \textup{ minor of } \mathcal{A}^{(i)} \textup{ lies in the ideal of } \widetilde{Y}^{\times i} \subseteq ({\mathbb{P}}^{m})^{\times i} \}$.
+Then any specialization of $\mathcal{A}^{(i)}$ to $i$ points in $\widetilde{Y}$ is a matrix over ${\mathbb{C}}$ of rank $\leq r_i$; moreover if the points are general, then the specialization has rank exactly $r_i$, since $\widetilde{Y}$ is irreducible. In particular $\textup{rank}(A^{s}) = r_s$ and $\textup{rank}(A^{s+1}) = r_{s+1}$, so $\dim \ker A^{(s)} = \dim \ker A^{(s+1)}$ implies that $r_s = r_{s+1}$.  
+It follows that specializing $\mathcal{A}^{(s+1)}$ to $p_1, p_2, \ldots, p_s, q$ for \textit{any} $q \in \widetilde{Y}$ gives a rank $r_s$ matrix.  Hence, every degree $d$ form in $\ker A^{(s)}$ evaluates to 0 at every $q \in \widetilde{Y}$.  Since $\widetilde{Y}$ is reduced, we deduce that $\ker A^{(s)} \subseteq J_d$.
+\end{proof}
+
+It follows from \Cref{hilbertFunctionThm} that the integers $\dim \ker A^{(1)}, \dim \ker A^{(2)}, \ldots$ decrease by exactly $1$, until the first instance where they fail to decrease, at which point they stabilize: $\dim \ker A^{(i)} = \dim \ker A^{(s)}$ for $i \ge s$. This stable value is the value of the Hilbert function, $\dim \ker A^{(s)} = H_{\widetilde{Y}}(d)$. In particular, it suffices to compute $\dim \ker A^{(N)}$ for $N = \binom{m+d}{d}$, i.e. one may assume the interpolation matrix is square. Although this may seem wasteful (as stabilization may have occurred with fewer rows), this is indeed what \texttt{numericalHilbertFunction} does, due to the algorithm used to compute kernel dimension numerically. To be precise, kernel dimension is found via a singular value decomposition (SVD) -- namely, if a gap (= ratio of consecutive singular values) greater than the option {\tt{SVDGapThreshold}} (with default value 200) is observed in the list of all singular values, then this is taken as an indication that all singular values past the greatest gap are numerically zero. On example problems, it was observed that taking only one more additional row than was needed often did not reveal a satisfactory gap in singular values.  In addition, numerical stability is improved via preconditioning on the interpolation matrices -- namely, each row is normalized in the Euclidean norm before computing the SVD.
+
+\begin{example} \label{canonicalCurveEx}
+Let $X$ be a random canonical curve of genus 4 in ${\mathbb{P}}^3$, so $X$ is the complete intersection of a random quadric and cubic.
+Let $F : {\mathbb{P}}^3 \dashrightarrow {\mathbb{P}}^2$ be a projection by 3 random cubics.
+Then $\widetilde{Y}$ is a plane curve of degree $3^{\dim(\widetilde{Y})} \cdot \deg(X) = 3 \cdot 2 \cdot 3 =18$,
+so the ideal of $\widetilde{Y}$ contains a single form of degree 18.  We verify this as follows:
+
+\begin{verbatim}
+i5 : R = CC[x_0..x_3];
+i6 : I = ideal(random(2,R), random(3,R));
+i7 : F = toList(1..3)/(i -> random(3,R));
+i8 : T = numericalHilbertFunction(F, I, 18)
+Sampling image points ...
+     -- used 4.76401 seconds
+Creating interpolation matrix ...
+     -- used 0.313925 seconds
+Performing normalization preconditioning ...
+     -- used 0.214475 seconds
+Computing numerical kernel ...
+     -- used 0.135864 seconds
+Hilbert function value: 1
+o8 = NumericalInterpolationTable
+\end{verbatim}
+
+\vspace{0.1cm}
+
+The output is a \texttt{NumericalInterpolationTable}, which is a \texttt{HashTable} storing the results of the interpolation computation described above.  From this, one can obtain a floating-point approximation to a basis of $J_d$.  This is done via the command \texttt{extractImageEquations}:
+
+\begin{verbatim}
+i9 : extractImageEquations T
+o9 : | -.0000712719y_1^18+(.000317507-.000100639i)y_1^17y_2-(.0000906039-.000616564i)y_1^16y_2^2
+     ------------------------------------------------------------------------------------------
+     -(.00197404+.00177936i)y_1^15y_2^3+(.0046344+.00196825i)y_1^14y_2^4-(.00475536-.00157142i)
+     ------------------------------------------------------------------------------------------
+     y_1^13y_2^5+(.00550602-.0100492i)y_1^12y_2^6-(.012252-.0188461i)y_1^11y_2^7+ ... |
+\end{verbatim}
+
+\vspace{0.2cm}
+
+An experimental feature to find equations over ${\mathbb{Z}}$ may be called with the option \texttt{attemptExact => true}.
+\end{example}
+
+\vspace{0.2cm}
+
+\noindent
+\textsc{Degree.}
+After dimension, degree is the most basic invariant of a projective variety $\widetilde{Y} \subseteq {\mathbb{P}}^m$.
+Set $k := \dim(\widetilde{Y})$. For a general linear space $ L \in \textup{Gr}({\mathbb{P}}^{m-k}, {\mathbb{P}}^{m})$ of complementary dimension to $\widetilde{Y}$,
+the intersection $L \cap \widetilde{Y}$ is a finite set of reduced points. The degree of $\widetilde{Y}$ is by definition the cardinality of $L \cap \widetilde{Y}$, which is independent of the general linear space $L$. Thus one approach to find $\deg(\widetilde{Y})$ is to fix a random $L_0$ and compute the set of points $L_0 \cap \widetilde{Y}$.
+
+\textit{NumericalImplicitization} takes this tack, but the method used to find $L_0 \cap \widetilde{Y}$ is not the most obvious. First and foremost, we do not know the equations of $\widetilde{Y}$, so all solving must be done in $X$.
+Secondly, we do \textit{not} compute $F^{-1}(L_0) \cap X$ from the equations of $X$ and the equations of $L_0$ pulled back under $F$, 
+because that has degree $\deg(F) \cdot \deg(\widetilde{Y})$ -- potentially much bigger than $\deg(\widetilde{Y})$.
+Instead, \textit{monodromy} is employed to find $L_0 \cap \widetilde{Y}$.
+
+To state the technique, 
+we consider the map:
+$$ \Phi := \{ (L, y) \in \operatorname{Gr}({\mathbb{P}}^{m-k}, {\mathbb{P}}^{m}) \times \widetilde{Y} \,\, | \,\, y \in L\} \, \subseteq \operatorname{Gr}({\mathbb{P}}^{m-k}, {\mathbb{P}}^{m}) \times \widetilde{Y} \xrightarrow{\makebox[1cm]{$\rho_1$}} \, \operatorname{Gr}({\mathbb{P}}^{m-k}, {\mathbb{P}}^{m})$$
+where $\rho_{1}$ is projection onto the first factor.  There is a nonempty Zariski open subset $U \subset \operatorname{Gr}({\mathbb{P}}^{m-k}, {\mathbb{P}}^{m})$ such that the restriction $\rho_{1}^{-1}(U) \rightarrow U$ is a $\textup{deg}(\widetilde{Y})$-to-1
+covering map, namely $U$ equals the complement of the Hurwitz divisor from \cite{St}.  Now fix a generic basepoint $L_{0} \in U$.
+Then the fundamental group $\pi_{1}(U, L_{0})$ acts on the fiber $\rho_{1}^{-1}(L_{0}) = L_{0} \cap \widetilde{Y}$. 
+This action is known as monodromy.  It is a key fact that the induced group homomorphism $\pi_{1}(U, L_{0}) \longrightarrow \textup{Sym}(L_{0} \cap \widetilde{Y}) \cong \textup{Sym}_{\deg(\widetilde{Y})}$ is surjective, by irreducibility of $\widetilde{Y}$. More explicitly:
+
+\begin{theorem} \label{thm:monodromy}
+Let $\widetilde{Y}, \, U, \, L_{0}$ be as above, and write $L_{0} = V(\ell_{0})$
+where $\ell_{0} \in ({\mathbb{C}}[y_0, \ldots, y_m]_{1})^k$ is a height $k$ column vector of linear forms.
+Fix another generic point $L_{1} = V(\ell_{1}) \in U$, where $\ell_{1} \in ({\mathbb{C}}[y_0, \ldots, y_m]_{1})^k$.
+For any $\gamma_0, \gamma_1 \in {\mathbb{C}}$, consider the following loop of linear subspaces of ${\mathbb{P}}^{m}$\textup{:}
+
+\vspace{-0.5em}
+
+$$ t \mapsto \begin{cases}
+      V\Big{(}(1-2t)\cdot \ell_0 + \gamma_1 2t \cdot \ell_{1} \Big{)}  & \,\,\, \textup{if}\ 0 \leq t \leq \frac{1}{2} \\
+      V\Big{(}(2-2t)\cdot \ell_{1} + \gamma_0 (2t-1) \cdot \ell_{0}\Big{)}  & \,\,\, \textup{if}\ \frac{1}{2} \leq t \leq 1.
+    \end{cases}$$
+
+\noindent For a nonempty Zariski open subset of $(\gamma_0, \gamma_1) \in {\mathbb{C}}^{2}$, this loop is
+contained in $U$.  Moreover, the classes of these loops in $\pi_{1}(U, L_{0})$ generate the full
+symmetric group $\textup{Sym}(L_{0} \cap \widetilde{Y})$.
+\end{theorem}
+
+\begin{proof}
+Let $\mathcal{L}$ be the pencil of linear subspaces of ${\mathbb{P}}^m$ generated by $\ell_0$ and $\ell_1$.
+Via monodromy, $\pi_1(\mathcal{L} \cap U, L_0)$ maps surjectively onto $\textup{Sym}(L_{0} \cap \widetilde{Y})$,
+by \cite[Corollary 3.5]{SVW}.  Here the topological space $\mathcal{L} \cap U$ is homeomorphic 
+to the Riemann sphere ${\mathbb{C}}{\mathbb{P}}^1$ minus a finite set of points, so $\pi_1(\mathcal{L} \cap U, L_0)$  
+is isomorphic to a free group on finitely many letters.  The explicit loops in the theorem 
+statement miss the finite set $\mathcal{L} \setminus (\mathcal{L} \cap U)$ for general $\gamma_0, \gamma_1$; moreover $\gamma_0, \gamma_1$
+may be chosen so that the loop above encloses exactly one point in $\mathcal{L} \setminus (\mathcal{L} \cap U)$.
+Therefore, the classes of these loops generate $\pi_1(\mathcal{L} \cap U, L_0)$.
+To visualize these loops, the reader may consult the proof of \cite[Lemma 7.1.3]{SW}.
+\end{proof}
+
+\texttt{numericalImageDegree} works by first sampling a general point $x \in X$, and manufacturing a general linear slice $L_0$ such that $F(x) \in L_0 \cap \widetilde{Y}$. Then, $L_0$ is moved around in a loop of the form described in Theorem \ref{thm:monodromy}.  This loop pulls back to a homotopy in $X$, where we use the equations of $X$ to track $x$.  The endpoint of the track is a point $x' \in X$ such that $F(x') \in L_0 \cap \widetilde{Y}$.  If $F(x)$ and $F(x')$ are numerically distinct, then the loop has \textit{learned} a new point in $L_0 \cap \widetilde{Y}$; otherwise $x'$ is discarded. We then repeat this process of tracking points in $X$ over each known point in $L_0 \cap \widetilde{Y}$, according to loops in Theorem \ref{thm:monodromy}.  
+Note that for random $\gamma_0, \gamma_1 \in {\mathbb{C}}$, each loop has a positive probability -- bounded away from 0 -- of learning new points in $L_0 \cap \widetilde{Y}$, up until all of $L_0 \cap \widetilde{Y}$ is known.
+Thus by carrying out many loops from Theorem \ref{thm:monodromy}, the probability of finding all points in $L_0 \cap \widetilde{Y}$ approaches 1.  In practice, if several consecutive loops\footnote{This is specified by the option \texttt{maxRepetitiveMonodromies} (with default value 4).} do not learn new points in $L_0 \cap \widetilde{Y}$, then we suspect that all of $L_0 \cap \widetilde{Y}$ has been calculated. To verify this, we pass to the \textit{trace test} (see \cite[Corollary 2.2]{SVW}, \cite[\S 5]{HR} or \cite[\S 1]{LS}), which provides a characterization for when a subset of $L_0 \cap \widetilde{Y}$ equals $L_0 \cap \widetilde{Y}$ . If the trace test is failed, then $L_0$ is replaced by a new random $L_0'$ and preimages in $X$ of known points of $L_0 \cap \widetilde{Y}$ are tracked to those preimages of points of $L_0' \cap \widetilde{Y}$.  Afterwards, monodromy for $L'_0 \cap \widetilde{Y}$ begins anew.  If the trace test is failed \texttt{maxTraceTests} (= 10 by default) times in total, then \texttt{numericalImageDegree} exits with only a lower bound on $\deg(\widetilde{Y})$.  
+
+\begin{example}\label{ex:raicu}
+Let $\widetilde{Y} = \sigma_2({\mathbb{P}}^1 \times {\mathbb{P}}^1 \times {\mathbb{P}}^1 \times {\mathbb{P}}^1 \times {\mathbb{P}}^1) \subseteq {\mathbb{P}}^{31}$. We find that $\deg(\widetilde{Y}) = 3256$, using the commands below:
+
+\vspace{0.1cm}
+
+\begin{verbatim}
+i10 : R = CC[a_1..a_5, b_1..b_5, t_0, t_1];
+i11 : F1 = terms product(apply(toList(1..5), i -> 1 + a_i));
+i12 : F2 = terms product(apply(toList(1..5), i -> 1 + b_i));
+i13 : F = apply(toList(0..<2^5), i -> t_0*F1#i + t_1*F2#i);
+i14 : time numericalImageDegree(F, ideal 0_R, maxRepetitiveMonodromies => 2)
+Sampling point in source ...
+Tracking monodromy loops ...
+Points found: 2
+Points found: 4
+Points found: 8
+Points found: 16
+Points found: 32
+Points found: 62
+Points found: 123
+Points found: 239
+Points found: 466
+Points found: 860
+Points found: 1492
+Points found: 2314
+Points found: 3007
+Points found: 3229
+Points found: 3256
+Points found: 3256
+Points found: 3256
+Running trace test ...
+Degree of image: 3256
+      -- used 388.989 seconds
+o14 = PseudoWitnessSet
+\end{verbatim}
+
+\vspace{0.1cm}
+
+\noindent In \cite[Theorem 4.1]{Rai}, it is proven via representation theory and combinatorics that the prime ideal $J$ of $\widetilde{Y}$ is generated by the $3 \times 3$ minors of all flattenings of $2^{\times 5}$ tensors, so we can confirm that $\deg(J) = 3256$.  However, the naive attempt to compute the degree of $\widetilde{Y}$ symbolically by taking the kernel of a ring map -- from a polynomial ring in 32 variables -- has no hope of finishing in any reasonable amount of time.
+
+The output \texttt{o14} above is a \texttt{PseudoWitnessSet}, which is a \textit{Macaulay2} 
+\texttt{HashTable} that 
+stores the computation of $L_0 \cap \widetilde{Y}$.  This numerical representation of parameterized varieties was introduced in \cite{HS}.
+\end{example}
+
+\vspace{0.2cm}
+
+\noindent \textsc{Membership.} 
+Classically, given a variety $Y \subseteq {\mathbb{A}}^m$ and a point $y \in {\mathbb{A}}^m$, we determine whether or not $y \in Y$
+by finding set-theoretic equations of $Y$ (which generate the ideal of $Y$ up to radical), 
+and then testing if $y$ satisfies these equations.
+If a \texttt{PseudoWitnessSet} for $Y$ is available, then point membership in $Y$ can instead be verified by \textit{parameter homotopy}.  More precisely, \texttt{isOnImage} determines if $y$ lies in the constructible set $F(X) \subseteq Y$, as follows.  We fix a general affine linear subspace $L_y \subseteq {\mathbb{A}}^m$ of complementary dimension $m-k$ passing through $y$.   Then $y \in F(X)$ if and only if $y \in L_y \cap F(X)$, so it suffices to compute the set $L_y \cap F(X)$. 
+Now, a \texttt{PseudoWitnessSet} for $Y$ provides
+a general section $L \cap F(X)$, and preimages in $X$.  We move $L$ to $L_y$ as in \cite[Theorem 7.1.6]{SW}.  This pulls back to a homotopy in $X$, where we use the equations of $X$ to track those preimages.  Applying $F$ to the endpoints of the track gives all isolated points in $L_y \cap F(X)$ by \cite[Theorem 7.1.6]{SW}.  Since $L_y$ was general, the proof of \cite[Corollary 10.5]{Eis} shows
+$L_y \cap F(X)$ is zero-dimensional, so this procedure computes the entire set $L_y \cap F(X)$.
+
+\begin{example}
+Let $Y \subseteq {\mathbb{A}}^{18}$ be defined by the resultant of three quadratic equations in three unknowns.  In
+other words, $Y$ consists of all coefficients $(c_1, \ldots, c_{6}, d_{1}, \ldots, d_{6}, e_{1}, \ldots, e_{6}) \in {\mathbb{A}}^{18}$ such that the system
+
+\vspace{-0.15cm}
+
+\[
+\begin{aligned}
+0 &= c_{1} x^{2} + c_{2} xy + c_{3} xz + c_{4} y^2 + c_{5} yz + c_{6} z^2 \\
+0 &= d_{1} x^{2} + d_{2} xy + d_{3} xz + d_{4} y^2 + d_{5} yz + d_{6} z^2\\
+0 &= e_{1} x^{2} + e_{2} xy + e_{3} xz + e_{4} y^2 + e_{5} yz + e_{6} z^2
+\end{aligned}
+\]
+
+\vspace{0.05cm}
+
+\noindent admits a solution $(x:y:z) \in {\mathbb{P}}^2$. 
+Here $Y$ is a hypersurface, and a matrix formula for its defining equation was derived in \cite{ES},
+using exterior algebra methods.  We rapidly determine point
+membership in $Y$ numerically as follows.
+
+\begin{verbatim}
+i15 : R = CC[c_1..c_6, d_1..d_6, e_1..e_6, x, y, z];
+i16 : I = ideal(c_1*x^2+c_2*x*y+c_3*x*z+c_4*y^2+c_5*y*z+c_6*z^2,
+                d_1*x^2+d_2*x*y+d_3*x*z+d_4*y^2+d_5*y*z+d_6*z^2,
+                e_1*x^2+e_2*x*y+e_3*x*z+e_4*y^2+e_5*y*z+e_6*z^2);
+i17 : F = toList(c_1..c_6 | d_1..d_6 | e_1..e_6);
+i18 : W = numericalImageDegree(F, I, verboseOutput => false); -- Y has degree 12
+i19 : p1 = numericalImageSample(F, I); p2 = point random(CC^1, CC^#F);
+i21 : time (isOnImage(W, p1), isOnImage(W, p2))
+      -- used 0.186637 seconds
+o21 = (true, false)
+
+\end{verbatim}
+\end{example}
+
+\vspace{-0.15cm}
+
+\noindent \textsc{Acknowledgements.} We are grateful to Anton Leykin for his encouragement, and to Luke Oeding
+for testing \nobreak \textit{NumericalImplicitization}.  We also thank David Eisenbud and Bernd Sturmfels for helpful discussions and comments.  This work has been supported by the US National Science Foundation (DMS-1001867).
+
+\begin{thebibliography}{99}
+
+\bibitem{AH} 
+J.~Alexander and A.~Hirschowitz, 
+Polynomial interpolation in several variables, 
+{\em J. Alg. Geom.} \textbf{4} (1995), no. 2, 201--222.
+
+\bibitem{BGLR}
+D.J.~Bates, E.~Gross, A~Leykin and J.I.~Rodriguez,
+Bertini for Macaulay2,
+{\href{http://arxiv.org/abs/{1310.3297v1}}{{\tt arXiv:{1310.3297v1}}}}.
+
+\bibitem{Ber}
+D.J.~Bates, J.D.~Hauenstein, A.J.~Sommese and C.W.~Wampler, 
+{\em Bertini: Software for numerical algebraic geometry}. 
+Available at \url{https://bertini.nd.edu}.
+
+\bibitem{Eis}
+D.~Eisenbud, 
+{\em Commutative algebra: With a view toward algebraic geometry},
+Graduate Texts in Mathematics \textbf{150},
+Springer-Verlag, New York, 1995.
+
+\bibitem{ES}
+D.~Eisenbud and F.~Schreyer, 
+Resultants and Chow forms via exterior syzygies, 
+{\em J. Amer.
+Math. Soc.} \textbf{16} (2003), no. 3, 537--579.
+
+\bibitem{M2} 
+D.R.~Grayson and M.E.~Stillman, 
+{\em Macaulay2, a software system for research in algebraic geometry}. 
+Available at \url{http://www.math.uiuc.edu/Macaulay2/}.
+
+\bibitem{GPV}
+E.~Gross, S.~Petrovi\'c and J.~Verschelde,
+Interfacing with PHCpack,
+{\em J. Softw. Algebra Geom.}
+\textbf{5} (2013), 20--25.
+
+\bibitem{Har} 
+R.~Hartshorne, 
+{\em Algebraic Geometry},
+Graduate Texts in Mathematics \textbf{52},
+Springer-Verlag, New York, 1977.
+
+\bibitem{HR}
+J.D.~Hauenstein and J.I.~Rodriguez,
+Numerical Irreducible Decomposition of Multiprojective Varieties,
+{\href{http://arxiv.org/abs/{1507.07069v2}}{{\tt arXiv:{1507.07069v2}}}}.
+
+\bibitem{HS}
+J.D.~Hauenstein and A.J.~Sommese,
+Witness sets of projections,
+{\em Appl. Math. Comput.}
+\textbf{217} (2010), no. 7, 3349--3354.
+
+\bibitem{Ley}
+A.~Leykin,
+Numerical Algebraic Geometry,
+{\em J. Softw. Algebra Geom.}
+\textbf{3} (2011), 5--10.
+
+\bibitem{LS}
+A.~Leykin and F.~Sottile,
+Trace test,
+{\href{http://arxiv.org/abs/{1608.00540v1}}{{\tt arXiv:{1608.00540v1}}}}.
+
+\bibitem{Rai}
+C.~Raicu,
+Secant varieties of Segre-Veronese varieties,
+{\em Algebra Number Theory}
+\textbf{6} (2012), no. 8, 1817--1868.
+
+\bibitem{SVW} 
+A.J.~Sommese, J.~Verschelde and C.W.~Wampler,
+Symmetric functions applied to decomposing solution sets of polynomial sets,
+{\em SIAM J. Numer. Anal.} \textbf{40} (2002), no. 6, 2026--2046.
+
+\bibitem{SW}
+A.J.~Sommese and C.W.~Wampler, 
+{\em The numerical solution of systems of polynomials},
+The Publishing Co. Pte. Ltd., Hackensack, NJ, 2005.
+
+\bibitem{St} 
+B.~Sturmfels, 
+The Hurwitz Form of a Projective Variety, 
+{\em J. Symb. Comput.} \textbf{79} (2017) 186--196.
+
+\bibitem{PHC}
+J.~Verschelde, 
+Algorithm 795: PHCPACK: A general-purpose solver for polynomial systems by homotopy continuation, 
+{\em ACM Trans. Math. Software} 
+\textbf{25} (1999), no. 2, 251--276.
+Available at \url{https://www.math.uic.edu/~jan/download.html}.
+
+\end{thebibliography}
+
+\end{document}

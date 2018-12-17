@@ -1,0 +1,2051 @@
+\documentclass[a4paper]{amsart}
+
+\usepackage{xspace}
+\usepackage{graphicx}
+
+\numberwithin{equation}{section}
+
+ 
+
+\theoremstyle{plain}
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{cor}{Corollary}[section]
+\newtheorem{prop}{Proposition}[section]
+\newtheorem{lem}{Lemma}[section]
+\theoremstyle{definition}
+\newtheorem{rem}{Remark}[section]
+
+\begin{document}
+
+\title[Piecewise polynomial approximation of gradients]{Approximating 
+gradients with continuous piecewise polynomial functions}
+\date{\today}
+
+\author[A. Veeser]{Andreas Veeser}
+\email{Andreas.Veeser@unimi.it}
+\urladdr{http://www.mat.unimi.it/users/veeser/}
+
+\keywords{Approximation of gradients, continuous piecewise polynomials,
+  finite elements, Lagrange elements, discontinuous elements,
+  a~priori error estimates, adaptive tree approximation}
+\subjclass{41A15, 41A63, 41A05, 65N30, 65N15}
+
+\begin{abstract}
+Motivated by conforming finite element methods for elliptic problems of second 
+order, we analyze the approximation of the gradient of a target function by 
+continuous piecewise polynomial functions over a simplicial mesh.  The main 
+result is that the global best approximation error is equivalent to an 
+appropriate sum in terms of the local best approximations errors on elements.  
+Thus, requiring continuity does not downgrade local approximability and 
+discontinuous piecewise polynomials essentially do not offer additional 
+approximation power, even for a fixed mesh.  This result implies error bounds in 
+terms of piecewise regularity over the whole admissible smoothness range.  
+Moreover, it allows for simple local error functionals in adaptive tree 
+approximation of gradients.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+\label{S:Intro}
+
+Finite element methods are one of the most successful tools for the
+numerical solution of partial differential equations.  In their
+simplest form they are Galerkin methods where the discrete space is
+given by elements that are appropriately coupled.  This piecewise
+structure allows to construct bases that are, on one hand, relatively
+easy to implement and, on the other hand, are locally supported.  The
+latter leads to linear systems with sparse matrices, which can be
+stored and often solved with optimal linear complexity.
+
+ 
+\medskip This article concerns the approximation properties of continuous
+piecewise polynomial functions over a simplicial mesh, which build a prototype 
+finite element space.  It analyzes the interplay of global and local best 
+errors when approximating the gradient of a target function.
+
+Continuous piecewise polynomial functions arise when solving elliptic boundary 
+value problems of second order with Lagrange elements (see \S\ref{S:Poly} for 
+a definition).  To be more specific, if the associated bilinear form is 
+$H^1_0(\Omega)$-coercive, a typical choice is
+\begin{equation}
+\label{model_subspace}
+ {S}
+ {:=}
+ \Big\{ v:{\overline{\Omega}}\to{\mathbb{R}} \mid 
+  \forall{K}\in{\mathcal{M}}\ v_{|{K}}\in{\mathcal{P}_{{\ell}}({{K}})}, \,
+  v\in C^0({\overline{\Omega}}), \, v_{|\partial\Omega}=0
+ \Big\},
+\end{equation}
+where ${\mathcal{M}}$ is a conforming simplicial mesh of a domain $\Omega$ and 
+${\mathcal{P}_{{\ell}}({{K}})}$ denotes the set of polynominals with degree $\leq{\ell}$ 
+over an element ${K}\in{\mathcal{M}}$.  Requiring continuity and incorporating the 
+boundary condition in \eqref{model_subspace} ensure ${S} \subset 
+H^1_0(\Omega)$ and thus the conformity of finite element method.
+C\'ea's lemma therefore implies that the error of the Galerkin solution in
+${S}$ is dictated by the best global approximation error for the
+exact solution $u\in H^1_0(\Omega)$:
+\begin{equation*}
+\label{best-global-error}
+ E(u)
+ {:=}
+ E(u,{S})
+ {:=}
+ \inf \big\{
+  {\left\|{{\nabla}(u-v)}\right\|_{{\Omega}}} \mid v\in{S}
+ \big\},
+\end{equation*}
+where ${\left\|{\cdot}\right\|_{{\Omega}}}$ stands for the norm of $L^2(\Omega)$.  In
+view of the piecewise structure of space ${S}$, the approximation of $u$ 
+on each element ${K}\in{\mathcal{M}}$ is limited by the local shape functions 
+${\mathcal{P}_{{\ell}}({{K}})}$.  This suggests to introduce the local best approximation 
+errors
+\begin{equation*}
+\label{local-best-errors}
+ e_{K}(u)
+ {:=}
+ \inf \big\{
+  {\left\|{{\nabla}(u-p)}\right\|_{{K}}} \mid p\in{\mathcal{P}_{{\ell}}({{K}})}
+ \big\},
+\qquad
+ \forall{K}\in{\mathcal{M}}.
+\end{equation*}
+The question arises how the global and local best errors are related and how 
+their relationship is affected by requiring conformity.
+
+In the described context the main result Theorem \ref{T:elm-dec} reads as 
+follows.  For any conforming mesh, the global best error is equivalent to the 
+appropriately collected local best errors.  More precisely, there holds
+\begin{equation}
+\label{equivalence}
+ \left(
+  \sum_{{K}\in{\mathcal{M}}} e_{K}(u)^2
+ \right)^{\frac12}
+ \leq
+ E(u)
+ \leq
+ C\left(
+  \sum_{{K}\in{\mathcal{M}}} e_{K}(u)^2
+ \right)^{\frac12},
+\end{equation}
+where $C$ can be bounded in terms of the shape regularity of ${\mathcal{M}}$.  The 
+first inequality in \eqref{equivalence} is straight-forward and just a 
+quantitative version of the motivation that suggests to introduce the local 
+best errors.  The second inequality, which is not obvious and the proper 
+concern of this paper, means that the above requirements for conformity 
+essentially do not downgrade the approximation potiential given by the local 
+discrete spaces.  It thus confirms in particular the coupling via continuity of 
+the elements.
+Adopting the broken $H^1$-seminorm as error notion, there is a second 
+interpretation of \eqref{equivalence}: discontinuous and continuous piecewise 
+polynomial functions have essentially the same approximation power.  We also 
+derive variants of \eqref{equivalence} addressing the coupling of partial 
+derivatives of the approximants and mesh conformity; see Theorem 
+\ref{T:pder-dec} and Theorem \ref{T:n-elm-dec}, respectively.
+
+\smallskip The second inequality in \eqref{equivalence} is proved in 
+\S\ref{S:ConformityImpact} by means of suitable local error bounds for a 
+continuous interpolant.  As interpolant, one can use a variant of the 
+Scott-Zhang interpolant \cite{Scott.Zhang:90} or averages like in S.~Brenner 
+\cite{Brenner:96} of local best approximations.  The key ingredients for these 
+local error bounds are the Trace and Poincar\'e inequalities.
+
+\medskip Equivalence \eqref{equivalence} reduces the quantification of
+the global best error to the quantification of decoupled, local best
+approximation errors.  We illustrate the usefulness of this aspect
+with two applications in \S\ref{S:appl}.
+
+First, the second inequality in \eqref{equivalence} may be used in the
+{a~priori\xspace} analysis of finite element solutions.  For example, inserting
+the Bramble-Hilbert lemma in the right-hand side of \eqref{equivalence}, one 
+readily obtains the upper bound
+\begin{equation}
+\label{apriori-ub}
+ E(u)
+ \leq
+ C \left(
+  \sum_{{K}\in{\mathcal{M}}} h_{K}^{2\ell}
+   {\left\|{D^{\ell+1} u}\right\|_{{K}}}^2
+ \right)^{\frac12},
+\end{equation}
+where $h_{K}$ denotes the diameter of an element ${K}\in{\mathcal{M}}$.  Notice that 
+the right-hand side involves only piecewise regularity and so vanishes whenever
+$u\in{S}$.  This is also true for Lagrange interpolation error estimates, 
+but not for the available error bounds \cite{Clement:75,Scott.Zhang:90} for 
+interpolation of non-smooth functions.  Here it is obtained without invoking 
+the imbedding $H^{\ell+1}\subset C^0$ and so also under weaker regularity 
+assumptions on the target function $u$. 
+
+Second, \eqref{equivalence} can be applied in constructive nonlinear 
+approximation.  When using the local best errors $e_{K}(u)$ as local error 
+functionals in the adaptive tree approximation of P.~ Binev and R.~DeVore 
+\cite{Binev.DeVore:04}, then equivalence \eqref{equivalence} ensures that the 
+approximations, which are constructed with linear complexity, are near best 
+with respect to the $H^1$-seminorm. 
+
+\section{Continuous piecewise polynomial functions and gradients}
+\label{S:Poly}
+In this section we define the approximants, fix associated notation, and review 
+their relationship with gradients.  We also provide a basis for them and, to 
+prepare interpolation, link the coefficients of that basis to the space of 
+target functions.
+
+\bigskip Let $\Omega$ be a non-empty open set of ${{\mathbb{R}}^d}$, $d\in{\mathbb{N}}$.  As usual, 
+${L^{{2}}}(\Omega)$ denotes the Hilbert space of real-valued functions on 
+$\Omega$ that are measurable and square-integrable with respect to the Lebesgue 
+measure of ${{\mathbb{R}}^d}$ and ${H^{{1}}}(\Omega)$ is the Hilbert space of all functions 
+that, together with their distributional gradients, are in ${L^{{2}}}(\Omega)$.
+
+Given $k\in{\mathbb{N}}$ with $k\leq d$, a set ${K}$ is a $k$-simplex in ${{\mathbb{R}}^d}$ if it 
+is the convex hull of $k+1$ points $a_0,\dots,a_k\in{{\mathbb{R}}^d}$ that do not lie
+on a plane of dimension $k-1$.  The set of extreme points of a convex set $C$ 
+is denoted by $\operatorname{Vert} C$.  For example, there holds 
+$\operatorname{Vert}{K} = \{a_0,\dots,a_k\}$ in the definition of $k$-simplex.  A 
+$m$-simplex ${F}$ with $m\in\{1,\dots,k\}$ is a $m$-face of ${K}$ if 
+$\operatorname{Vert}{F} \subset \operatorname{Vert}{K}$. By convention, a vertex is a 
+$0$-face.  As usual, $h_{K}$ denotes the diameter of ${K}$, while 
+$\rho_{K}$ stands for the diameter of the largest ball in ${K}$. The 
+boundary of any $d$-simplex ${K}$ in ${{\mathbb{R}}^d}$ can be represented locally by a 
+Lipschitz function.  Hence the trace operator 
+\begin{equation}
+\label{TraceOp}
+ (\cdot)_{|\partial{K}}:{H^{{1}}}({K})\to{L^{{2}}}(\partial{K})
+\end{equation}
+is well-defined.  Hereafter ${L^{{2}}}(\partial{K})$ stands for the
+Hilbert space of all real-valued functions on $\partial{K}$ that
+are measurable and square-integrable with respect to the
+$(d-1)$-dimensional Hausdorff measure.
+
+Assume that ${\mathcal{M}}$ is a conforming simplicial mesh of $\Omega$.  More
+precisely, ${\mathcal{M}}$ is a finite sequence of $d$-simplices in ${{\mathbb{R}}^d}$ such
+that
+\begin{gather}
+\label{A:conforming_mesh}
+ \overline\Omega = \bigcup_{{K}\in{\mathcal{M}}} {K}
+\qquad\text{and}\qquad
+ \forall {K},{K}'\in{\mathcal{M}}
+\quad
+ \operatorname{Vert} ({K}\cap{K}') \subset \operatorname{Vert}{K} \cap \operatorname{Vert}{K}'.
+\end{gather}
+In \S\ref{S:ConformityImpact} below we make an additional
+assumption on the mesh ${\mathcal{M}}$.  The second condition in
+\eqref{A:conforming_mesh} has two implications.  First, it ensures
+that ${\mathcal{M}}$ is a non-overlapping covering in that there holds
+\[
+ {\left|{\Omega}\right|}
+ =
+ \sum_{{K}\in{\mathcal{M}}} {\left|{K}\right|}
+\]
+for the Lebesgue measure ${\left|{\cdot}\right|}$ in ${{\mathbb{R}}^d}$.  Second, it entails
+that ${\mathcal{M}}$ is conforming or face-to-face, i.e.\ for any two
+`elements' ${K},{K}'\in{\mathcal{M}}$ the intersection ${K}\cap{K}'$ is a
+$k$-face of both $d$-simplices ${K}$ and ${K}'$ for some
+$k\in\{0,\dots,d\}$. 
+
+The existence of a conforming simplicial mesh implies that $\Omega$ is
+bounded and some regularity for its boundary $\partial\Omega$.  In
+particular, cusps are outruled but domains like the slit domain
+$\{x=(x_1,x_2)\in{\mathbb{R}}^2\mid \max\{|x_1|,|x_2|\}<1, x_2 \neq 0 \text{ or
+} x_1<0 \}$ are allowed.  For the latter example, the usual definition
+of the trace operator ${H^{{1}}}(\Omega)\to{L^{{2}}}(\partial\Omega)$ does
+not apply as the boundary is not locally a graph of a function.
+Nevertheless, exploiting \eqref{TraceOp}, we can define that a 
+function $v\in{H^{{1}}}(\Omega)$ equals a function $g\in{L^{2}}(\partial\Omega)$ on 
+the boundary by
+\[
+ v_{|\partial\Omega}=g
+\quad\text{:$\iff$}\quad
+ \forall{K}\in{\mathcal{M}}\ v_{|\partial\Omega\cap\partial{K}} = 
+   g_{|\partial\Omega\cap\partial{K}}.
+\]
+
+\medskip As mentioned in the introduction \S\ref{S:Intro}, the space
+\[
+ {S}^{{\ell},0}_0({\mathcal{M}})
+ {:=}
+ \{ V:\overline\Omega\to{\mathbb{R}} \mid
+   \forall{K}\in{\mathcal{M}}\ V_{|{K}}\in{\mathcal{P}_{{\ell}}({{K}})},\ 
+    V\in C^0(\overline\Omega),\ 
+   V_{|\partial\Omega}=0 \}
+\]
+with ${\ell}\in{\mathbb{N}}$ may be used when approximating functions in
+\begin{equation}
+\label{D:H10}
+ H^1_0(\Omega)
+ {:=}
+ \{v\in{L^{{2}}}(\Omega) \mid
+  {\nabla} v\in{L^{{2}}}(\Omega),\ 
+  v_{|\partial\Omega} = 0 \}.
+\end{equation}
+The first property in the definition of ${S}^{{\ell},0}_0({\mathcal{M}})$
+determines the basic nature of the approximants: their piecewise
+structure and that each one can be identified with a finite number of
+parameters.  The role of the other two properties, which constrain this basic 
+nature, is clarified by the following proposition in terms of the space
+\[
+ {S}^{{\ell},{-1}}({\mathcal{M}})
+ {:=}
+ \{ V:\overline\Omega\to{\mathbb{R}} \mid
+   \forall{K}\in{\mathcal{M}}\ V_{|{K}}\in{\mathcal{P}_{{\ell}}({{K}})} \}
+\]
+of all functions that are piecewise polynomial over ${\mathcal{M}}$ and the
+space
+\[
+ {S}^{{\ell},0}({\mathcal{M}})
+ {:=}
+ \{ V\in{S}^{{\ell},{-1}} \mid
+   V\in C^0(\overline\Omega) \}
+\]
+of all functions that are in addition continuous.
+
+\begin{prop}[Characterization of $H^1$- and $H^1_0$-conformity]
+\label{P:conforming}
+  A piecewise polynomial function $V\in{S}^{{\ell},{-1}}({\mathcal{M}})$ is
+  in ${H^{{1}}}(\Omega)$ if and only if it is continuous in
+  $\overline\Omega$.  Moreover, a continuous piecewise polynomial
+  function $V\in{S}^{{\ell},0}({\mathcal{M}})$ is in ${H^{{1}}}_0(\Omega)$
+  if and only if $V_{|\partial\Omega}=0$.
+\end{prop}
+
+\begin{proof}
+  The first equivalence is a consequence of
+  \cite[Chapter II, Theorem 5.1]{Braess:01}, while then the second one
+  immediately follows from definition \eqref{D:H10}.
+\end{proof}
+
+Hence the requirements $V\in C^0(\overline\Omega)$ and $V_{|\partial\Omega}=0$ 
+are sufficient and necessary for conformity of the approximants.  Clearly, the 
+first requirement $V\in C^0(\overline\Omega)$ is independent from the 
+considered boundary condition $v_{|\partial\Omega}$; see also Corollaries 
+\ref{C:Dirichlet} and \ref{C:Neumann} below. 
+
+\medskip Next, we recall the Lagrange basis of ${S}^{{\ell},0}({\mathcal{M}})$, 
+${\ell}\in{\mathbb{N}}$.  Using multi-index notation, the Lagrange nodes of order ${\ell}$ 
+of a $k$-simplex ${K}=\operatorname{Conv}\{a_0,\dots,a_k\}$ in ${{\mathbb{R}}^d}$ are given by
+\[
+ {L_{{\ell}}}({K})
+ {:=}
+ \left\{
+  \frac1{\ell} \sum_{i=1}^k \alpha_i a_i \mid
+   \alpha=(\alpha_0,\dots,\alpha_k)\in{\mathbb{N}}_0^{k+1}, \
+   {|{{\alpha}}|}={\ell}
+  \right\}.
+\]
+These nodes determine ${\mathcal{P}_{{\ell}}({{K}})}$ in that there holds
+\[
+ P_{|{L_{{\ell}}}({K})}=Q_{|{L_{{\ell}}}({K})}
+\implies
+ P=Q \text{ on }{K}
+\]
+for any $P,Q\in{\mathcal{P}_{{\ell}}({{K}})}$.  Moreover, they are compatible with the 
+dimensional structure of a $d$-simplex: if ${F}$ is a $k$-face of ${K}$, 
+then
+\begin{equation}
+\label{LagrangeCompatability}
+ {L_{{\ell}}}({K})\cap{F}={L_{{\ell}}}({F}).
+\end{equation}
+The Lagrange nodes of the space ${S}^{{\ell},0}({\mathcal{M}})$ are
+\[
+ {L_{{\ell}}}({\mathcal{M}})
+ {:=}
+ \bigcup_{{K}\in{\mathcal{M}}} {L_{{\ell}}}({K});
+\]
+notice that a node $z\in{L_{{\ell}}}({\mathcal{M}})$ may be shared by
+several elements $K\in{\mathcal{M}}$.
+
+Using the conformity of ${\mathcal{M}}$ and \eqref{LagrangeCompatability}, the Lagrange 
+basis $\{{\Phi}_z\}_{z\in{L_{{\ell}}}({\mathcal{M}})}$ of 
+${S}^{{\ell},0}({\mathcal{M}})$ is characterized by
+\begin{equation}
+\label{LgrBasis}
+ {\Phi}_z\in{S}^{{\ell},0}({\mathcal{M}})
+\quad\text{and}\quad
+ \forall y\in{L_{{\ell}}}({\mathcal{M}})\ 
+ {\Phi}_z(y) = \delta_{yz}
+\end{equation}
+and, for any $V\in{S}^{{\ell},0}({\mathcal{M}})$, provides the representation
+\begin{equation*}
+  V = \sum_{z\in{L_{{\ell}}}({\mathcal{M}})} V(z) {\Phi}_z
+\end{equation*}
+in terms of its nodal values $\{V(z)\}_{z\in{L_{{\ell}}}({\mathcal{M}})}$. Each 
+basis function ${\Phi}_z$ is locally supported.  More precisely, the support
+$\operatorname{supp}{\Phi}_z{:=}\overline{\{x\in\Omega\mid{\Phi}_z\neq0\}}$, which 
+corresponds to the domain of influence of the degree of freedom
+$V \mapsto V(z)$, verifies
+\[
+ \operatorname{supp}{\Phi}_z
+ =
+ \omega_z\
+ {:=}
+ \bigcup_{{K}\in{\mathcal{M}}:{K}\ni z} {K}.
+\]
+It is useful to determine the scaling behavior of norms of the Lagrange basis 
+functions.  To this end, we associate nodes of a given element ${K}\in{\mathcal{M}}$ 
+to the ones of the reference simplex ${{{K}_d}}=\operatorname{Conv}\{0,e_1,\dots,e_d\}$ in 
+${{\mathbb{R}}^d}$ in the following manner. Given $z\in{L_{{\ell}}}({K})$, write 
+$z=\sum_{i=0}^d\lambda_i a_i$ as a convex combination of the vertices of 
+${K}$, rearrange the coefficients in decreasing order such that
+$\lambda_0^*\geq\dots\geq\lambda_d^*$ and set
+\begin{equation}
+\label{RefNode}
+ \Hat{z}{:=}\sum_{i=1}^d \lambda_i^* e_i
+ \in
+ {L_{{\ell}}}({{{K}_d}}).
+\end{equation}
+Notice that, although the rearrangement may be not unique, $\Hat z$ is
+well-defined and does not depend on the enumeration of the vertices of ${K}$.  
+Fixed one node $z\in{L_{{\ell}}}({K})$, there exists a (not necessarily 
+unique) affine mapping $A:{{\mathbb{R}}^d}\to{{\mathbb{R}}^d}$ such that $A({{{K}_d}})={K}$ and $A(\Hat 
+z)=z$.  Hence the transformation rule and ${\left|{{{K}_d}}\right|}=1/d!$ leads to
+\begin{equation}
+\label{LebnormBFct2}
+ {{\left\|{{{\Phi}_z}}\right\|_{{0,2;{K}}}}}
+ =
+ \sqrt{d!}{\left|{K}\right|}^{\frac12} {{\left\|{{\Hat{\Phi}_{\Hat z}}}\right\|_{{0,2;{{{K}_d}}}}}}
+\end{equation}
+where ${\left|{K}\right|}$ is the $d$-dimensional Lebesgue measure of ${K}$ and 
+$\Hat{\Phi}_{\Hat z}\in{\mathcal{P}_{{\ell}}({{{{K}_d}}})}$ is the polynomial that is 1 
+at $\Hat{z}$ and vanishes at the other Lagrange nodes 
+of ${{{K}_d}}$.
+
+Furthermore, it is useful to extend the linear functionals
+\begin{equation}
+\label{PointEVal}
+ \delta_z : 
+ {S}^{{\ell},0}({\mathcal{M}}) \ni V
+ \mapsto
+ V(z) \in {\mathbb{R}}
+\end{equation}
+to functions in ${H^{{1}}}(\Omega)$.  To this end, we invoke the construction of 
+L.\ R.\ Scott and S.\ Zhang \cite{Scott.Zhang:90}, which exploits the trace 
+theorem \eqref{TraceOp}.  Denote the set of all $(d-1)$-faces of ${\mathcal{M}}$ by 
+${\mathcal{F}_{d-1}}({\mathcal{M}})$ and fix a $(d-1)$-dimensional face $F\in{\mathcal{F}_{d-1}}({\mathcal{M}})$.  Let 
+$\{{\Psi}^F_z\}_{z\in{L_{{\ell}}}({F})}$ be the ${L^{{2}}}({F})$-Riesz 
+representations in ${\mathcal{P}_{{\ell}}({{F}})}$ of the functionals 
+$\{\delta_z^{F}\}_{z\in{L_{{\ell}}}({F})}$ given by 
+$\delta_z^{F}(P)=P(z)$ for all $P\in{\mathcal{P}_{{\ell}}({{F}})}$.  Since the latter 
+functionals are the basis of ${\mathcal{P}_{{\ell}}({{F}})}'$ that is dual to 
+$\{{\Phi}_z{}_{|{F}}\}_{z\in{L_{{\ell}}}({F})}$, this amounts to 
+defining $\{{\Psi}_z^{F}\}_{z\in{L_{{\ell}}}({F})}$ by
+\begin{equation}
+\label{DBFct}
+ {\Psi}_z^{F}\in{\mathcal{P}_{{\ell}}({{F}})}
+\quad\text{and}\quad
+ \forall y\in{L_{{\ell}}}({F}) \ 
+  \int_F {\Phi}_y {\Psi}_z^{F} = \delta_{yz}.
+\end{equation}
+In order to state the counterpart of \eqref{LebnormBFct2}, use
+\eqref{RefNode} to associate a given node
+$z\in{L_{{\ell}}}({F})$ of some face ${F}\in{\mathcal{F}_{d-1}}({\mathcal{M}})$ to
+a node of the reference simplex ${K}_{d-1}$ in ${\mathbb{R}}^{d-1}$.  Upon
+identifying ${\mathbb{R}}^{d-1}$ with ${\mathbb{R}}^{d-1}\times\{0\}\subset{{\mathbb{R}}^d}$, this
+gives the same point as applying \eqref{RefNode} for some element
+${K}$ containing ${F}$.  Again the transformation rule leads to
+\begin{equation}
+\label{LebnormDBFct2} 
+ {{\left\|{{{\Psi}_z}}\right\|_{{0,2;{F}}}}}
+ =
+ \frac{1}{\sqrt{(d-1)!}}{\left|{F}\right|}^{-\frac12}
+ {{\left\|{{\Hat{\Psi}_{\Hat z}}}\right\|_{{0,2;{{K}_{d-1}}}}}},
+\end{equation}
+where ${\left|{F}\right|}$ is the $(d-1)$-dimensional Hausdorff measure of
+${F}$ and $\Hat{\Psi}_{\Hat z}$ the $L^2({K}_{d-1})$-dual basis
+function corresponding to $\Hat{\Phi}_{\Hat z}$.  Since
+${\Phi}_y{}_{|{F}}=0$ for each
+$y\in{L_{{\ell}}}({\mathcal{M}})\setminus{L_{{\ell}}}({F})$, the
+orthogonality condition in \eqref{DBFct} extends to
+\[
+ \forall y\in{L_{{\ell}}}({\mathcal{M}})
+\quad 
+ \int_F {\Phi}_y {\Psi}_z^{F} = \delta_{yz}.
+\]
+Given $z\in{L_{{\ell}}}({F})$, this yields
+\[
+ \forall V\in{S}^{{\ell},0}({\mathcal{M}})
+\quad 
+ V(z) = {N}_{z;{F}}(V)
+\]
+where ${N}_{z;{F}}$ is defined on ${H^{{1}}}(\Omega)$ by
+\begin{equation}
+\label{ScottZhangFct}
+ {N}_{z;{F}}(v)
+ {:=}
+ \int_F v {\Psi}_z^{F}.
+\end{equation}
+Thus, given a node $z\in{L_{{\ell}}}({\mathcal{M}})$ of
+${S}^{{\ell},0}({\mathcal{M}})$, any ${N}_{z;{F}}$ with ${F} \ni
+z$ extends the linear functional \eqref{PointEVal} to
+${H^{{1}}}(\Omega)$. Finally, we note that if $z\in\partial\Omega$,
+then the implication
+\[
+ v\in{H^{{1}}}_0(\Omega)
+ \implies
+ N_{z;F}(v) = 0
+\]
+is ensured whenever there hold $F\ni z$ and $F\subset\partial\Omega$ is a 
+boundary face.
+
+\section{Conformity and approximation error}
+\label{S:ConformityImpact}
+Proposition \ref{P:conforming} determines conditions that characterize when 
+piecewise polynomial functions are conforming.  The main goal of this section is 
+to analyse the impact of these conditions on the error when approximating the 
+gradient of a function.
+
+\subsection{Global and local best errors}
+\label{S:best-errors}
+We first provide a notion that measures the possible downgrading resulting from
+conformity.  In order to take into account boundary conditions, we consider the 
+following setting for the space $X$ of target functions and the approximants 
+${S}({\mathcal{M}})$ over a mesh ${\mathcal{M}}$.  Assume that $X$ and ${S}({\mathcal{M}})$ 
+are, respectively, closed affine subspaces of ${H^{1}}(\Omega)$ and 
+${S}^{{\ell},0}({\mathcal{M}})$ with ${\ell}\geq1$ and that the ${H^{1}}$-seminorm
+\begin{equation}
+\label{H1seminorm}
+ {\left|{w}\right|_{{\Omega}}}
+ {:=}
+ {{\left\|{{|{\nabla} w|}}\right\|_{{0,2;\Omega}}}}
+ =
+ \left( \int_\Omega |{\nabla} w|^2 \right)^{\frac12}.
+\end{equation}
+is definite on $X-{S}({\mathcal{M}})$.   The setting $X={H^{1}}_0(\Omega)$ and
+${S}({\mathcal{M}})={S}^{{\ell},0}_0({\mathcal{M}})$ in the introduction 
+\S\ref{S:Intro} is an example.
+
+The best (possible) error of approximating $v\in X$ is then given by
+\[
+ E(v,{\mathcal{M}})
+ {:=}
+ E\big( v,{S}({\mathcal{M}}) \big)
+ {:=}
+ \inf_{V\in{S}({\mathcal{M}})} {\left|{v-V}\right|_{{\Omega}}}
+\]
+and $E(v,{\mathcal{M}})=0$ implies $v\in{S}({\mathcal{M}})$. Thanks to, e.g., the
+Projection Theorem in Hilbert spaces, there exists a unique best
+approximation $V_{\mathcal{M}}$ such that
+\[
+ {\left|{v-V_{\mathcal{M}}}\right|_{{\Omega}}}
+ =
+ E(v,{\mathcal{M}}).
+\]
+If $S({\mathcal{M}})$ is a linear space, this is  equivalent to
+\[
+ \forall W\in{S}({\mathcal{M}})
+\quad
+ \int_\Omega {\nabla} V_{\mathcal{M}} \cdot {\nabla} W
+ =
+  \int_\Omega {\nabla} v \cdot {\nabla} W.
+\]
+and $V_{\mathcal{M}}$ is called the Ritz projection of $v$ onto ${S}({\mathcal{M}})$.
+
+Similarly, on each single element ${K}\in{\mathcal{M}}$, the best error is
+given by
+\[
+ e(v,{K})
+ {:=}
+ e\big( v,{\mathcal{P}_{{\ell}}({{K}})} \big)
+ {:=}
+ \inf_{P\in{\mathcal{P}_{{\ell}}({{K}})}} {\left|{v-P}\right|_{K}},
+\]
+which depends only on the local gradient $({\nabla} v)_{|{K}}$ of the
+target function and the shape functions associated with ${K}$.
+Applying the Projection Theorem in the Hilbert space
+${H^{{1}}}({K})/{\mathbb{R}}$, we see that here best approximations also exist
+but are only unique up to a constant.  Let $P_{K}$ be the best
+approximation that has the same mean value on ${K}$ as the target
+function $v$.  In other words, $P_{K}$ is characterized by
+\begin{equation}
+\label{Pelm}
+ P_{K}\in{\mathcal{P}_{{\ell}}({{K}})},
+\quad
+ \int_{K} P_{K} = \int_{K} v
+\quad\text{and}\quad
+ {\left|{v-P_{K}}\right|_{K}}=e(v,{K}),
+\end{equation}
+the latter being equivalent to
+\begin{equation}
+\label{Pelm:ort}
+ \forall Q\in{\mathcal{P}_{{\ell}}({{K}})}
+\quad
+ \int_{K} {\nabla} P_{K} \cdot {\nabla} Q
+ =
+ \int_{K} {\nabla} v \cdot {\nabla} Q.
+\end{equation}
+
+Since the local best errors cannot be overtaken by any global approximation, 
+one may expect that an appropriate `sum' of them provides a lower bound for 
+corresponding global best errors.  In fact, if ${S}'$ is any subspace of 
+${S}^{{\ell},-1}({\mathcal{M}})$, one readily verifies
+\begin{align}
+\label{local<=global}
+ \left[
+  \sum_{{K}\in{\mathcal{M}}} e(v,{K})^2
+ \right]^{\frac12}
+ \leq
+  E(v,{S}'),
+\end{align}
+interpreting the right-hand side in a broken manner if necessary. Notice that 
+there holds equality for ${S}'={S}^{{\ell},-1}({\mathcal{M}})$, while for 
+${S}'={S}({\mathcal{M}})\subset{S}^{{\ell},0}({\mathcal{M}})$ the question arises 
+if the requirement of continuity entails some downgrading of the approximation 
+quality: the local approximants $P_{K}$, ${K}\in{\mathcal{M}}$, on the left-hand side 
+are decoupled, while their counterparts $V_{\mathcal{M}}{}_{|{K}}$, ${K}\in{\mathcal{M}}$, on 
+the right-hand side are coupled and so constrained.
+
+In order to measure the possible downgrading, consider the inequality opposite 
+to \eqref{local<=global} and denote by ${\delta}({\mathcal{M}})$ the smallest constant 
+$C$ such that
+\begin{equation}
+\label{global<=Clocal}
+ \forall v\in X
+\quad
+ E\big( v,{S}({\mathcal{M}}) \big)
+ \leq
+ C  \left[
+  \sum_{{K}\in{\mathcal{M}}} e(v,{K})^2
+ \right]^{\frac12}
+\end{equation}
+is valid; if there is no such constant $C$, set ${\delta}({\mathcal{M}}) = \infty$.  We 
+refer to ${\delta}({\mathcal{M}})$ as the decoupling coefficient of ${S}({\mathcal{M}})$.  
+If the decoupling coefficient is big, or even $\infty$, requiring continuity
+entails that the local approximation potential is not well exploited, at least
+for some target functions.  If it is moderate, or even 1, dispensing with 
+continuity does not improve the approximation quality in a substantial manner.
+
+It is instructive to consider, for a moment, \eqref{global<=Clocal} with
+$X={L^{2}}(\Omega)$ and to replace the ${H^{1}}$-seminorm by the ${L^{{2}}}$-norm.
+Then a function from
+${S}^{{\ell},-1}({\mathcal{M}})\setminus{S}^{{\ell},0}({\mathcal{M}})$ is an
+admissible target function and we immediately obtain that there holds
+${\delta}({\mathcal{M}})=\infty$ in this case.
+
+The following lemma introduces the key property of the ${H^{1}}$-seminorm
+that ensures a finite decoupling coefficient.
+\begin{lem}[Trace and error norm]
+\label{L:TraceAndError}
+Let ${F}$ be a $(d-1)$-face of a $d$-simplex ${K}$.  For any
+$w\in{H^{1}}({K})$ with $\int_{K} w = 0$, there holds
+\[
+ {{\left\|{{w}}\right\|_{{0,2;{F}}}}}
+ \leq
+ {{C_\text{Tr}}} \left(
+   \frac{h_{K} {\left|{F}\right|}}{{\left|{K}\right|}}
+  \right)^{\frac12}
+  h_{K}^{\frac12} {{\left\|{{{\nabla} w}}\right\|_{{0,2;{K}}}}},
+\]
+where ${{C_\text{Tr}}}{:=}\sqrt{C_P(C_P+2/d)}$ and $C_P$ is the optimal Poincar\'e 
+constant for $d$-simplices.  The quotient between the parathensis is bounded in 
+terms of the shape coefficient $h_{K}/\rho_{K}$ of ${K}$.
+\end{lem}
+
+The classical result of L.\ E.\ Payne and H.\ F.\ Weinberger
+\cite{Payne.Weinberger:60}, see also M.\ Bebendorf \cite{Bebendorf:03}, 
+ensures $C_P\leq1/\pi$.  In the case $d=2$, R.\ S.\ Laugesen and B.\ A.\ 
+Siudeja \cite{Laugesen.Siudeja:10} show $C_P=1/{j_{1,1}}$ where 
+$j_{1,1}\approx 3.8317$ denotes the first positive root of the Bessel function 
+$J_1$. 
+
+\begin{proof}
+Corollary 4.5 and Remark 4.6 of \cite{Veeser.Verfuerth:09} imply the
+trace inequality
+\begin{equation*}
+ \frac1{{\left|{F}\right|}} {{\left\|{{w}}\right\|_{{0,2;{F}}}}}^2
+ \leq
+ \frac1{{\left|{K}\right|}} {{\left\|{{w}}\right\|_{{0,2;{K}}}}}^2
+ +
+ \frac{2h_{K}}{d{\left|{K}\right|}} {{\left\|{{w}}\right\|_{{0,2;{K}}}}}
+  {{\left\|{{{\nabla} w}}\right\|_{{0,2;{K}}}}}.
+\end{equation*}
+We thus obtain the claimed inequality for $w$ by inserting the Poincar\'e 
+inequality
+\begin{equation*}
+ {{\left\|{{w}}\right\|_{{0,2;{K}}}}}
+ \leq
+ C_P h_{K} {{\left\|{{{\nabla} w}}\right\|_{{0,2;{K}}}}},
+\end{equation*}
+which applies thanks to $\int_{K} w = 0$.
+
+In order to bound the quotient between the parathensis, observe that 
+Cavallieri's principle yields ${\left|{K}\right|} = (h^\perp_{F}{\left|{F}\right|})/d$, 
+where $h^\perp_{F}$ denotes the height of ${K}$ over ${F}$.  Hence we 
+obtain
+\[
+ \frac{h_{K} {\left|{F}\right|}}{{\left|{K}\right|}}
+ =
+ d\frac{h_{K}}{h^\perp_F}
+ \leq
+ d\frac{h_{K}}{\rho_{K}}
+\]
+with the help of the inequality $\rho_{K} \leq h^\perp_{F}$.
+\end{proof}
+The significance of Lemma \ref{L:TraceAndError} lies in the following 
+observations.
+If the intersection ${F}$ of two elements $K_1,K_2\in{\mathcal{M}}$ is a common 
+$(d-1)$-face, then the condition $V\in C^0(\overline\Omega)$ requires that the 
+traces $V_{|\partial{K}_1}$ and $V_{|\partial{K}_2}$ coincide on ${F}$.  
+The local best approximation $P_{{K}_1}$ and $P_{{K}_2}$ are close to this 
+property in that, thanks to Lemma \ref{L:TraceAndError}, their properly 
+measured difference is bounded in terms of the local best errors:
+\begin{align*}
+ h_{F}^{-\frac12} {{\left\|{{P_{{K}_1}-P_{{K}_2}}}\right\|_{{0,2;{F}}}}}
+ &\leq
+ h_{F}^{-\frac12} {{\left\|{{P_{{K}_1}-v}}\right\|_{{0,2;{F}}}}}
+  + 
+  h_{F}^{-\frac12} {{\left\|{{v-P_{{K}_2}}}\right\|_{{0,2;{F}}}}}
+\\
+ &\leq
+ C \big[ e(v,{K}_1) + e(v,{K}_2) \big],
+\end{align*} 
+where $h_{F}{:=}\operatorname{diam}{F}$ and $C$ depends on $d$ and on the shape 
+coefficients of ${K}_1$ and ${K}_2$.  Consequently, the trace $V_{|{F}}$ 
+can be defined by $P_{K_1}$, $P_{K_2}$ or a mixture of both without 
+substantially downgrading the approximation potential of the shape functions of 
+the two elements ${K}_1$ and ${K}_2$.  The same remark applies to near best 
+approximations in place of $P_{K_1}$ and $P_{K_2}$.
+
+Similary, Lemma \ref{L:TraceAndError} implies that, thanks to 
+$v_{|\partial\Omega}=0$, properly measured traces on $\partial\Omega$ of local 
+best approximations are bounded again in terms of local best errors or, in 
+other words, almost vanish.  Consequently, enforcing vanishing boundary values 
+will not downgrade the approximation quality.
+
+\subsection{Interpolation}
+In order to show that the decoupling coefficient ${\delta}({\mathcal{M}})$ is finite, 
+we define
+\[
+ {\Pi}:{H^{{1}}}(\Omega)\to{S}^{{\ell},0}({\mathcal{M}})
+\]
+such that
+\begin{equation}
+\label{Ip;BdryVals}
+ v\in X
+ \implies
+ {\Pi} v\in{S}({\mathcal{M}})
+\end{equation}
+and
+\begin{equation}
+\label{GDcplng}
+ {\left|{v-{\Pi} v}\right|_{{\Omega}}}
+ \leq
+ C \left[
+  \sum_{{K}\in{\mathcal{M}}} e(v,{K})^2
+ \right]^{\frac12}
+\end{equation}
+for some constant $C$, independent of $v$.  Notice that the latter
+property requires that ${\Pi}$ is a projection whenever ${S}({\mathcal{M}})
+\subset X$ and stable with respect to \eqref{H1seminorm}.
+
+\begin{subequations}
+\label{DefIp}
+\medskip Using the Lagrange basis \eqref{LgrBasis} of
+${S}^{{\ell},0}({\mathcal{M}})$, we can write
+\[
+ \Pi v
+ =
+ \sum_{z\in{L_{{\ell}}}({\mathcal{M}})} {\Pi}_z v \, {\Phi}_z
+\]
+and defining ${\Pi}$ amounts to choosing suitable linear functionals
+${\Pi}_z\in{H^{{-1}}}(\Omega)$, $z\in{L_{{\ell}}}({\mathcal{M}})$, for the nodal
+values.  For this purpose, it is convenient to introduce the following notion.
+A node $z\in{L_{{\ell}}}({\mathcal{M}})$ is called unconstrained in
+${S}({\mathcal{M}})$ if and only if $\operatorname{supp}{\Phi}_z$ is contained in one element
+of ${\mathcal{M}}$ and there holds $\operatorname{span} {\Phi}_z\subset{S}({\mathcal{M}})$.  Extending
+functions on elements by zero, this is equivalent to requiring that there
+holds $\operatorname{span} {\Phi}_z{}_{|{K}}\subset{S}({\mathcal{M}})$ for any element
+${K}\in{\mathcal{M}}$.  Unotherwise $z$ is called constrained and we write
+$z\in{\mathcal{C}}$.
+
+Fix an arbitrary node $z\in{L_{{\ell}}}({\mathcal{M}})$. If $z\not\in{\mathcal{C}}$, then
+${\Pi}_zv$ affects only the local error ${\left|{v - {\Pi} v}\right|_{K}}$ on that
+element.  In this case, set
+\begin{equation}
+\label{DefIp:unconstrained}
+ {\Pi}_z v {:=} P_{K}(z),
+\end{equation}
+where $P_{K}$ is given by \eqref{Pelm}.
+
+Whereas, if $z\in{\mathcal{C}}$, then ${\Pi}_zv$ has to deviate from 
+\eqref{DefIp:unconstrained} for at least one other element or has to assume a
+prescribed value.  In order to meet both issues,  we employ the Scott-Zhang 
+functionals \eqref{ScottZhangFct}.  To this end, fix some face 
+${F}_z\in{\mathcal{F}_{d-1}}({\mathcal{M}})$ containing $z$; this choice may be subject to
+further conditions for certain examples of ${S}({\mathcal{M}})$.  We then set
+\begin{equation}
+\label{DefIp:constrained}
+ {\Pi}_z v
+ {:=}
+ {N}_{z;F_z}(v).
+\end{equation}
+
+We illustrate this definition in the setting of the introduction \S\ref{S:Intro}
+where $X={H^{1}}_0(\Omega)$ and ${S}({\mathcal{M}})={S}^{{\ell},0}_0({\mathcal{M}})$.
+Here there holds
+\[
+ {\mathcal{C}} = {L_{{\ell}}}({\mathcal{M}}) \cap {\Sigma}
+\quad\text{with}\quad
+ {\Sigma}
+ {:=}
+ \bigcup_{{F}\in{\mathcal{F}_{d-1}}({\mathcal{M}})} {F}
+\]
+and, if $z\in{\mathcal{C}}$, we addditionally require that 
+${F}_z\subset\partial\Omega$ whenever $z\in\partial\Omega$ lies on the
+boundary.  This readily ensures \eqref{Ip;BdryVals}.  In Remark \ref{R:Ip}
+below we further discuss the constuction of ${\Pi}$, comparing it with existing
+interpolation operators and indicating alternatives.  In particular, we shall
+see that, irrespective of the choice of ${F}_z$, the definition
+\eqref{DefIp:unconstrained} is `near to the best \eqref{DefIp:constrained}' in
+a suitable sense.
+\end{subequations}
+
+Notice that, on one hand, the face in \eqref{DefIp:constrained} is
+linked to an arbitrary element of $\operatorname{supp}{\Phi}_z$ only through the
+node $z$ and, on the other hand, traces of ${H^{1}}$-functions are
+well-defined only on at least $(d-1)$-dimensional faces.  The
+following property of the mesh therefore appears to be essential for
+local near best approximation properties of ${\Pi}$.  A star
+\[
+ \omega_z = \bigcup\{{K}\in{\mathcal{M}} : {K}\ni z\},
+\qquad
+ z\in{L_{{\ell}}}({\mathcal{M}}),
+\]
+is called $(d-1)$-face-connected if for any element ${K}$ and $(d-1)$-face
+${F}$ containing $z$ there exists a sequence $({K}_i)_{i=1}^n$ such
+that
+\begin{itemize}
+\item any ${K}_i$, $i=0,\dots,n$, is an element of the star,
+\item any intersection ${K}_i\cap{K}_{i+1}$,
+  $i=0,\dots,n-1$, is a $(d-1)$-face of the star,
+\item ${K}_0$ contains ${F}_z$ and ${K}_n={K}$.
+\end{itemize}
+This property holds for stars of interior nodes $z\in\Omega$.  The case of a 
+boundary node $z\in\partial\Omega$ is more subtle.  It holds whenever the 
+boundary is a Lipschitz graph in a sufficiently big neighborhood of $z$.  
+Noteworthy, the latter property is not necessary; see, e.g., the slit domain 
+and Figure \ref{F:edge-connectedness} (left).  Roughly speaking, it will be 
+verified also in similar cases where the boundary can be accessed from both 
+sides if that part is at least $(d-1)$-dimensional, otherwise it will not hold. 
+Figure \ref{F:edge-connectedness} (right) illustrates such a counterexample 
+for $d=2$.  
+\begin{figure}[h]
+ \centering
+ \includegraphics[bb=176 37 650 505,
+                  width=0.4\hsize,
+                  height=20ex]{Connected.eps}
+\qquad\qquad
+ \includegraphics[bb=176 37 650 505,
+                  width=0.4\hsize,
+                  height=20ex]{NotConnected.eps}
+ \caption{Edge-connectedness: two-dimensional stars (grey areas) at the 
+boundary (thick lines), the left one is edge-connected, the right one is not.}
+ \label{F:edge-connectedness}
+\end{figure}
+It is worth noting that, if a star is not $(d-1)$-face-connected, the $H^1$-norm 
+is not strong enough to couple both sides across their common part of the 
+boundary, suggesting that also corresponding elements should not be coupled in 
+the finite element space.
+
+\subsection{Local decoupling}
+\label{S:ldecoupling}
+
+The definition of $\Pi$ and the identity
+\[
+ {\left|{w}\right|_{{\Omega}}}^2
+ =
+ \sum_{{K}\in{\mathcal{M}}}{\left|{w}\right|_{K}}^2,
+\]
+suggest to show \eqref{GDcplng} by establishing local counterparts, involving
+the patches
+\[
+ \omega_{K}
+ {:=}
+ \bigcup \{{K}'\in{\mathcal{M}}:{K}'\cap{K}\neq\emptyset\}
+\]
+in ${\mathcal{M}}$.
+\begin{thm}[Local decoupling]
+\label{T:LDcplng}
+Assume that the stars $\omega_z$, $z\in{L_{{\ell}}}({K})$, associated with 
+a given element ${K}\in{\mathcal{M}}$ are $(d-1)$-face-connected.  Then there exists a 
+constant ${\delta}_{K}$ such that, for all $v\in{H^{1}}(\omega_{K})$,
+\begin{equation}
+\label{LDcplng}
+ {\left|{v - {\Pi} v}\right|_{K}}^2
+ \leq
+ e(v,{K})^2 
+ +
+ {\delta}_{K}^2
+ \sum_{z\in{L_{{\ell}}}({K})} \sum_{{K}'\ni z} e(v,{K}')^2,
+\end{equation}
+where the second sum is over all ${K}'\in{\mathcal{M}}$ containing $z$.  The constant 
+${\delta}_{K}$ depends on $d$, $\ell$, and the elements in $\omega_{K}$.
+\end{thm}
+\begin{proof}
+We start by recalling the definition \eqref{Pelm} of the best approximation 
+$P_{K}$ and exploit the orthogonality \eqref{Pelm:ort} to write
+\[
+ {\left|{v - {\Pi} v}\right|_{K}}^2
+ =
+ e(v,{K})^2 
+ +
+ {\left|{P_{K} - {\Pi} v}\right|_{K}}^2,
+\]
+where the second square on the right hand side measures the deviation of ${\Pi} 
+v$ of being locally optimal.  Thanks to \eqref{DefIp:unconstrained}, there holds
+\[
+ (P_{K} - {\Pi} v)_{|{K}}
+ =
+ \sum_{z\in{L_{{\ell}}}({K})}
+  \big[ P_{K}(z) - {\Pi}_z v \big] {\Phi}_z{}_{|{K}}
+ =
+ \sum_{z\in{L_{{\ell}}}({K})\cap{\mathcal{C}}}
+  \big[ P_{K}(z) - {N}_{z,{F}_z}(v) \big] {\Phi}_z{}_{|{K}},
+\]
+which reveals that this deviation is entirely related to the requirements for 
+conformity.  To bound it, we first apply the triangle inequality to obtain
+\begin{equation}
+\label{CplngErr}
+ {\left|{P_{K} - {\Pi} v}\right|_{K}}
+ \leq
+  \sum_{z\in{L_{{\ell}}}({K})\cap{\mathcal{C}}}
+  \big| P_{K}(z) - {N}_{z,{F}_z}(v) \big|
+   {{\left\|{{{\nabla}{\Phi}_z}}\right\|_{{0,2;{K}}}}}.
+\end{equation}
+We proceed by bounding each term of the sum separately.  To this end,
+fix any $z\in{L_{{\ell}}}({K})\cap{\mathcal{C}}$ and, using that
+$\omega_z$ is $(d-1)$-face-connected, choose a corresponding sequence
+$({K}_i)_{i=0}^n$ of elements connecting ${F}_z$ with ${K}$.  Set
+${F}_0{:=}{F}_z$ and ${F}_i{:=}{K}_{i-1}\cap{K}_i$ for
+$i=1,\dots,n$.  For the sake of readibility, we sometimes replace
+${K}_i$ and ${F}_i$ by $i$.  Recalling the definition \eqref{DBFct}
+of the local dual basis, we note
+\[
+ P_{K}(z)-{N}_{z,{F}_z}(v)
+ =
+ {N}_{z,n}(P_n)-{N}_{z,0}(v)
+\]
+and
+\[
+ \forall i=0,\dots,n-1
+\quad
+ {N}_{z,i}(P_i)
+ =
+ P_i(z)
+ =
+ {N}_{z,i+1}(P_i),
+\]
+which, by telescopic expansion, leads to
+\begin{equation}
+\label{Telescopic}
+ P_{K}(z)-{N}_{z,{F}_z}(v)
+ =
+ {N}_{z,0}(P_0-v)
+ +
+ \sum_{i=1}^n {N}_{z,i}(P_i-P_{i-1}).
+\end{equation}
+Since ${F}_0\subset{K}_0$ and $\int_{{K}_0} (v-P_0) = 0$, one can
+combine \eqref{LebnormDBFct2} and Lemma \ref{L:TraceAndError} to
+derive
+\begin{align*}
+ |{N}_{z,0}(v-P_0)|
+ &=
+ \left|
+  \int_{{F}_0} (v-P_0) {\Psi}^i_z
+ \right|
+ \leq
+ {{\left\|{{v-P_0}}\right\|_{{0,2;{{F}_0}}}}} {{\left\|{{{\Psi}^0_z}}\right\|_{{0,2;{{F}_0}}}}}
+\\
+ &\leq
+ \frac{{C_\text{Tr}}}{\sqrt{(d-1)!}}
+ {{\left\|{{\Hat{\Psi}_{\Hat z}}}\right\|_{{0,2;{{K}_{d-1}}}}}}
+ \frac{h_{0}}{{\left|{{K}_0}\right|}^{\frac12}}
+  e(v,{K}_0),
+\end{align*}
+where ${\left|{{F}_0}\right|}$ cancels out.  Similarly, for $i=1,\dots,n$, one
+obtains
+\begin{equation*}\begin{aligned}
+ {N}_{z,i}(P_i &- P_{i-1})
+ \leq
+ |{N}_{z,i}(P_i - v)| + |{N}_{z,i}(v - P_{i-1})|
+\\
+ &\leq
+ \frac{{C_\text{Tr}}}{\sqrt{(d-1)!}}
+ {{\left\|{{\Hat{\Psi}_{\Hat z}}}\right\|_{{0,2;{{K}_{d-1}}}}}}
+ \left[
+  \frac{h_{i}}{{\left|{{K}_i}\right|}^{\frac12}} e(v,{K}_i)
+  +
+  \frac{h_{i-1}}{{\left|{{K}_{i-1}}\right|}^{\frac12}} e(v,{K}_{i-1})
+ \right].
+\end{aligned}\end{equation*}
+Using these bounds in the telescopic expansion \eqref{Telescopic} gives
+\[
+ |P_{K}(z)-{N}_{z,{F}_z}(v)|
+ \leq
+ \frac{2{{C_\text{Tr}}}}{\sqrt{(d-1)!}}
+ {{\left\|{{\Hat{\Psi}_{\Hat z}}}\right\|_{{0,2;{{K}_{d-1}}}}}}
+ \sum_{i=0}^n 
+  \frac{h_{i}}{{\left|{{K}_i}\right|}^{\frac12}} e(v,{K}_i).
+\]
+In order to get independent of the specific choice of ${F}_z$, we
+observe that the sequence $({K}_i)_{i=0}^n$ does not allow a double
+occurence of some element and that each element is a subset of
+$\omega_z=\operatorname{supp}{\Phi}_z$.  We therefore replace the preceding
+inequality by
+\begin{equation}\label{nbnval}
+ |P_{K}(z)-{N}_{z,{F}_z}(v)|
+ \leq
+ \frac{2{{C_\text{Tr}}}}{\sqrt{(d-1)!}}
+ {{\left\|{{\Hat{\Psi}_{\Hat z}}}\right\|_{{0,2;{{K}_{d-1}}}}}}
+  \sum_{{K}'\subset\omega_z}
+   \frac{h_{{K}'}}{{\left|{{K}'}\right|}^{\frac12}}
+   e(v,{K}'),
+\end{equation}
+where the sum is over all elements ${K}'\in{\mathcal{M}}$ with
+${K}'\subset\omega_z$.  Inserting this inequality and
+\eqref{LebnormBFct2} into \eqref{CplngErr}, one arrives at
+\begin{equation*}
+ {\left|{P_{K} - {\Pi} v}\right|_{K}}
+ \leq
+ 2 \sqrt{d} {{C_\text{Tr}}}
+ \sum_{z\in{L_{{\ell}}}({K})\cap{\mathcal{C}}}
+ \sum_{{K}'\subset\omega_z}
+  d_{\Hat z}
+   \frac{h_{{K}'} {{\left\|{{{\nabla}{\Phi}_z}}\right\|_{{0,2;{K}}}}} {\left|{K}\right|}^{\frac12}}
+   {{{\left\|{{{\Phi}_z}}\right\|_{{0,2;{K}}}}} {\left|{{K}'}\right|}^{\frac12}}
+   e(v,{K}')
+\end{equation*}
+with
+\[
+ d_{\Hat z}
+ {:=}
+ {{\left\|{{\Hat{\Psi}_{\Hat z}}}\right\|_{{0,2;{{K}_{d-1}}}}}}
+ {{\left\|{{\Hat{\Phi}_{\Hat z}}}\right\|_{{0,2;{{{K}_d}}}}}}.
+\]
+Applying a Cauchy-Schwarz inequality, one obtains a sum of the squares
+of the local best errors and the claimed inequality with
+\begin{equation}
+\label{locDcplngConst}
+ {\delta}_{K}^2
+ =
+ 4 d {{C_\text{Tr}}}
+ \sum_{z\in{L_{{\ell}}}({K})\cap{\mathcal{C}}}
+  d_{\Hat z}^2 \mu_z
+  \frac{h_{K}^2 {{\left\|{{{\nabla}{\Phi}_z}}\right\|_{{0,{K};2}}}}^2}
+   {{{\left\|{{{\Phi}_z}}\right\|_{{0,{K};2}}}}^2}
+\end{equation}
+and
+\[
+ \mu_z
+ {:=}
+ \frac{{\left|{K}\right|}}{h_{K}^2}
+ \sum_{{K}'\subset\omega_z}
+  \frac{h_{{K}'}^2}{{\left|{{K}'}\right|}}.
+\] 
+\end{proof}
+
+Some remarks on the local decoupling constant ${\delta}_{K}$ in
+\eqref{locDcplngConst} are in order.  Only $\mu_z$ and
+$h_{K} {{\left\|{{{\nabla}{\Phi}_z}}\right\|_{{0,{K};2}}}} /
+{{\left\|{{{\Phi}_z}}\right\|_{{0,{K};2}}}}$ depend on geometrical properties of the
+elements in the patch $\omega_{K}$.  Both terms, independently, do
+not change under rescalings of $\omega_{K}$.  While
+$h_{K} {{\left\|{{{\nabla}{\Phi}_z}}\right\|_{{0,{K};2}}}} /
+{{\left\|{{{\Phi}_z}}\right\|_{{0,{K};2}}}}$ corresponds to an inverse
+estimate, $\mu_z$ multiplies the number of elements in the star around
+$z$ with the mean value of the quotient
+\[
+ \frac{h_{{K}'}^2{\left|{K}\right|}}{h_{K}^2{\left|{{K}'}\right|}}.
+\]
+To conclude this subsection, let us consider the case where the patch
+$\omega_{K}$ consists of elements whose shape coefficients are
+uniformly bounded by $\sigma_{K}$:
+\begin{equation}
+\label{LocShapeReg}
+ \forall {K}'\subset\omega_{K}
+\quad
+ \frac{h_{{K}'}}{\rho_{{K}'}}
+ \leq
+ \sigma_{K}.
+\end{equation}
+Then a standard scaling argument, see e.g.\ \cite[(4.5.3)]{Brenner.Scott:08} 
+shows that
+\[
+ \frac{h_{K} {{\left\|{{{\nabla}{\Phi}_z}}\right\|_{{0,{K};2}}}}}
+  {{{\left\|{{{\Phi}_z}}\right\|_{{0,{K};2}}}}}
+ \leq
+ \sigma_{K}
+ \frac{{{\left\|{{{\nabla}\Hat{\Phi}_{\Hat z}}}\right\|_{{0,{{{K}_d}};2}}}}}
+  {{{\left\|{{\Hat{\Phi}_{\Hat z}}}\right\|_{{0,{{{K}_d}};2}}}}}.
+\]
+Moreover, since the (solid) angles of the elements in $\omega_{K}$ are bounded 
+away from 0 in terms of $\sigma_{K}$, the number of elements in each star of 
+$\omega_K$ is bounded in terms of $\sigma_{K}$. Comparing elements having 
+common faces, we thus obtain that the diameters and the volumes of the elements
+in a star of $\omega_{K}$ are comparable up to $\sigma_{K}$.  Consequently, 
+there holds $\mu_z\leq C(\sigma_{K})$ for each $z\in{L_{{\ell}}}({K})$ 
+and the following lemma.
+
+\begin{lem}[${\delta}_{K}$ and shape regularity]
+Under the assumption \eqref{LocShapeReg} there holds
+\[
+ {\delta}_{K}^2
+ \leq
+ 4 d {{C_\text{Tr}}}
+ C(\sigma_{K})
+ \sum_{z\in{L_{{\ell}}}({K})\cap{\mathcal{C}}}
+  {{\left\|{{\Hat{\Psi}_{\Hat z}}}\right\|_{{0,{{K}_{d-1}};2}}}}^2
+  {{\left\|{{{\nabla}\Hat{\Phi}_{\Hat z}}}\right\|_{{0,{{{K}_d}};2}}}}^2.
+\]
+\end{lem}
+
+\subsection{Global decoupling and boundary conditions}
+Summing up the inequalities of Theorem \ref{T:LDcplng}, we obtain our main 
+result.
+
+\begin{thm}[Decoupling of elements]
+\label{T:elm-dec}
+Assume that all stars of the mesh ${\mathcal{M}}$ are $(d-1)$-face-connected.  Then 
+there exists a constant $C$ such that
+\begin{equation*}
+ {\left|{v-{\Pi} v}\right|_{{\Omega}}}
+ \leq
+ C \left[
+  \sum_{{K}\in{\mathcal{M}}} e(v,{K})^2
+ \right]^{\frac12}
+\end{equation*}
+for all $v\in{H^{1}}(\Omega)$.  The constant $C$ depends on the dimension $d$, 
+the polynomial degree ${\ell}$ and the shape coefficient $\sigma_{\mathcal{M}} {:=} 
+\max_{{K}\in{\mathcal{M}}}  h_{K}/\rho_{K}$ of ${\mathcal{M}}$.
+\end{thm}
+
+\begin{proof}
+We sum \eqref{LDcplng} over all ${K}\in{\mathcal{M}}$.  On the right-hand side, we hit 
+a given element ${K}'\in{\mathcal{M}}$ at most $1+n_{\ell} N_{\mathcal{M}}$ times, where 
+$n_{\ell} = \#\{z\in{L_{{\ell}}}({K})\mid z\in\partial{K}\}$ indicates the 
+number of boundary Lagrange nodes and 
+\[
+ N_{\mathcal{M}}
+ {:=}
+ \max_{z\in{L_{{\ell}}}({\mathcal{M}})} \#\{{K}'\in{\mathcal{M}} \mid {K}'\ni z\}
+\]
+stands for the maximum number of elements in a star. The latter can be bounded 
+in terms of the shape coefficient of ${\mathcal{M}}$, see the end 
+of \S\ref{S:ldecoupling}, and the claim follows.
+\end{proof}
+
+Theorem \ref{T:elm-dec} covers various boundary conditions associated with an 
+`${H^{1}}$-setting'.  We illustrate this by discussing Dirichlet
+and Neumann boundary conditions for Poisson's equation.
+
+For Dirichlet boundary conditions, we follow the approach of
+L.\ R.\ Scott and S.\ Zhang in \cite[\S5]{Scott.Zhang:90}.  Denote by
+${\Pi^{\text{SZ}}}:{H^{{1}}}(\Omega)\to{S}^{{\ell},0}({\mathcal{M}})$ the interpolation
+operator therein and recall that the restriction ${\Pi^{\text{SZ}}} v_{|\partial\Omega}$
+depends only on $v_{|\partial\Omega}$.  Given boundary values
+$g\in{H^{{\frac12}}}(\partial\Omega)$, the weak solution of a Dirichlet
+problem is from the trial space
+\[
+ X_g {:=} \{ v \in {H^{1}}(\Omega) \mid v_{|\partial\Omega} = g \}
+\]
+and the finite element solution is sought in the space
+\[
+ {S}_g({\mathcal{M}})
+ {:=}
+ \{ V\in{S}^{{\ell},-1}({\mathcal{M}}) \mid
+    V\in C^0(\overline\Omega),
+    V_{|\partial\Omega} = {\Pi^{\text{SZ}}} g \}
+ 
+ 
+\]
+which is not necessarily a subspace of $X_g$.  In view of \cite[Lemma 
+2.1]{Sacchi.Veeser:06}, \eqref{H1seminorm} is a definite error notion on 
+$X_g-{S}_g({\mathcal{M}})$.  Since however ${\Pi^{\text{SZ}}} v_{|\partial\Omega} = 
+v_{|\partial\Omega}$ for all $v\in{S}^{{\ell},0}({\mathcal{M}})$, there holds 
+${S}_g({\mathcal{M}})\subset X_g$, i.e.\ the ensuing finite element method is 
+conforming, whenever possible.  It is not difficult to show that the finite 
+element solution is a near best approximation from ${S}_g({\mathcal{M}})$.
+
+\begin{cor}[Dirichlet boundary values]
+\label{C:Dirichlet}
+For any $v\in X_g$, there holds
+\[
+  E\big( v,{S}_g({\mathcal{M}}) \big)
+ \leq
+ C  \left[
+  \sum_{{K}\in{\mathcal{M}}} e(v,{K})^2
+ \right]^{\frac12},
+\]
+where $C$ is the constant from Theorem \ref{T:LDcplng}.  Consequently, the 
+decoupling coefficient of ${S}_g({\mathcal{M}})$ is bounded in terms of $d$, 
+${\ell}$ and $\sigma_{\mathcal{M}}$.
+\end{cor}
+
+\begin{proof}
+As for the case corresponding to the introduction, there holds
+\[
+ {\mathcal{C}} = {L_{{\ell}}}({\mathcal{M}}) \cap {\Sigma}
+\quad\text{with}\quad
+ {\Sigma}
+ =
+ \bigcup_{{F}\in{\mathcal{F}_{d-1}}({\mathcal{M}})} {F}
+\]
+and we require that ${F}_z\subset\partial\Omega$ whenever 
+$z\in{\mathcal{C}}\cap\partial\Omega$.  Moreover, we require that the choices of 
+${F}_z$ for all $z\in{L_{{\ell}}}({\mathcal{M}})\cap\partial\Omega$ in definitions 
+of ${\Pi^{\text{SZ}}}$ and ${\Pi}$ coincide.  Consequently,
+\[
+ {\Pi} v_{|\partial\Omega}
+  =
+ {\Pi^{\text{SZ}}} v_{|\partial\Omega}
+\]
+and \eqref{Ip;BdryVals} holds with $X=X_g$ and 
+${S}({\mathcal{M}})={S}_g({\mathcal{M}})$. Theorem \ref{T:elm-dec} thus yields the
+claim.
+\end{proof}
+For homogeneous Dirichlet boundary values $g=0$, Corollary \ref{C:Dirichlet}
+implies the non-obivous part of \eqref{equivalence}. A further immediate
+consequence is that `near best in ${S}_g({\mathcal{M}})$' entails `near best in 
+${S}^{{\ell},0}({\mathcal{M}})$'.  In particular, the aforementioned finite element 
+solution is thus near best in ${S}^{{\ell},0}({\mathcal{M}})$.
+
+For Neumann boundary conditions, the trial space is
+\[
+ \Tilde X {:=} {H^{1}}(\Omega)/{\mathbb{R}},
+\]
+which can be approximated by
+\[
+ \Tilde{S}({\mathcal{M}})
+ {:=}
+ {S}^{{\ell},0}({\mathcal{M}})/{\mathbb{R}}.
+\]
+Again, \eqref{H1seminorm} is a definite error notion and the finite element
+solution of this space is near best.
+ 
+\begin{cor}[Neumann boundary values]
+\label{C:Neumann}
+For any $v\in \Tilde X$, there holds
+\[
+  E\big( v, \Tilde{S}({\mathcal{M}}) \big)
+ \leq
+ C  \left[
+  \sum_{{K}\in{\mathcal{M}}} e(v,{K})^2
+ \right]^{\frac12},
+\]
+where $C$ is the constant from Theorem \ref{T:LDcplng}.  Consequently,
+the decoupling coefficient of $\Tilde{S}({\mathcal{M}})$ is bounded
+in terms of $d$, ${\ell}$ and $\sigma_{\mathcal{M}}$.
+\end{cor}
+
+\begin{proof}
+ Identifying
+ ${H^{1}}(\Omega)/{\mathbb{R}}$ and $\{v\in{H^{1}}(\Omega) \mid \int_\Omega v = 0 \}$,
+ the implication \eqref{Ip;BdryVals} holds with $X=\Tilde X$ and Theorem
+ \eqref{T:elm-dec} again yields the claim.
+\end{proof}
+Similarly, one can consider Robin boundary conditions or mixed ones and obtain
+corresponding statements.
+ 
+\begin{rem}[Construction of interpolation operator]
+\label{R:Ip}
+The definition of the nodal values ${\Pi}_zv$ for constrained nodes
+$z\in{L_{{\ell}}}({\mathcal{M}})\cap{\mathcal{C}}$ is the critical part.  For constrained
+nodes on the boundary, we follow the approach of \cite{Scott.Zhang:90}.
+The role of \eqref{nbnval} in proving Theorem \ref{T:elm-dec} reveals that this
+is a near best choice with respect to the involved local errors and can be
+adopted also for the other constrained nodes.  Inequality \eqref{nbnval} shows
+also that the particular admissible choice of ${F}_z$ does not matter.
+Moreover, its proof reveals that, for interior constrained nodes, also
+$P_{K}(z)$ where the element ${K}$ contains $z$, or some average of these 
+values may be used.  Interpolation operators of this type may be viewed as 
+a composition of taking a best approximation in $S^{\ell,-1}({\mathcal{M}})$ and 
+a so-called enriching operator.   The latter have been used to connect 
+non-conforming finite element methods to conforming ones in various contexts; 
+see, e.g., S.\ Brenner \cite{Brenner:96, Brenner:99}, O.\ S.\ Karakashian and 
+F.\ Pascal \cite{Karakashian.Pascal:03}, T.\ Gudi \cite{Gudi:10} and A.\ Bonito 
+and R.\ H.\ Nochetto \cite{Bonito.Nochetto:10}.
+\end{rem}
+
+\subsection{Local gradient conformity}
+\label{S:grd-conformity}
+The local best errors $e(v,{K})$, ${K}\in{\mathcal{M}}$, are related to approximation 
+problems of the following type. Approximate a vector function, which is the 
+gradient of a scalar function, with gradients of polynomial functions.  The 
+components of the approximants are coupled whenever ${\ell}\geq2$: indeed, the 
+value of higher order partial derivatives then does not depend on their order of 
+application.  Hence the following question arises: Does this coupling lead to 
+some downgrading with respect to approximants, the components of which are 
+independent polynomial functions?
+
+A similar question arises for $E(v,{\mathcal{M}})$.  However, in view of Theorem 
+\ref{T:elm-dec}, it suffices for both questions to compare the local best 
+errors $e(v,{K})$, ${K}\in{\mathcal{M}}$, with the following ones:
+\begin{align*}
+ {\underline{e}}(v,{K})
+ &{:=}
+ \inf_{Q\in{\mathcal{P}_{{{\ell}-1}}({{K}})}^d} {\left\|{{\nabla} v-Q}\right\|_{K}}
+ =
+ \left( \sum_{i=1}^d
+  \inf_{R\in{\mathcal{P}_{{{\ell}-1}}({{K}})}} {\left\|{\partial_i v - R}\right\|_{K}}^2
+ \right)^{\frac12},
+\end{align*}
+with
+\[
+ {\left\|{f}\right\|_{{\Omega}}}
+ {:=}
+ \| |f| \|_{0,2;\Omega}
+ =
+ \left(
+  \int_\Omega |f|^2
+ \right)^{\frac12}
+\]
+for $f\in{L^{2}}(\Omega)^d$.  Also here the inequality
+\[
+ {\underline{e}}(v,{K}) \leq e(v,{K})
+\]
+is straight-forward, while the opposite one is more involved and its proof 
+relies on the construction of a suitable (quasi-)interpolant.  We shall use the 
+averaged Taylor polynomial of \cite{Dupont.Scott:80} by T.~Dupont and 
+L.~R.~Scott, which is a variant of the one of S.\ L. Sobolev.  In order to 
+avoid a dependence on the element shape, we follow an idea of S.~Dekel and 
+D.~Leviatan in \cite{Dekel.Leviatan:04} and average in a reference 
+configuration. 
+\begin{thm}[Decoupling of partial derivatives]
+\label{T:pder-dec}
+There is a constant $C$ depending only on $d$, ${\ell}\in{\mathbb{N}}$ such that, for any 
+element ${K}\in{\mathcal{M}}$ and any function $v\in{H^{1}}({K})$, there holds
+\[
+  e(v,{K})
+  \leq
+  C {\underline{e}}(v,{K}).
+\]
+\end{thm}
+
+\begin{proof}
+Given ${\ell}\in{\mathbb{N}}_0$, denote by $I_{\ell}$ the operator corresponding to the 
+averaged Taylor polynomial of order ${\ell}+1$ (and degree $\leq{\ell})$ over the 
+largest inscribed ball in ${{{K}_d}}$.  Remarkably, the averaged Taylor 
+polynomial commutes with differentation in that $\partial_i (I_{\ell} 
+w)=I_{{\ell}-1} (\partial_i w)$ for all $w\in{H^{1}}({{{K}_d}})$ and 
+$i\in\{1,\dots,d\}$; see, e.g., \cite[(4.1.17)]{Brenner.Scott:08}.  Corollary 
+3.4 in \cite{Dekel.Leviatan:04} generalizes this to
+\begin{equation}\label{Diff-avgTaylor}
+ \partial_i \Big( \big[ I_{\ell} (v\circ A) \big] \circ A^{-1} \Big)
+ =
+ \Big( I_{{\ell}-1} \big[ (\partial_i v) \circ A \big] \Big) \circ A^{-1},
+\end{equation}
+where $A:{{{K}_d}}\to{K}$ is an affine bijection, $v\in{H^{1}}({K})$ and 
+${\ell}\geq1$.  Moreover, $I_{\ell}$ is a ${L^{2}}$-stable projection on 
+${\mathcal{P}_{{\ell}}({{{{K}_d}}})}$: for any $w\in{L^{2}}({{{K}_d}})$, there hold
+\begin{gather*}
+ w\in{\mathcal{P}_{{\ell}}({{{{K}_d}}})} \implies I_{\ell} w = w,
+\\
+ {\left\|{I_{\ell} w}\right\|_{{{K}_d}}} \leq C_{d,{\ell}} {\left\|{w}\right\|_{{{K}_d}}}.
+\end{gather*}
+see, e.g., \cite[(4.1.15), (4.2.8)]{Brenner.Scott:08}.  Lemma~5 of J.~Xu and 
+L.~Zikatanov \cite{Xu.Zikatanov:03} therefore implies that $I_{\ell}$ is near 
+best with the constant $C_{d,{\ell}}$:
+\begin{equation}\label{Ipdeg:nbest}
+ {\left\|{w-I_{\ell} w}\right\|_{{{K}_d}}}
+ \leq
+ C_{d,{\ell}} \inf_{S\in{\mathcal{P}_{{\ell}}({{{{K}_d}}})}} {\left\|{w-S}\right\|_{{{K}_d}}}.
+\end{equation}
+
+Motivated by \eqref{Diff-avgTaylor}, we choose $P = \big[ I_{\ell} (v\circ A) 
+\big] \circ A^{-1} \in{\mathcal{P}_{{\ell}}({{K}})}$ and, also using the transformation 
+rule and \eqref{Ipdeg:nbest} with ${\ell}-1$ in place of ${\ell}$, 
+we obtain
+\begin{align*}
+ e(v,{K})^2
+ &\leq
+ {\left\|{{\nabla} (v - P)}\right\|_{K}}^2
+ =
+ \sum_{i=1}^d {\left\|{\partial_i v - \partial_i P}\right\|_{K}}^2
+\\
+ &=
+ \sum_{i=1}^d 
+  {\left\|{\partial_i v - \Big(
+    I_{{\ell}-1} \big[ (\partial_i v) \circ A \big] 
+    \Big) \circ A^{-1}}\right\|_{K}}^2.
+\\
+ &=
+ \frac{{\left|{K}\right|}}{{\left|{{{K}_d}}\right|}} \sum_{i=1}^d 
+  {\left\|{ (\partial_i v)\circ A - I_{{\ell}-1} \big[ (\partial_i v) \circ A 
+   \big] }\right\|_{{{K}_d}}}^2
+\\
+ &\leq
+ C_{d,{\ell}-1}^2 \frac{{\left|{K}\right|}}{{\left|{{{K}_d}}\right|}} \sum_{i=1}^d
+  \inf_{S\in{\mathcal{P}_{{{\ell}-1}}({{{{K}_d}}})}}
+   {\left\|{\partial_i v\circ A - S}\right\|_{{{K}_d}}}^2
+\\
+ &\leq
+ C_{d,{\ell}-1}^2  \sum_{i=1}^d
+  \inf_{R\in{\mathcal{P}_{{{\ell}-1}}({{K}})}}
+   {\left\|{\partial_i v - R}\right\|_{K}}^2
+ =
+ C_{d,{\ell}-1}^2 {\underline{e}}(v,{K})^2
+\end{align*}
+Consequently, the claimed inequality holds with $C=C_{d,{\ell}-1}$.
+\end{proof}
+
+The combination of Theorems \ref{T:elm-dec} and \ref{T:pder-dec} yields the 
+following statement.
+
+\begin{cor}[Decoupling of elements and partial derivatives]
+\label{C:elm-pd-dec}
+There is a constant $C$ such that for any $v\in X$ there holds
+\[
+ E\big( v,{S}({\mathcal{M}}) \big)
+ \leq
+ C \left[
+  \sum_{{K}\in{\mathcal{M}}} {\underline{e}}(v,{K})^2
+ \right]^{\frac12},
+\]
+with $C\leq C_{d,{\ell}-1} {\delta}({\mathcal{M}})$, which can be bounded in terms of 
+$d$, ${\ell}$ and $\sigma_{\mathcal{M}}$.
+\end{cor}
+
+It is worth noticing that the right-hand side in Corollary \ref{C:elm-pd-dec} 
+involves best errors of approximation problems that may be considered the most 
+simplest ones involving polynomials and measuring the error in some 
+${L^{2}}$-sense.
+
+\section{Two applications}
+\label{S:appl}
+The main novelty of the preceding section lies in the type of statements that 
+are proven.  The goal of this section is to advocate its usefulness by 
+showing that it allows for simplifications or improvements in theory and 
+algorithms.  Doing so, we focus on applications of the decoupling of elements 
+and, in order to cover various boundary conditions, we adopt the setting of 
+\S\ref{S:best-errors}.
+
+\subsection{Convergence and error estimates}
+\label{S:Conv-ErrEst}
+We start by reviewing some approximation results that play an important role in 
+the a~priori error analysis of finite element methods.
+
+A minimum requirement for a numerical method for a boundary value problem is 
+that the approximate solution converges to the exact one as the meshsize tends 
+to $0$.  In case of a finite element method, a necessary (and also sufficient, 
+if for example the C\'ea Lemma holds) condition for this is that the best error 
+of the corresponding finite element space tends to $0$.  It is instructive to 
+prove this well-known fact for continuous piecewise polynomial functions with 
+the help of Theorem \ref{T:elm-dec}.
+
+\begin{thm}[Convergence]
+There holds
+ \[
+  E(v,{\mathcal{M}}) \to 0
+  \quad\text{as}\quad
+  h {:=} \max_{{K}\in{\mathcal{M}}} h_{K} \to 0
+ \]
+within a shape-regular family of meshes with $(d-1)$-face connected stars.
+ \end{thm}
+
+\begin{proof}
+Given a vector function $f\in{L^{2}}(\Omega)^d$, let $\overline f\in 
+{L^{\infty}}(\Omega)^d$ be the piecewise constant function given by
+\[
+ \forall{K}\in{\mathcal{M}}
+ \quad
+ \overline f_{|{K}} = \frac1{{\left|{K}\right|}} \int_{K} f.
+\]
+Theorem \ref{T:elm-dec} and ${\ell}\geq1$ imply
+\begin{equation}\label{mv-bd}\begin{aligned}
+ E(v,{\mathcal{M}}) 
+ &\leq
+ C \left( \sum_{{K}\in{\mathcal{M}}} e(v,{K})^2 \right)^{\frac12}
+ \leq
+ C \left(
+  \sum_{{K}\in{\mathcal{M}}} \inf_{P\in{\mathcal{P}_{1}({{K}})}} {\left|{v-P}\right|_{K}}^2
+ \right)^{\frac12}
+\\
+ &=
+ C \left(
+  \sum_{{K}\in{\mathcal{M}}} \inf_{c\in{\mathbb{R}}} {\left\|{{\nabla} v - c}\right\|_{K}}^2
+ \right)^{\frac12}
+ =
+ C {\left\|{{\nabla} v - \overline{{\nabla} v}}\right\|_{{\Omega}}},
+\end{aligned}\end{equation}
+which allows to conclude with a standard argument.  Let ${\epsilon}>0$ be arbitrary. 
+Since $C^0(\overline\Omega)$ is dense in ${L^{2}}(\Omega)$, there exists $g\in 
+C^0(\overline\Omega)^d$ such that ${\left\|{{\nabla} v - g}\right\|_{{\Omega}}}\leq{\epsilon}/3$. 
+Thanks to ${\left\|{\overline f}\right\|_{{\Omega}}}\leq{\left\|{f}\right\|_{{\Omega}}}$, we derive
+\begin{multline*}
+ {\left\|{{\nabla} v - \overline{{\nabla} v}}\right\|_{{\Omega}}}
+ \leq
+ {\left\|{{\nabla} v - g}\right\|_{{\Omega}}}
+  + {\left\|{g - \overline g}\right\|_{{\Omega}}}
+  + {\left\|{\overline{g-{\nabla} v}}\right\|_{{\Omega}}}
+ \leq
+ (2{\epsilon})/3 + {\left\|{g - \overline g}\right\|_{{\Omega}}}
+\end{multline*}
+and the last term can be made smaller ${\epsilon}/3$ for sufficiently small $h$, 
+because $g$ is uniform continuous in view of the compactness of 
+$\overline\Omega$.
+\end{proof}
+
+Notice that the first equality in \eqref{mv-bd} corresponds to a special case 
+of Theorem \ref{T:pder-dec} and its combination with Theorem \ref{T:elm-dec} 
+simplifies the following density argument in that it does not involve 
+derivatives.
+
+\medskip Usually, the validity of a finite element method is theoretically 
+investigated by deriving a~priori error estimates, quantifying the convergence 
+speed in terms of powers of $h$.  Accordingly, such estimates for the best 
+error of the corresponding finite element space are of interest.  These are 
+usually obtained by directly bounding the error of some interpolation operator 
+in terms of higher order Sobolev seminorms.  Here we use Theorem 
+\ref{T:elm-dec} and
+\begin{equation*}
+ {{\left|{{v}}\right|_{{{s},{2};{K}}}}}
+ {:=}
+ \begin{cases}
+  \left(
+   \sum_{|\alpha|=s} {{\left\|{{\partial^\alpha v}}\right\|_{{0,{2};{K}}}}}^2
+  \right)^{\frac12}
+  & \text{if }s\in{\mathbb{N}}
+\\
+  (1-\theta)\left(
+    \sum_{|\alpha|=\lfloor s\rfloor} \displaystyle
+     \int_{K}\int_{K}
+     \frac{|\partial^\alpha v(x) - \partial^\alpha v(y)|^2}{|x-y|^{2\theta+d}}
+    \right)^{\frac12}
+  & \text{otherwise,}
+ \end{cases} 
+\end{equation*}
+where $s>0$ indicates the smoothness, $\theta {:=} s - \lfloor s \rfloor$ 
+its fractional part and the sums are over all multi-indices of order $\lfloor s 
+\rfloor$; the factor $(1-\theta)$ is motivated by J.\ Bourgain et al.\ 
+\cite{Bourgain.Brezis.Mironescu:01}.
+
+\begin{thm}[Error estimates]
+\label{T:ErrEst}
+Let $v\in X$ a target function, ${\mathcal{M}}$ be a mesh with $(d-1)$-face connected 
+stars and $1\leq s\leq{\ell}+1$.  If $v_{|{K}}\in{H^{{s}}}({K})$ for all 
+${K}\in{\mathcal{M}}$, then
+\[
+ E(v,{\mathcal{M}})
+ \leq
+ C \left(
+   \sum_{{K}\in{\mathcal{M}}} h_{K}^{2(s-1)} {{\left|{{v}}\right|_{{{s},{2};{K}}}}}^2
+ \right)^{\frac12},
+\]
+where $C$ can be bounded in terms of $d$, ${\ell}$, $\sigma_{\mathcal{M}}$ and $s$. 
+If $s\in{\mathbb{N}}$, then
+\[
+ C \leq \frac{s!}{(\lceil\frac{s}{d}\rceil!)^d} C_P^{s-1}\delta({\mathcal{M}})
+\]
+where $C_P$ is the optimal Poincar\'e constant for $d$-simplices in ${{\mathbb{R}}^d}$.
+\end{thm}
+
+\begin{proof}
+Combine Theorem \ref{T:elm-dec} and the Bramble-Hilbert inequality
+\begin{equation}\label{BrambleHilbert}
+ e(v,{K})
+ \leq
+ C h_{K}^{s-1} {{\left|{{v}}\right|_{{{s},{2};{K}}}}}
+\end{equation}
+where $C$ depends on $d$, ${\ell}$, $s$ and the shape coefficient of $d$-simplex 
+${K}$.  The latter follows, e.g., from \cite[Theorems 3.2 and 
+6.1]{Dupont.Scott:80} and a standard scaling argument.  The explicit constant 
+for $s\in{\mathbb{N}}$ is ensured by choosing a polynomial that allows an iterative 
+application of the Poincar\'e inequality; see R.~Verf\"urth 
+\cite[\S3]{Verfuerth:99}.
+\end{proof}
+
+We compare the bound of Theorem \ref{T:ErrEst} and those available via 
+Lagrange and Scott-Zhang interpolation \cite[\S4]{Scott.Zhang:90}; error bounds 
+via Cl\'ement interpolation \cite{Clement:75} coincide with the latter ones for 
+homogeneous Dirichlet boundary conditions.
+
+Doing so, we fix a mesh and vary through functions -- a viewpoint differing 
+from the usual one where a function is fixed and meshes vary.  Notice that in 
+the former case to be considered the most convenient choice of $s$ is not 
+necessarily the maximal one; indeed, the product $h_{K}^s 
+{{\left|{{v}}\right|_{{{s},{2};{K}}}}}$ may not be monotone decreasing in $s$ for certain 
+functions. This is closely related to the following drawback of the bounds via 
+Lagrange interpolation for $d\geq2$.  Consider a sequence of functions 
+$(v_n)_n$ in ${H^{{\lfloor d/2 \rfloor +1}}}(\Omega)$ converging to a function not 
+better than ${H^{{d/2}}}(\Omega)$.  Then any bound via Lagrange interpolation 
+blows up, while those of Theorem \ref{T:ErrEst} and via Scott-Zhang 
+interpolation remain bounded for suitable $s\in{[{1},{{d/2}}]}$.
+
+On the other hand, bounds via Lagrange interpolation can be readily derived 
+in terms of broken Sobolev seminorms on elements; see, e.g., 
+\cite[(4.4.20)]{Brenner.Scott:08} and modify the last three steps in its 
+proof.  While Theorem \ref{T:ErrEst} shares this property, the bounds via 
+Scott-Zhang interpolation \cite{Scott.Zhang:90} involve regularity across 
+element boundaries.  The broken Sobolev norms on elements have the following 
+advantage: If $E(v,{\mathcal{M}})=0$, then the bounds of Theorem \ref{T:ErrEst} and 
+Lagrange interpolation also vanish, while those via Scott-Zhang interpolation 
+\cite{Scott.Zhang:90} do not vanish for $s\in{{]}1,{3/2}{[}}$ and are not 
+applicable, i.e.\ are $\infty$, for $s\geq3/2$ whenever $v$ has non-constant 
+gradient. Similarly as before, this has its counterparts for smooth functions.  
+To illustrate this, let $(v_n)_n$ be a sequence of functions in 
+${H^{{{\ell}+1}}}(\Omega)$ and consider various conditions ensuring convergence to 
+a function in ${S}({\mathcal{M}})$ with non-constant gradient.  If  $E(v_n,{\mathcal{M}}) 
+\to 0$, then also the right-hand side of Theorem \ref{T:elm-dec} tends to $0$.  
+If additionally the restrictions $v_n{}_{|{K}}$ converge in ${H^{{s}}}({K})$ 
+for some $1 < s \leq {\ell}+1$, then the corresponding bound of Theorem 
+\ref{T:ErrEst} tends to $0$.  The same holds for bounds of Lagrange 
+interpolation, but only $s\in{{]{{d/2}}},{{{\ell}+1}]}}$ are admissible.  The 
+situation for bounds via Scott-Zhang interpolation is different: if $1<s<3/2$, 
+then the corresponding bound does not tend to $0$ and if $3/2\leq s \leq 
+{\ell}+1$, it even blows up.
+
+Summarizing, one may say that the approach via Theorem \ref{T:elm-dec} 
+combines advantages of the available bounds for both Lagrange interpolation and 
+interpolation of non-smooth functions. In particular, for 
+$1 < s \leq d/2$ with $d\geq3$, the error bounds in terms of piecewise 
+regularity seem to be new.  Bounds in terms of broken regularity are useful 
+also in the context of surface finite element methods (SFEM); see 
+F.\ Camacho and A.\ Demlow \cite{Camacho.Demlow:P}.
+
+\subsection{Adaptive tree approximation of gradients}
+\label{S:tree-approx}
+The upper bound of the global best error in Theorem \ref{T:ErrEst} locally 
+combines meshsize and higher order derivatives.  This suggests that, for a 
+given target function, certain meshes a more convenient than others.
+I.\ Babu\v{s}ka and W.\ C.\ Rheinboldt \cite{Babuska.Rheinboldt:78a} formally 
+derive the following criteria, also called equidistribution principle: a mesh 
+minimizing the aforementioned upper bound subject to a fixed number of elements 
+equidistributes the element contributions, e.g.,  $h_{K} 
+{{\left|{{v}}\right|_{{{2},{2};{K}}}}}$ does not depend on $K\in{K}$.  Obviously this 
+requires in general graded meshes.
+
+An algorithmically simple way of constructing graded meshes arises from a 
+prescribed rule for subdividing elements, which induces a tree structure.  An 
+example of this was already in 1967 studied by S.\ Birman and M.\ Solomyak 
+\cite{Birman.Solomyak:67}.  For continuous piecewise polynomial functions over 
+conforming simplicial meshes, one can use bisection with recursive completion; 
+for an overview of this technique, see e.g.\ Nochetto et al.\ 
+\cite[\S4]{Nochetto.Siebert.Veeser:09}.  Although recursive bisection limits 
+mesh flexibility, in particular mesh grading, the discussion in R.\ DeVore 
+\cite[\S6]{DeVore:98} and the results of P.\ Binev et al.\ 
+\cite{Binev.Dahmen.DeVore.Petrushev:02} reveal that the regularity dictating 
+the asymptotic balance of global best error and number of degree of freedoms is 
+close to the best possible one.  In particular, the global best $H^1$-error of 
+suitably graded two-dimensional meshes decays like $\#{\mathcal{M}}^{-\frac12}$ if 
+$u\in{W^{{2},{p}}}(\Omega)$ with $1<p\leq 2$; notice that the latter is weaker 
+than the requirement $u\in{H^{2}}(\Omega)$ corresponding to the decay rate with 
+quasi-uniform meshes and that $p=1$ corresponds to a optimal Sobolev embedding.
+
+The goal of this section is to derive and analyze an instance of the tree 
+algorithm by P.~Binev and R.~DeVore \cite{Binev.DeVore:04} that constructs near 
+best bisection meshes for the approximation of gradients with piecewise 
+polynomial functions.  It may be used for coarsening in adaptive algorithms 
+iterating the main steps
+ \[
+  \texttt{error reduction} \to \texttt{sparsity adjustment}.
+ \]
+Interestingly, this scheme can be applied also if a good a posteriori error 
+estimator is not available.  It includes algorithms like in 
+\cite[\S8]{Binev.Dahmen.DeVore:04} and algorithms that are based upon 
+discretizing the steps of an infinite-dimensional solver.  Moreover, the 
+following algorithm can be used to compute an approximation of the best error of 
+bisection meshes with a given number of elements. Such approximations are of 
+interest as a benchmark for corresponding adaptive finite element methods.
+
+In order to introduce the algorithm and to state its main property, we need the 
+following notation.  Let ${\mathcal{M}}_0$ be an initial mesh of $\Omega$ that is 
+admissible for bisection with recursive completion; see, e.g., \cite[Assumption 
+11.1 on p.~453]{Nochetto.Siebert.Veeser:09}.  Denote by 
+${\mathbb{M}}'$ the set of all meshes that can be generated by bisections without 
+completion from ${\mathcal{M}}_0$; these meshes are not necessarily conforming and 
+each one correponds to a subtree in the master tree given by ${\mathcal{M}}_0$ and the 
+bisection rule of a single $d$-simplex.  Moreover, denote by ${\mathbb{M}}$ the 
+subset of ${\mathbb{M}}'$ of all meshes that are conforming.  If 
+${\mathcal{M}}'\in{\mathbb{M}}'$ is a possibly non-conforming mesh, denote by 
+$\texttt{complete}({\mathcal{M}}')$ the smallest refinement of ${\mathcal{M}}'$ in ${\mathbb{M}}$.  
+Since ${\mathcal{M}}_0$ is admissible, Binev et al.\ 
+\cite[Theorem~2.4]{Binev.Dahmen.DeVore:04} if 
+$d=2$ and R.~Stevenson \cite[Theorem~6.1]{Stevenson:08} otherwise ensure the 
+non-obvious relationship
+\begin{equation}\label{complete}
+ \#\texttt{complete}({\mathcal{M}}') - \#{\mathcal{M}}_0
+ \leq
+ {{C_\text{cmpl}}} (\#{\mathcal{M}}' - \#{\mathcal{M}}_0)
+\end{equation}
+with ${{C_\text{cmpl}}}$ depending only on ${\mathcal{M}}_0$.  For any $N\geq\#{\mathcal{M}}_0$, we 
+associate best errors with the two mesh families ${\mathbb{M}}$ and ${\mathbb{M}}'$.  
+Namely, the best approximation error 
+\begin{equation*}
+ \sigma(v,N)
+ {:=}
+ \min \big\{ E \big( v,{S}({\mathcal{M}}) \big)
+  \mid {\mathcal{M}}\in{\mathbb{M}},\ \#{\mathcal{M}}\leq 
+N \big\}
+\end{equation*}
+with continuous piecewise polynomial functions over conforming meshes with less 
+than $N$ elements, which is greater than the corresponding best error 
+\begin{equation}
+\label{nlberr}
+ \sigma'(v,N)
+ {:=}
+ \min \{ E\big( v,{S}^{{\ell},-1}({\mathcal{M}}') \big)
+   \mid {\mathcal{M}}'\in{\mathbb{M}}',\ \#{\mathcal{M}}'\leq N \}
+\end{equation}
+with possibly discontinuous piecewise polynomial functions over possibly 
+non-con\-form\-ing meshes.  There also holds an inequality in the oppposite 
+direction, which may be seen as a generalization of Theorem \ref{T:elm-dec}.
+
+\begin{thm}[Non-conforming decoupling of elements]
+\label{T:n-elm-dec}
+Assume that the initial mesh ${\mathcal{M}}_0$ is conforming, admissible, and that 
+all its stars are $(d-1)$-face-connected.  Then there exist constants $C_1$ 
+and $C_2$ depending only on ${\mathcal{M}}_0$ such that, for any $v\in X$ and 
+$N\geq N_0{:=}\#{\mathcal{M}}_0$, there holds
+\[
+ \sigma(v,N)
+ \leq
+ C_1 \sigma'\left(
+  v, \left\lfloor \frac{N-N_0}{C_2} \right\rfloor + N_0
+  \right).
+\]
+\end{thm}
+
+\begin{proof}
+Set $N'{:=}\lfloor (N-N_0)/{{C_\text{cmpl}}} \rfloor + N_0$ and choose an optimal 
+possibly non-conforming mesh ${\mathcal{M}}\in{\mathbb{M}}'$ such that 
+$E\big( v,{S}^{{\ell},-1}({\mathcal{M}}') \big) = \sigma'(v,N')$.  Since 
+${\mathcal{M}}_0$ is admissible, \eqref{complete} yields $\#{\mathcal{M}}\leq N$ for
+${\mathcal{M}}{:=}\texttt{complete}({\mathcal{M}}')$.  Hence
+\begin{align*}
+ \sigma(v,N)
+ &\leq
+ E\big( v, {S}({\mathcal{M}}) \big)
+ \leq
+ {\delta}({\mathcal{M}}) E\big( v, {S}^{{\ell},-1}({\mathcal{M}}) \big)
+ \leq
+ {\delta}({\mathcal{M}}) E\big( v, {S}^{{\ell},-1}({\mathcal{M}}') \big)
+\\
+ &=
+ {\delta}({\mathcal{M}}) \sigma'(v,N')
+\end{align*}
+thanks to ${S}^{{\ell},-1}({\mathcal{M}})\subset{S}^{{\ell},-1}({\mathcal{M}}')$.  
+The shape coefficient for any mesh in ${\mathbb{M}}$ is bounded in terms of the one 
+of ${\mathcal{M}}_0$; see, e.g., \cite[Lemma 4.1]{Nochetto.Siebert.Veeser:09}.   
+Moreover, any mesh in ${\mathbb{M}}$ inherits from ${\mathcal{M}}_0$ that all its stars are 
+$(d-1)$-face-connected.  Theorem \ref{T:elm-dec} therefore implies 
+${\delta}({\mathcal{M}})\leq{\delta}$, were ${\delta}$ depends only on ${\mathcal{M}}_0$.  The 
+claimed inequality thus holds with $C_1={\delta}$ and $C_2={{C_\text{cmpl}}}$.
+\end{proof}
+
+The number of competing meshes for the best errors grows exponentially with 
+$N-\#{\mathcal{M}}_0$.  Nevertheless the following variant of adaptive tree 
+approximation by P.~Binev and R.~DeVore \cite{Binev.DeVore:04} constructs near 
+best meshes with $O(N)$ operations and computations of the local error 
+functional
+\[
+ {\epsilon}({K}){:=} e(v,{K})^2,
+\]
+where ${K}$ is any $d$-simplex and $v\in{H^{1}}(\Omega)$ the target function. 
+Given a threshold $t>0$, we proceed as follows:
+
+\smallskip\noindent
+\begin{itemize}
+ \item[] ${\mathcal{M}}_t'{:=}\emptyset$;
+ \item[] \texttt{for all} ${K}\in{\mathcal{M}}_0$
+ \begin{itemize}
+  \item[] $\eta({K}) {:=} {\epsilon}({K})$;
+  \item[] $\texttt{if } \eta({K})>t \texttt{ then grow}({K})$;
+ \end{itemize}
+ \item[] \texttt{end for}
+ \item[] ${\mathcal{M}}_t {:=} \texttt{complete}({\mathcal{M}}_t')$;
+\end{itemize}
+
+\smallskip\noindent
+where $\texttt{grow}({K})$ grows the subtree generating ${\mathcal{M}}_t'$ and 
+collects its leafs by
+
+\smallskip\noindent
+\begin{itemize}
+ \item[] $({K}_1,{K}_2)=\texttt{bisect}({K})$;
+ \item[] \texttt{for} $i=1,2$
+ \begin{itemize}
+  \item[] $\eta({K}_i) {:=} \big[
+      {\epsilon}({K}_i)^{-1} + \eta({K})^{-1} 
+    \big]^{-1}$
+  \item[] $\texttt{if } \eta({K}_i)>t$ \texttt{ then}
+  \begin{itemize}
+   \item[] $\texttt{grow}({K}_i)$;
+  \end{itemize}
+  \item[] \texttt{else}
+  \begin{itemize}
+   \item[] ${\mathcal{M}}_t' {:=} {\mathcal{M}}_t' \cap \{{K}_i\}$; 
+  \end{itemize}
+ \end{itemize}
+\end{itemize}
+
+\smallskip\noindent
+and $\texttt{bisect}({K})$ implements the bisection of a single simplex; 
+see, e.g., \cite[\S4.1]{Nochetto.Siebert.Veeser:09}.
+
+The core of this algorithm is the thresholding algorithm in 
+\cite{Birman.Solomyak:67} with the following important difference: the 
+local functional $\eta({K})$ depends not only on the local error functionals 
+but also on their history within in the subdivison hierarchy.
+
+There are noteworthy variants of this algorithm.  In particular, the threshold 
+$t$ can be avoided by successively bisecting the elements maximizing the 
+indicators $\eta({K})$ of the current mesh; see \cite{Binev.DeVore:04}.  In 
+this case one may also ensure the conformity of the mesh at any intermediate 
+step.  For these variants, the following theorem presents only non-essential 
+changes.
+
+\begin{thm}[Tree approximation]
+\label{T:tree-approx}
+Assume that the initial mesh ${\mathcal{M}}_0$ is conforming, admissible, and that 
+all its stars are $(d-1)$-face-connected.  Then there exist constants $C_1$ 
+and $C_2$ depending only on ${\mathcal{M}}_0$ such that, for any $v\in X$ and any 
+threshold $t>0$, the output mesh ${\mathcal{M}}$ of the tree algorithm verifies
+\[
+ E\big( v,{S}({\mathcal{M}}) \big)
+ \leq
+ C_1 \sigma' \left( v, \left\lceil \frac{\#{\mathcal{M}}}{C_2} \right\rceil \right)
+\]
+whenever $\#{\mathcal{M}}\geq C_2(2\#{\mathcal{M}}_0+1)$.
+\end{thm}
+
+\begin{proof}
+The local error functional ${\epsilon}({K}) = e(v,{K})^2 = 
+\inf_{P\in{\mathcal{P}_{{\ell}}({{K}})}} {\left|{v-P}\right|_{K}}^2$ obviously depends only on 
+the target function $v$ and the simplex ${K}$.  Moreover, it is subadditive: 
+if $({K}_1,{K}_2)=\texttt{bisect}({K})$, then ${\epsilon}({K}_1) + {\epsilon}({K}_2) 
+\leq {\left|{v-P}\right|_{{{K}_1}}}^2 + {\left|{v-P}\right|_{{{K}_2}}}^2$ for any 
+$P\in{\mathcal{P}_{{\ell}}({{K}})}$ and thus
+\[
+ {\epsilon}({K}_1) + {\epsilon}({K}_2) \leq {\epsilon}({K}).
+\]
+Hence Theorem 4 of P.~Binev's contribution in \cite{Oberwolfach4.3:07} 
+applies to the above for-loop that constructs ${\mathcal{M}}_t'$.  Writing
+\[
+ N_0{:=}\#{\mathcal{M}}_0,
+\quad
+ N'{:=}\#{\mathcal{M}}_t',
+\quad
+ L'{:=} N'-N_0
+\]
+and observing $E\big( v,{S}^{{\ell},-1}({\mathcal{M}}) \big)^2 = 
+\sum_{{K}\in{\mathcal{M}}} {\epsilon}({K})$ for any ${\mathcal{M}}'\in{\mathbb{M}}'$, we therefore have
+\[
+ E\big( v,{S}^{{\ell},-1}({\mathcal{M}}_t') \big)
+ \leq
+ \min_{0 \leq l \leq L'} \left( 1 +
+   \frac{l + \min\{l,N_0\}}{L' + 1 - l}
+   \right) \sigma'(v,N_0+l).
+\]
+Under the assumption $N'\geq2N_0$ this simplifies to
+\[
+ E\big( v,{S}^{{\ell},-1}({\mathcal{M}}_t') \big)
+ \leq
+ \min_{2N_0 \leq n \leq N'} \frac{N'+1}{N'+1-n} \sigma'(v,n).
+\]
+Since ${\mathcal{M}}_0$ is admissible, \eqref{complete} ensures
+\[
+ N - N_0
+ \leq
+ {{C_\text{cmpl}}} (N' - N_0)
+\]
+for $N{:=}\#{\mathcal{M}}_t$.  In view of $N\geq N'\geq 2N_0$, we may use the simpler 
+inequality $N\leq \Tilde C_2 N'$ with $\Tilde C_2=2{{C_\text{cmpl}}}$.  Since $x\mapsto 
+x/(x-c)$ is decreasing and $E$ monotone, one thus can derive
+\[
+ E\big( v,{S}^{{\ell},-1}({\mathcal{M}}_t) \big)
+ \leq
+ \min_{2N_0 \leq n \leq N/\Tilde C_2}
+   \frac{N}{N - \Tilde C_2 n} \sigma'(v,n)
+\]
+whenever $N\geq 2\Tilde C_2 N_0$.  Similarly as in the proof of Theorem 
+\ref{T:n-elm-dec}, Theorem \ref{T:ErrEst} therefore implies
+\[
+ E\big( v,{S}({\mathcal{M}}_t) \big)
+ \leq
+ \delta \min_{2N_0 \leq n \leq N/\Tilde C_2}
+   \frac{N}{N - \Tilde C_2 n} \sigma'(v,n)
+\]
+where $\delta$ depends only on ${\mathcal{M}}_0$.  Choosing $n\in{\mathbb{N}}$ such that
+$N/(2\Tilde C_2) -1 < n \leq N/(2\Tilde C_2)$, the claimed inequality 
+follows with $C_1=2\delta$ and $C_2=2\Tilde C_2$ as above.
+\end{proof}
+
+Theorem \ref{T:tree-approx} is of non-asymptotic nature; as can be seen from 
+the proof, the condition $\#{\mathcal{M}}\geq C_2(2\#{\mathcal{M}}_0+1)$ arising from 
+$N'\geq2N_0$ is of simplifying nature.  In particular, it does not suppose any 
+regularity beyond ${H^{1}}(\Omega)$ of the target function.  
+
+In \cite[\S7]{Binev.DeVore:04} a similar algorithm is proposed.  It relies on 
+the local error functionals
+\[
+ \Tilde{\epsilon}({K})
+ {:=}
+ \inf\big\{
+  {\left|{v-V}\right|_{{\omega_{K}}}} \mid V\in{S}({\mathcal{M}}_{K})
+  \big\}
+\]
+where ${\mathcal{M}}_{K}$ is the set of elements of the so-called minimal ring 
+$R^-({K})$ around ${K}$ given by
+\[
+ R^-({K})
+ {:=}
+ \bigcap_{{\mathcal{M}}\in{\mathbb{M}}:{\mathcal{M}}\ni{K}} R({K},{\mathcal{M}})
+\quad\text{with}\quad
+ R({K},{\mathcal{M}})
+ {:=}
+ \bigcup_{{K}'\in{\mathcal{M}}:{K}'\cap{K}\neq\emptyset} {K}'.
+\]
+In view of the minimality of the ring, these error functionals do not depend on 
+the surrounding mesh.  They are not subadditive, but weakly subadditive with 
+respect to repeated bisections and so another variant of the tree algorithm 
+with a similar statement to Theorem \ref{T:tree-approx} still applies.  The 
+local error functionals $e({K})$ are however simpler to implement and can be 
+combined with single bisection.  Thus, the use of Theorem \ref{T:elm-dec} here 
+permits an algorithmic simplification. 
+ 
+
+\subsection*{Acknowledgments}
+The author wants to thank Francesco Mora for useful discussions regarding 
+Theorem \ref{T:elm-dec}.
+
+\begin{thebibliography}{10}
+
+\bibitem{Oberwolfach4.3:07}
+{\em Adaptive numerical methods for {PDE}s}, Oberwolfach Rep., 4 (2007),
+  pp.~1663--1739.
+\newblock Abstracts from the workshop held June 10--16, 2007, Organized by Rolf
+  Rannacher, Endre S{\"u}li and R{\"u}diger Verf{\"u}rth, Oberwolfach Reports.
+  Vol. 4, no. 3.
+
+\bibitem{Babuska.Rheinboldt:78a}
+{\sc I.~Babu{\v{s}}ka and W.~C. Rheinboldt}, {\em Error estimates for adaptive
+  finite element computations}, SIAM J. Numer. Anal., 15 (1978), pp.~736--754.
+
+\bibitem{Bebendorf:03}
+{\sc M.~Bebendorf}, {\em A note on the {P}oincar{\'e} inequality for convex
+  domains}, Z. Anal. Anwendungen, 22 (2003), pp.~751--756.
+
+\bibitem{Binev.Dahmen.DeVore:04}
+{\sc P.~Binev, W.~Dahmen, and R.~DeVore}, {\em Adaptive finite element methods
+  with convergence rates}, Numer. Math., 97 (2004), pp.~219--268.
+
+\bibitem{Binev.Dahmen.DeVore.Petrushev:02}
+{\sc P.~Binev, W.~Dahmen, R.~DeVore, and P.~Petrushev}, {\em Approximation
+  classes for adaptive methods}, Serdica Math. J., 28 (2002), pp.~391--416.
+\newblock Dedicated to the memory of Vassil Popov on the occasion of his 60th
+  birthday.
+
+\bibitem{Binev.DeVore:04}
+{\sc P.~Binev and R.~DeVore}, {\em Fast computation in adaptive tree
+  approximation}, Numer. Math., 97 (2004), pp.~193--217.
+
+\bibitem{Birman.Solomyak:67}
+{\sc M.~{\v{S}}. Birman and M.~Z. Solomjak}, {\em Piecewise polynomial
+  approximations of functions of classes {$W_{p}{}^{\alpha }$}}, Mat. Sb.
+  (N.S.), 73 (115) (1967), pp.~331--355.
+
+\bibitem{Bonito.Nochetto:10}
+{\sc A.~Bonito and R.~H. Nochetto}, {\em Quasi-optimal convergence rate of an
+  adaptive discontinuous {G}alerkin method}, SIAM J. Numer. Anal., 48 (2010),
+  pp.~734--771.
+
+\bibitem{Bourgain.Brezis.Mironescu:01}
+{\sc J.~Bourgain, H.~Brezis, and P.~Mirnoescu}, {\em Another look at {S}obolev
+  spaces}, in Optimal control and partial differential equations, E.~R.
+  J.~L.~Mendali and A.~Sulem, eds., IOS Press, 2001, pp.~439--455.
+
+\bibitem{Braess:01}
+{\sc D.~Braess}, {\em Finite elements}, Cambridge University Press, Cambridge,
+  second~ed., 2001.
+\newblock Theory, fast solvers, and applications in solid mechanics, Translated
+  from the 1992 German edition by Larry L. Schumaker.
+
+\bibitem{Brenner:96}
+{\sc S.~C. Brenner}, {\em Two-level additive {S}chwarz preconditioners for
+  nonconforming finite element methods}, Math. Comp., 65 (1996), pp.~897--921.
+
+\bibitem{Brenner:99}
+\leavevmode\vrule height 2pt depth -1.6pt width 23pt, {\em Convergence of
+  nonconforming multigrid methods without full elliptic regularity}, Math.
+  Comp., 68 (1999), pp.~25--53.
+
+\bibitem{Brenner.Scott:08}
+{\sc S.~C. Brenner and L.~R. Scott}, {\em The mathematical theory of finite
+  element methods}, vol.~15 of Texts in Applied Mathematics, Springer, New
+  York, third~ed., 2008.
+
+\bibitem{Camacho.Demlow:P}
+{\sc F.~Camacho and A.~Demlow}, {\em {$L_2$} and pointwise a posteriori error
+  estimates for fem for elliptic pde on surfaces}, tech. rep., University of
+  Kentucky, 2013.
+
+\bibitem{Clement:75}
+{\sc P.~Cl\'{e}ment}, {\em Approximation by finite element functions using
+  local regularization}, Revue Francaise Automat. Informat. Recherche.
+  Operationelle Ser. Rouge Anal. Num\'{e}r., 9 (1975), pp.~77--84.
+
+\bibitem{Dekel.Leviatan:04}
+{\sc S.~Dekel and D.~Leviatan}, {\em The {B}ramble-{H}ilbert lemma for convex
+  domains}, SIAM J. Math. Anal., 35 (2004), pp.~1203--1212.
+
+\bibitem{DeVore:98}
+{\sc R.~A. DeVore}, {\em Nonlinear approximation}, in Acta numerica, 1998,
+  vol.~7 of Acta Numer., Cambridge Univ. Press, Cambridge, 1998, pp.~51--150.
+
+\bibitem{Dupont.Scott:80}
+{\sc T.~Dupont and R.~Scott}, {\em Polynomial approximation of functions in
+  {S}obolev spaces}, Math. Comp., 34 (1980), pp.~441--463.
+
+\bibitem{Gudi:10}
+{\sc T.~Gudi}, {\em A new error analysis for discontinuous finite element
+  methods for linear elliptic problems}, Math. Comp., 79 (2010),
+  pp.~2169--2189.
+
+\bibitem{Karakashian.Pascal:03}
+{\sc O.~A. Karakashian and F.~Pascal}, {\em A posteriori error estimates for a
+  discontinuous {G}alerkin approximation of second-order elliptic problems},
+  SIAM J. Numer. Anal., 41 (2003), pp.~2374--2399 (electronic).
+
+\bibitem{Laugesen.Siudeja:10}
+{\sc R.~S. Laugesen and B.~A. Siudeja}, {\em Minimizing {N}eumann fundamental
+  tones of triangles: an optimal {P}oincar\'e inequality}, J. Differential
+  Equations, 249 (2010), pp.~118--135.
+
+\bibitem{Nochetto.Siebert.Veeser:09}
+{\sc R.~H. Nochetto, K.~G. Siebert, and A.~Veeser}, {\em Theory of adaptive
+  finite element methods: an introduction}, in Multiscale, nonlinear and
+  adaptive approximation, Springer, Berlin, 2009, pp.~409--542.
+
+\bibitem{Payne.Weinberger:60}
+{\sc L.~E. Payne and H.~F. Weinberger}, {\em An optimal
+  {P}oincar{\'e}-inequality for convex domains}, Archive Rat. Mech. Anal., 5
+  (1960), pp.~286--292.
+
+\bibitem{Sacchi.Veeser:06}
+{\sc R.~Sacchi and A.~Veeser}, {\em Locally efficient and reliable a posteriori
+  error estimators for {D}irichlet problems}, Math. Models Methods Appl. Sci.,
+  16 (2006), pp.~319--346.
+
+\bibitem{Scott.Zhang:90}
+{\sc L.~R. Scott and S.~Zhang}, {\em Finite element interpolation of nonsmooth
+  functions satisfying boundary conditions}, Math. Comp., 54 (1990),
+  pp.~483--493.
+
+\bibitem{Stevenson:08}
+{\sc R.~Stevenson}, {\em The completion of locally refined simplicial
+  partitions created by bisection}, Math. Comp., 77 (2008), pp.~227--241
+  (electronic).
+
+\bibitem{Veeser.Verfuerth:09}
+{\sc A.~Veeser and R.~Verf\"urth}, {\em Explicit upper bounds for dual norms of
+  residuals}, SIAM J. Numer. Anal., 47 (2009), pp.~2387--2405.
+
+\bibitem{Verfuerth:99}
+{\sc R.~Verf{\"u}rth}, {\em A note on polynomial approximation in {S}obolev
+  spaces}, M2AN Math. Model. Numer. Anal., 33 (1999), pp.~715--719.
+
+\bibitem{Xu.Zikatanov:03}
+{\sc J.~Xu and L.~Zikatanov}, {\em Some observations on {B}abu\v ska and
+  {B}rezzi theories}, Numer. Math., 94 (2003), pp.~195--202.
+\end{thebibliography}
+
+\end{document}
+\endinput
+

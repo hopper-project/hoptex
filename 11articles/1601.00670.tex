@@ -1,0 +1,1556 @@
+\documentclass{article}
+
+\usepackage[T1]{fontenc}
+
+\usepackage[bitstream-charter]{mathdesign}
+\usepackage{amsmath}
+\usepackage[scaled=0.92]{PTSans}
+
+\usepackage[
+  paper  = letterpaper,
+  left   = 1.65in,
+  right  = 1.65in,
+  top    = 1.0in,
+  bottom = 1.0in,
+  ]{geometry}
+\usepackage{setspace}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+\definecolor{shadecolor}{gray}{0.9}
+
+\usepackage[final,expansion=alltext]{microtype}
+\usepackage[english]{babel}
+\usepackage[parfill]{parskip}
+\usepackage{afterpage}
+\usepackage{framed}
+\usepackage{nicefrac}
+
+\DeclareRobustCommand{\parhead}[1]{\textbf{#1}~}
+
+\usepackage{graphicx}
+\usepackage[labelfont=bf]{caption}
+\usepackage[format=hang]{subcaption}
+
+\usepackage{booktabs}
+
+\usepackage{natbib}
+
+\usepackage[algoruled]{algorithm2e}
+\usepackage{listings}
+\usepackage{fancyvrb}
+\fvset{fontsize=\normalsize}
+
+\usepackage[colorlinks,bookmarks=false]{hyperref}
+\hypersetup{citecolor=Violet}
+\hypersetup{linkcolor=black}
+\hypersetup{urlcolor=MidnightBlue}
+
+\usepackage[acronym,smallcaps,nowarn]{glossaries}
+
+\usepackage{listings}
+\lstset{language=C++,
+  keywordstyle=\color{MidnightBlue}\bfseries,
+  keywordstyle=[2]\color{BrickRed}\bfseries,
+  keywordstyle=[3]\color{Violet},
+  morekeywords={vector, real, in},
+  keywords=[2]{data, parameters, model, transformed},
+  keywords=[3]{lower, upper, normal, bernoulli_logit}
+}
+\lstdefinestyle{mystyle}{
+    commentstyle=\color{OliveGreen},
+    numberstyle=\tiny\color{black!60},
+    stringstyle=\color{BrickRed},
+    basicstyle=\ttfamily\scriptsize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=none,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\DeclareRobustCommand{\mb}[1]{\ensuremath{\boldsymbol{\mathbf{#1}}}}
+
+ \newacronym{KL}{kl}{Kullback-Leibler}
+\newacronym{ELBO}{elbo}{evidence lower bound}
+
+\newacronym{EM}{em}{expectation maximization}
+
+\newacronym{MCMC}{mcmc}{Markov chain Monte Carlo}
+\newacronym{MC}{mc}{Monte Carlo}
+
+\newacronym{EP}{ep}{expectation propagation}
+
+\newacronym{VI}{vi}{variational inference}
+\newacronym{MFVI}{mfvi}{mean-field variational inference}
+\newacronym{SVI}{svi}{stochastic variational inference}
+\newacronym{CAVI}{cavi}{coordinate ascent variational inference}
+
+\newacronym{AD}{ad}{automatic differentiation}
+\newacronym{ADVI}{advi}{automatic differentiation variational inference}
+\newacronym{ADVIDIAG}{advi-diag}{automatic differentiation variational
+inference diagonal}
+\newacronym{ADSVI}{adsvi}{automatic differentiation stochastic variational
+inference}
+
+\newacronym{RMSPROP}{rmsprop}{rmsprop}
+
+\newacronym{GMM}{gmm}{Gaussian mixture model}
+\newacronym{LDA}{lda}{latent Dirichlet allocation}
+\newacronym{ARD}{ard}{automatic relevance determination}
+
+\newacronym{SGA}{sga}{stochastic gradient ascent}
+
+\newacronym{MLE}{mle}{maximum likelihood estimate}
+ 
+\begin{document}
+
+\title{\textbf{Variational Inference: A Review for Statisticians}}
+\author{David M.~Blei\\
+  Department of Computer Science and Statistics\\ Columbia
+  University\\ \\
+  Alp Kucukelbir\\
+  Department of Computer Science \\ Columbia University\\ \\
+  Jon D.~McAuliffe \\
+  Department of Statistics\\University of California, Berkeley}
+\maketitle
+
+\bigskip
+
+\begin{abstract}
+One of the core problems of modern statistics is to approximate
+difficult-to-compute probability distributions. This problem is especially
+important in Bayesian statistics, which frames all inference about unknown
+quantities as a calculation about the posterior. In this paper, we review
+\gls{VI}, a method from machine learning that approximates
+probability distributions through optimization. \gls{VI} has been used in myriad
+applications and tends to be faster than classical methods, such as Markov chain
+Monte Carlo sampling. The idea behind \gls{VI} is to first posit a family of
+distributions and then to find the member of that family which is close to the
+target. Closeness is measured by Kullback-Leibler divergence. We review the
+ideas behind mean-field variational inference, discuss the special case of
+\gls{VI} applied to exponential family models, present a full example with a
+Bayesian mixture of Gaussians, and derive a variant that uses stochastic
+optimization to scale up to massive data.  We discuss modern research in
+\gls{VI} and highlight important open problems. \gls{VI} is
+powerful, but it is not yet well understood.  Our hope in writing this paper is
+to catalyze statistical research on this widely-used class of algorithms.
+\end{abstract}
+
+\emph{Keywords:} Algorithms; 
+Statistical Computing; Computationally Intensive Methods.
+
+\clearpage
+\glsresetall{}
+
+\section{Introduction}
+
+One of the core problems of modern statistics is to approximate
+difficult-to-compute probability distributions.  This problem is
+especially important in Bayesian statistics, which frames all
+inference about unknown quantities as a calculation about the
+posterior.  Modern Bayesian statistics relies on models for which the
+posterior is not easy to compute and corresponding algorithms for
+approximating them.
+
+In this paper, we review variational inference, a method from machine
+learning for approximating probability
+distributions~\citep{Jordan:1999,wainwright2008graphical}.
+Variational inference is widely used to approximate posterior
+distributions for Bayesian models, an alternative strategy to
+\gls{MCMC} sampling.  Compared to \gls{MCMC}, variational inference
+tends to be faster and easier to scale to large data---it has been
+applied to problems such as large-scale document analysis,
+high-dimensional neuroscience, and computer vision.  But variational
+inference has been studied less rigorously than than \gls{MCMC}, and
+its statistical properties are less well understood.  In writing this
+paper, our hope is to catalyze statistical research on variational
+inference.
+
+First, we set up the general problem.  Consider a joint distribution
+of latent variables ${\mathbf{z}} = z_{1:m}$ and observations ${\mathbf{x}} = x_{1:n}$,
+EQDS82Q
+In Bayesian models, the latent variables help govern the distribution
+of the data.  A Bayesian model draws the latent variables from a prior
+distribution $p({\mathbf{z}})$ and then relates them to the observations
+through the likelihood $p({\mathbf{x}} {\,\vert\,} {\mathbf{z}})$.  Inference in a Bayesian model
+amounts to conditioning on data and computing the posterior
+$p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$.  In complex Bayesian models, this computation often
+requires approximate inference.
+
+For over 50 years, the dominant paradigm for approximate inference has
+been \gls{MCMC}. First, we construct a Markov chain on ${\mathbf{z}}$ whose
+stationary distribution is the posterior $p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$.  Then, we
+sample from the chain for a long time to (hopefully) collect
+independent samples from the stationary distribution. Finally, we
+approximate the posterior with an empirical estimate constructed from
+the collected samples.
+
+\gls{MCMC} sampling has evolved into an indispensable tool to the
+modern Bayesian statistician. Landmark developments include the
+Metropolis-Hastings algorithm \citep{Metropolis:1953,Hastings:1970},
+the Gibbs sampler \citep{Geman:1984} and its application to Bayesian
+statistics \citep{Gelfand:1990}. \gls{MCMC} algorithms are under
+active investigation.  They have been widely studied, extended, and
+applied; see \citet{Robert:2004} for a perspective.
+
+Variational inference is an alternative approach to approximate
+inference. Rather than using sampling, the main idea behind variational
+inference is to use optimization.  First, we posit a
+\emph{family} of approximate distributions of the latent variables
+${\mathcal{Q}}$.  Then, we try to find the member of that family that minimizes
+the \gls{KL} divergence to the exact posterior,
+EQDS83Q
+Finally, we approximate the posterior with the optimized member of the
+family $q^*(\cdot)$.
+
+Variational inference thus turns the inference problem into an
+optimization problem, and the reach of the family ${\mathcal{Q}}$ manages the
+complexity of this optimization.  One of the key ideas behind
+variational inference is to choose ${\mathcal{Q}}$ to be flexible enough to
+capture a distribution close to $p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$, but simple enough for
+efficient optimization.
+
+We emphasize that \gls{MCMC} and variational inference are different
+approaches to solving the same problem.  \gls{MCMC} algorithms sample from a
+Markov chain; variational algorithms solve an optimization problem.
+\gls{MCMC} algorithms approximate the posterior with samples from the
+chain; variational algorithms approximate the posterior with the
+result of the optimization.
+
+\parhead{Research on variational inference.}  The development of
+variational techniques for Bayesian inference followed two parallel,
+yet separate, tracks. \citet{Peterson:1987} is arguably the first
+variational procedure for a particular model: a neural network. This
+paper, along with insights from statistical mechanics
+\citep{parisi1988statistical}, led to a flurry of variational
+inference procedures for a wide class of models
+\citep{saul1996mean,jaakkola1996computing,jaakkola1997variational,
+  ghahramani1997factorial,Jordan:1999}.  In parallel,
+\citet{Hinton:1993} proposed a variational algorithm for a similar
+neural network model. \citet{Neal:1999} (first published in 1993) made
+important connections to the expectation-maximization
+algorithm~\citep{Dempster:1977}, which then led to a variety of
+variational inference algorithms for other types of models
+\citep{Waterhouse:1996,mackay1997ensemble}.
+
+Modern research on variational inference focuses on several aspects: 
+tackling Bayesian inference problems that involve massive
+data; using improved optimization methods for solving
+Equation\nobreakspace \textup {(\ref {eq:general-VI-optimization})} (which is usually subject to local
+minima); developing generic variational inference, algorithms that are
+easy to apply to a wide class of models; and increasing the accuracy
+of variational inference, e.g., by stretching the boundaries of
+$\mathcal{Q}$ while managing complexity in optimization.
+
+\parhead{Organization of this paper.}  Section\nobreakspace \ref {sec:vi} describes the
+basic ideas behind the simplest approach to variational inference:
+mean-field inference and coordinate-ascent optimization.
+Section\nobreakspace \ref {sec:mog} works out the details for a Bayesian mixture of
+Gaussians, an example model familiar to many readers. Sections\nobreakspace \ref {sec:exp-fam} and\nobreakspace  \ref {sec:cond-conj} describe variational inference
+for the class of models where the joint distribution of the latent and
+observed variables are in the exponential family---this includes many
+intractable models from modern Bayesian statistics and reveals deep
+connections between variational inference and the Gibbs sampler
+of~\citet{Gelfand:1990}.  Section\nobreakspace \ref {sec:svi} expands on this algorithm to
+describe stochastic variational inference~\citep{Hoffman:2013}, which
+scales variational inference to massive data using stochastic
+optimization~\citep{Robbins:1951}. Finally, with these foundations in
+place, Section\nobreakspace \ref {sec:discussion} gives a perspective on the
+field---applications in the research literature, a survey of
+theoretical results, and an overview of some open problems.
+ \section{Variational inference}
+\label{sec:vi}
+
+The goal of variational inference is to approximate a conditional
+distribution of latent variables given observed variables. The key
+idea is to solve this problem with optimization. We use a family of
+distributions over the latent variables, parameterized by free
+``variational parameters.'' The optimization finds the member of this
+family, i.e., the setting of the parameters, that is closest in
+\gls{KL} divergence to the conditional of interest. The fitted
+variational distribution then serves as a proxy for the exact
+conditional distribution.
+
+\subsection{The problem of approximate inference} \label{sec:latent-var-models}
+
+Let ${\mathbf{x}} = x_{1:n}$ be a set of observed variables and ${\mathbf{z}} = z_{1:m}$
+be a set of latent variables, with joint distribution $p({\mathbf{z}},
+{\mathbf{x}})$. We omit constants, such as hyperparameters, from the notation.
+
+The inference problem is to compute the conditional distribution of
+the latent variables given the observations, $p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$. This
+conditional can be used to produce point or interval estimates of the
+latent variables, form predictive distributions of new data, and more.
+
+We can write the conditional distribution as
+EQDS84Q
+The denominator contains the marginal distribution of the observations, also
+called the \emph{evidence}. We calculate it by marginalizing out the
+latent variables from the joint distribution,
+EQDS85Q
+For many models, this evidence integral is unavailable in closed form
+or requires exponential time to compute. The evidence is what we need
+to compute the conditional from the joint; this is why inference in
+such models is hard.
+
+Note we assume that all unknown quantities of interest are represented
+as latent random variables.  This includes parameters that
+might govern all the data, as found in Bayesian models, and latent
+variables that are ``local'' to individual data points.  It might
+appear to the reader that variational inference is only relevant in
+Bayesian settings. It has certainly had a significant impact on
+applied Bayesian computation, and we will be focusing on Bayesian
+models here. We emphasize, however, that variational inference is a
+general-purpose tool for estimating conditional distributions. One
+need not be a Bayesian to have use for variational inference.
+
+\parhead{Bayesian mixture of Gaussians.} Consider a Bayesian mixture
+of unit-variance Gaussians. There are $K$ mixture components,
+corresponding to $K$ normal distributions with means
+${\mb{\mu}} = \{\mu_1, \ldots, \mu_K\}$. The mean parameters are drawn
+independently from a common prior $p(\mu_k)$, which we assume to be a
+Gaussian ${\mathcal{N}}(0, \sigma^2)$.  (The prior variance $\sigma^2$ is a
+hyperparameter.)  To generate an observation $x_i$ from the model, we
+first choose a cluster assignment $c_i$, from a categorical
+distribution over $\{1, \dots, K\}$. We then draw $x_i$ from the
+corresponding Gaussian ${\mathcal{N}} (\mu_{c_i}, 1)$.
+
+The full hierarchical model is
+EQDM19Q
+For a sample of size $n$, the joint distribution of latent and
+observed variables is
+EQDS89Q
+The latent variables are ${\mathbf{z}} = \{{\mb{\mu}}, {\mathbf{c}}\}$, the $K$ class means
+and $n$ class assignments.
+
+Here, the evidence is
+EQDS90Q
+The integrand in~Equation\nobreakspace \textup {(\ref {eq:gmm-marginal})} does not contain a separate
+factor for each $\mu_k$. (Indeed, each $\mu_k$ appears in all $n$
+factors of the integrand.) Thus, the integral
+in~Equation\nobreakspace \textup {(\ref {eq:gmm-marginal})} does not reduce to a product of
+one-dimensional integrals. The time required for numerical evaluation
+of the $K$-dimensional integral is exponential in $K$.
+
+If we distribute the product over the sum in~\eqref{eq:gmm-marginal} and
+rearrange, we can write the evidence as a sum over all possible
+configurations ${\mathbf{c}}$ of cluster assignments,
+EQDS91Q
+Here each individual integral is computable, thanks to the conjugacy
+between the Gaussian prior on the components and the Gaussian
+likelihood. But there are $K^n$ of them, one for each configuration of
+the cluster assignments. Computing the evidence remains
+exponential in $K$, hence intractable.
+
+\subsection{The evidence lower bound}
+\label{sec:elbo}
+
+In variational inference, we specify a family $\mathcal{Q}$ of
+distributions over the latent variables. Each $q({\mathbf{z}}) \in \mathcal{Q}$
+is a candidate approximation to the exact conditional. Our goal is to
+find the best candidate, the one closest in \gls{KL} divergence to the
+exact conditional.\footnote{ The \gls{KL} divergence is an
+  information-theoretic measure of proximity between two
+  distributions. It is asymmetric---that is,
+  ${\textsc{kl}\left({q \| p}\right)} \neq {\textsc{kl}\left({p \| q}\right)}$---and nonnegative. It is minimized
+  when $q(\cdot) = p(\cdot)$.}  Inference now amounts to solving the
+following optimization problem,
+EQDS92Q
+Once found, $q^*(\cdot)$ is the best approximation of the conditional,
+within the family ${\mathcal{Q}}$.  The complexity of the family determines the
+complexity of this optimization.
+
+However, this objective is not computable because it requires
+computing the evidence $\log p({\mathbf{x}})$ in Equation\nobreakspace \textup {(\ref {eq:marginal})}.  (That the
+evidence is hard to compute is why we appeal to approximate inference
+in the first place.) To see why, recall that \gls{KL} divergence is
+EQDS93Q
+where all expectations are taken with respect to $q({\mathbf{z}})$.  Expand the
+conditional,
+EQDS94Q
+This reveals its dependence on $\log p({\mathbf{x}})$.
+
+Because we cannot compute the \gls{KL}, we optimize an alternative
+objective that is equivalent to the \gls{KL} up to an added constant,
+EQDS95Q
+This function is called the \gls{ELBO}.  The \gls{ELBO} is the
+negative \gls{KL} divergence of Equation\nobreakspace \textup {(\ref {eq:kl})} plus $\log p({\mathbf{x}})$, which
+is a constant with respect to $q({\mathbf{z}})$.  Maximizing the \gls{ELBO} is
+equivalent to minimizing the \gls{KL} divergence.
+
+Examining the \gls{ELBO} gives intuitions about the optimal
+variational distribution.  We rewrite the \gls{ELBO} as a sum of the
+expected log likelihood of the data and the \gls{KL} divergence
+between the prior $p({\mathbf{z}})$ and $q({\mathbf{z}})$,
+EQDM27Q
+Which values of ${\mathbf{z}}$ will this objective encourage $q({\mathbf{z}})$ to place
+its mass on? The first term is an expected likelihood; it encourages
+distributions that place their mass on configurations of the latent
+variables that explain the observed data. The second term is the
+negative divergence between the variational distribution and the
+prior; it encourages distributions close to the prior.  Thus the
+variational objective mirrors the usual balance between likelihood and
+prior.
+
+Another property of the \gls{ELBO} is that it lower-bounds the (log)
+evidence, $\log p({\mathbf{x}}) \geq {\textsc{elbo}}(q)$ for any $q({\mathbf{z}})$. This explains
+the name. To see this notice that Equations\nobreakspace \textup {(\ref {eq:kl})} and\nobreakspace  \textup {(\ref {eq:elbo})} give the
+following expression of the evidence,
+EQDS98Q
+The bound then follows from the fact that ${\textsc{kl}\left({\cdot}\right)} \geq 0$.  In the
+original literature on variational inference, this was derived through
+Jensen's inequality~\citep{Jordan:1999}.
+
+Finally, many readers will notice that the first term of the
+\gls{ELBO} in Equation\nobreakspace \textup {(\ref {eq:elbo})} is the expected complete log-likelihood,
+which is optimized by the \gls{EM}
+algorithm~\citep{Dempster:1977}. The \gls{EM} algorithm was designed
+for finding maximum likelihood estimates in models with latent
+variables. It uses the fact that the \gls{ELBO} is equal to the log
+likelihood $\log p({\mathbf{x}})$ (i.e., the log evidence) when
+$q({\mathbf{z}}) = p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$.  \gls{EM} alternates between computing the
+expected complete log likelihood according to $p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$ (the E
+step) and optimizing it with respect to the model parameters (the M
+step). Unlike variational inference, \gls{EM} assumes the expectation
+under $p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$ is computable and uses it in otherwise difficult
+parameter estimation problems. Unlike \gls{EM}, variational inference
+does not estimate fixed model parameters---it is often used in a
+Bayesian setting where classical parameters are treated as latent
+variables. Variational inference applies to models where we cannot
+compute the exact conditional of the latent variables.\footnote{Two
+  notes: (a) Variational \gls{EM} is the \gls{EM} algorithm with a
+  variational E-step, i.e., a computation of an approximate
+  conditional. (b) The coordinate ascent algorithm of Section\nobreakspace \ref {sec:cavi}
+  can look like the \gls{EM} algorithm. The ``E step'' computes
+  approximate conditionals of local latent variables; the ``M step''
+  computes a conditional of the global latent variables.  }
+
+\subsection{The mean-field variational family}
+\label{sec:mff}
+
+We described the \gls{ELBO}, the variational objective function in the
+optimization of Equation\nobreakspace \textup {(\ref {eq:variational-optimization})}. We now describe a
+variational family ${\mathcal{Q}}$, to complete the specification of the
+optimization problem.  The complexity of the family determines the
+complexity of the optimization; it is more difficult to optimize over
+a complex family than a simple family.
+
+In this review we focus on the \emph{mean-field variational family},
+where the latent variables are mutually independent and each governed
+by a distinct factor in the variational distribution.  A generic member
+of the mean-field variational family is
+EQDS99Q
+Each latent variable $z_j$ is governed by its own distribution
+$q_j(z_j)$.  In optimization, these variational factors are chosen to
+maximize the \gls{ELBO} of~Equation\nobreakspace \textup {(\ref {eq:elbo})}.
+
+We emphasize that the variational family is not a model of the
+observed data---indeed, the data ${\mathbf{x}}$ does not appear in
+Equation\nobreakspace \textup {(\ref {eq:mf-family})}. Instead, it is the \gls{ELBO}, and the
+corresponding \gls{KL} minimization problem, that connects the fitted
+variational distribution to the data and model.
+
+Notice we have not specified the parametric form of the individual
+variational factors. In principle, each can take on any parametric
+form appropriate to the corresponding random variable. For example, a
+continuous variable might have a Gaussian factor; a categorical
+variable will typically have a categorical factor. We will see in
+Sections\nobreakspace \ref {sec:ef} and\nobreakspace  \ref {sec:cond-conj} that there are many models for which
+properties of the model determine optimal forms of the mean-field
+factors.
+
+Finally, though we focus on mean-field inference in this review,
+researchers have also studied more complex families.  One way to
+expand the family is to add dependencies between the
+variables~\citep{Saul:1996a,Barber:1999a}; this is called structured
+variational inference.  Another way to expand the family is to
+consider mixtures of variational distributions, i.e., additional
+latent variables within the variational family~\citep{Lawrence:1998}.
+Both of these methods potentially improve the fidelity of the
+approximation, but there is a trade off. Structured and mixture-based
+variational families come with a more difficult-to-solve variational
+optimization problem.
+
+\parhead{Bayesian mixture of Gaussians (continued).}  Consider again
+the Bayesian mixture of Gaussians. The mean-field variational family
+contains approximate posterior distributions of the form
+EQDS100Q
+Following the mean-field recipe, each latent variable is governed by
+its own variational factor.  The factor
+$q(\mu_k; \hat{\mu}_k, \hat{\sigma}^2_k)$ is a Gaussian distribution
+on the $k$th mixture component's mean parameter; its mean is
+$\hat{\mu}_k$ and its variance is $\hat{\sigma}^2_k$.  The factor
+$q(c_i; \varphi_i)$ is a distribution on the $i$th observation's
+mixture assignment; its cluster probabilities are a $K$-vector
+$\varphi_i$.
+
+Here we have asserted parametric forms for these factors: the mixture
+components are Gaussian with variational parameters (mean and
+variance) specific to the $k$th cluster; the cluster assignments are
+categorical with variational parameters (cluster probabilities)
+specific to the $i$th data point.  (In fact, these are the optimal
+forms of the mean-field variational distribution for the mixture of
+Gaussians.)
+
+With the variational family in place, we have completely specified the
+variational inference problem for the mixture of Gaussians.  The
+\gls{ELBO} is defined by the model definition in Equation\nobreakspace \textup {(\ref {eq:gmm})} and the
+mean-field family in Equation\nobreakspace \textup {(\ref {eq:gmm-mf-family})}.  The corresponding
+variational optimization problem maximizes the \gls{ELBO} with respect
+to the variational parameters, i.e., the Gaussian parameters for each
+mixture component and the categorical parameters for each cluster
+assignment.  We will see this example through in Section\nobreakspace \ref {sec:mog}.
+
+\parhead{Visualizing the mean-field approximation.}  The mean-field family is
+expressive because it can capture any marginal distribution of the
+latent variables.  However, it cannot capture correlation between
+them.  Seeing this in action reveals some of the intuitions and
+limitations of mean-field variational inference.
+
+Consider a two dimensional Gaussian distribution, shown in violet in
+Figure\nobreakspace \ref {fig:accuracy}. This distribution is highly correlated, which
+defines its elongated shape.
+
+The optimal mean-field variational approximation to this posterior is
+a product of two Gaussian distributions. Figure\nobreakspace \ref {fig:accuracy} shows the
+mean-field variational density after maximizing the \gls{ELBO}. While
+the variational approximation has the same mean as the original
+distribution, its covariance structure is, by construction, decoupled.
+
+Further, the marginal variances of the approximation under-represent
+those of the target distribution. This is a common effect in
+mean-field variational inference and, with this example, we can see
+why.  The \gls{KL} divergence from the approximation to the posterior
+is in Equation\nobreakspace \textup {(\ref {eq:kl-simple})}.  It penalizes placing mass in $q(\cdot)$ on
+areas where $p(\cdot)$ has little mass, but penalizes less the
+reverse.  In this example, in order to successfully match the marginal
+variances, the circular $q(\cdot)$ would have to expand into territory
+where $p(\cdot)$ has little mass.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=3in]{figs/main-figure0.pdf}
+  \caption{Visualizing the mean-field approximation to a two-dimensional
+  Gaussian posterior. The ellipses ($2\sigma$) show the effect of mean-field
+  factorization.}
+  \label{fig:accuracy}
+\end{figure}
+
+\subsection{Coordinate ascent mean-field variational inference}
+\label{sec:cavi}
+
+Using the \gls{ELBO} and the mean-field family, we have cast
+approximate conditional inference as an optimization problem.  In this
+section, we describe one of the most commonly used algorithms for
+solving this optimization problem, \gls{CAVI}~\citep{Bishop:2006}. \gls{CAVI}
+iteratively optimizes each
+factor of the mean-field variational distribution, while holding the
+others fixed.  It climbs the \gls{ELBO} to a local optimum.
+
+\parhead{The algorithm.}  We first state a result.  Consider the
+$j$th latent variable $z_j$.  The \emph{complete conditional} of
+$z_j$ is its conditional distribution given all of the other latent
+variables in the model and the observations,
+$p(z_j {\,\vert\,} {\mathbf{z}}_{-j}, {\mathbf{x}})$.  Fix the other variational
+factors $q_{\ell}(z_{\ell})$, $\ell \neq j$.  The optimal
+$q_{j}(z_j)$ is then proportional to the exponentiated expected log of the
+complete conditional,
+EQDS101Q
+The expectation in Equation\nobreakspace \textup {(\ref {eq:qstar})} is with respect to the (currently
+fixed) variational distribution over ${\mathbf{z}}_{-j}$, that is,
+$\prod_{\ell \neq j} q_\ell(z_\ell)$. Equivalently, Equation\nobreakspace \textup {(\ref {eq:qstar})} is
+proportional to the exponentiated log of the joint,
+EQDS102Q
+Because of the mean-field family---that all the latent variables are
+independent---the expectations on the right hand side do not involve
+the $j$th variational factor.  Thus this is a valid coordinate update.
+
+These equations underlie the \gls{CAVI} algorithm, presented as
+Algorithm\nobreakspace \ref {alg:cavi}. We maintain a set of variational factors
+$q_{\ell}(z_{\ell})$. We iterate through them, updating $q_{j}(z_j)$ using
+Equation\nobreakspace \textup {(\ref {eq:optimal-qj})}. \gls{CAVI} goes uphill on the \gls{ELBO} of
+Equation\nobreakspace \textup {(\ref {eq:elbo})}, eventually finding a local optimum.
+
+\gls{CAVI} is closely related to Gibbs
+sampling~\citep{Geman:1984,Gelfand:1990}, the classical workhorse of
+approximate inference.  The Gibbs sampler maintains a realization of
+the latent variables and iteratively samples from each variable's
+complete conditional.  Equation\nobreakspace \textup {(\ref {eq:optimal-qj})} uses the same complete
+conditional. It takes the expected log, and uses this quantity to
+iteratively set each variable's variational factor.\footnote{Many
+  readers will know that we can significantly speed up the Gibbs
+  sampler by marginalizing out some of the latent variables; this is
+  called collapsed Gibbs sampling. We can speed up variational
+  inference with similar reasoning; this is called collapsed
+  variational inference~\citep{Hensman:2012a}.  (But these ideas are
+  outside the scope of our review.)}
+
+\glsreset{CAVI}
+\begin{algorithm}[t]
+\setstretch{1.25}
+\KwIn{A model $p({\mathbf{x}}, {\mathbf{z}})$, a data set ${\mathbf{x}}$}
+\KwOut{A variational distribution $q({\mathbf{z}}) = \prod_{j=1}^{m} q_{j}(z_j)$}
+\textbf{Initialize:} Variational factors $q_{j}(z_j)$ \\
+\While{the \gls{ELBO} has not converged} {
+  \For{$j \in \{1, \ldots, m\}$} {
+    Set $q_{j}(z_j) \propto \exp\{{\mathbb{E}}_{-j}[\log p(z_j {\,\vert\,} {\mathbf{z}}_{-j}, {\mathbf{x}})]\}$\\
+  }
+  Compute ${\textsc{elbo}}(q) = {\mathbb{E}\left[{\log p({\mathbf{z}}, {\mathbf{x}})}\right]} + {\mathbb{E}\left[{\log q({\mathbf{z}})}\right]}$
+}
+\Return{$q({\mathbf{z}})$}
+\caption{\Gls{CAVI}}
+\label{alg:cavi}
+\end{algorithm}
+
+\parhead{Derivation.} We now derive the coordinate update in
+Equation\nobreakspace \textup {(\ref {eq:optimal-qj})}. The idea appears in~\citet{Bishop:2006}, but the
+argument there uses gradients, which we do not. Rewrite the \gls{ELBO} of
+Equation\nobreakspace \textup {(\ref {eq:elbo})} as a function of the $j$th variational factor $q_j(z_j)$,
+absorbing into a constant the terms that do not depend on it,
+EQDS103Q
+We have rewritten the first term of the \gls{ELBO} using iterated expectation.
+The second term we have decomposed, using the independence of the variables
+(i.e., the mean-field assumption) and retaining only the term that depends
+on $q_j(z_j)$.
+
+Up to an added constant, the objective function in
+Equation\nobreakspace \textup {(\ref {eq:coordinate-elbo})} is equal to the negative \gls{KL} divergence between
+$q_{j}(z_j)$ and $q^*_{j}(z_j)$ from Equation\nobreakspace \textup {(\ref {eq:optimal-qj})}. Thus we
+maximize the \gls{ELBO} with respect to $q_j$ when we set
+$q_{j}(z_j) = q^*_{j}(z_j)$.
+
+\subsection{Practicalities}
+\label{sec:practicalities}
+
+Here, we highlight a few things to keep in mind when implementing and
+using variational inference in practice.
+
+\parhead{Initialization.}  The \gls{ELBO} is (generally) a non-convex
+objective function. \gls{CAVI} only guarantees convergence to a local
+optimum, which can be sensitive to initialization. Figure\nobreakspace \ref {fig:init}
+shows the \gls{ELBO} trajectory for 10 random initializations using
+the Gaussian mixture model.  (This inference is on images; see
+Section\nobreakspace \ref {sec:gaussian-study}.) Each initialization reaches a different
+value, indicating the presence of many local optima in the \gls{ELBO}.
+Note that better local optima give variational distributions that are
+closer to the exact posterior.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=5in]{figs/main-figure1.pdf}
+  \caption{Different initializations may lead \gls{CAVI} to find different local
+optima of the \gls{ELBO}.}
+  \label{fig:init}
+\end{figure}
+
+\parhead{Assessing convergence.} Monitoring the \gls{ELBO} in
+\gls{CAVI} is simple; we typically assess convergence once the change
+in \gls{ELBO} has fallen below some small threshold. However,
+computing the \gls{ELBO} of the full dataset may be
+undesirable. Instead, we suggest computing the average log predictive
+of a small held-out dataset. Monitoring changes here is a proxy to
+monitoring the \gls{ELBO} of the full data.
+
+\parhead{Numerical stability.} Probabilities are constrained to live
+within $ [0,1]$. Precisely manipulating and performing arithmetic of
+small numbers requires additional care. When possible, we recommend
+working with logarithms of probabilities.  One useful identity is the
+``log-sum-exp'' trick,
+EQDS104Q
+The constant $\alpha$ is typically set to $\max_i x_i$. This provides
+numerical stability to common computations in variational inference
+procedures.
+ \section{A complete example: Bayesian mixture of Gaussians}
+\label{sec:mog}
+
+\begin{algorithm}[t]
+\setstretch{1.25}
+
+\KwIn{Data $x_{1:n}$, number of components $K$, prior variance of
+  component means $\sigma^2$ }
+
+\KwOut{Variational distributions $q(z_i; \varphi_i)$ ($K$-categorical)
+  and $q(\mu_k; \hat{\mu}_k, \hat{\sigma}_k^2)$ (Gaussian)}
+
+\textbf{Initialize:} Variational parameters $\{\varphi_{1:n},
+\hat{\mu}_{1:K}, \hat{\sigma}_{1:K}^2\}$.\\
+
+\While{the \gls{ELBO} has not converged} {
+  \For{$i \in \{1, \ldots, n\}$}
+  {
+    Set $\varphi_{ik} \propto \exp\{{\mathbb{E}\left[{\mu_k; \hat{\mu}_k,
+      \hat{\sigma}_k^2}\right]} x_i - {\mathbb{E}\left[{\mu_k^2; \hat{\mu}_k, \hat{\sigma}_k^2}\right]} / 2\}$\\
+  }
+  \For{$k \in \{1, \ldots, K\}$}
+  {
+    EQDM35Q
+  }
+  Compute ${\textsc{elbo}}(\varphi_{1:n}, \hat{\mu}_{1:K}, \hat{\sigma}^2_{1:K})$
+}
+\Return{$\{\varphi_{1:n}, \hat{\mu}_{1:K}, \hat{\sigma}_{1:K}^2\}$}
+\caption{\gls{CAVI} for a Gaussian mixture model}
+\label{alg:gmm-cavi}
+\end{algorithm}
+
+As an example, we return to the simple mixture of Gaussians model of
+Section\nobreakspace \ref {sec:latent-var-models}. To review, consider $K$ mixture
+components and $n$ real-valued data points $x_{1:n}$. The latent
+variables are $K$ real-valued mean parameters ${\mb{\mu}} = \mu_{1:K}$ and
+$n$ latent-class assignments ${\mathbf{c}} = c_{1:n}$. The assignment $c_i$
+indicates which latent cluster $x_i$ comes from. In detail, $c_i$ is
+an indicator $K$-vector, all zeroes except for a one in the position
+corresponding to $x_i$'s cluster. There is a fixed hyperparameter
+$\sigma^2$, the variance of the normal prior on the $\mu_k$'s. We
+assume the observation variance is one and take a uniform prior over
+the mixture components.
+
+The joint distribution of the latent and observed variables is in
+Equation\nobreakspace \textup {(\ref {eq:gmm})}.  The variational family is in Equation\nobreakspace \textup {(\ref {eq:gmm-mf-family})}.
+Recall that there are two types of variational
+parameters---categorical parameters $\varphi_i$ for approximating the
+posterior cluster assignment of the $i$th data point and Gaussian
+parameters $(\hat{\mu}_k, \hat{\sigma}_k)$ for approximating the
+posterior of the $k$th mixture component.
+
+We combine the joint and the mean-field family to form the \gls{ELBO}
+for the mixture of Gaussians.  It is a function of the variational
+parameters,
+EQDM36Q
+In each term, we have made explicit the dependence on the variational
+parameters.  Each expectation can be computed in closed form.
+
+The \gls{CAVI} algorithm updates each variational parameter in turn.
+We first derive the update for the variational cluster assignment
+factor; we then derive the update for the variational mixture
+component factor.
+
+\subsection{The variational distribution of the mixture assignments}
+We first derive the variational update for the cluster assignment
+$c_i$.  Using Equation\nobreakspace \textup {(\ref {eq:optimal-qj})},
+EQDS110Q
+The terms in the exponent are the components of the joint distribution
+that depend on $c_i$.  The expectation in the second term is over the
+mixture components ${\mb{\mu}}$.
+
+The first term of Equation\nobreakspace \textup {(\ref {eq:gmm-z-update})} is the log prior of $c_i$. It
+is the same for all possible values of $c_i$,
+$\log p(c_i) = - \log K$. The second term is the expected log of the
+$c_i$th Gaussian density. Recalling that $c_i$ is an indicator vector,
+we can write
+ EQDS111Q  We
+use this to compute the expected log probability,
+EQDM38Q
+In each line we remove terms that are constant with respect to $c_i$.
+This calculation requires ${\mathbb{E}\left[{\mu_k}\right]}$ and ${\mathbb{E}\left[{\mu_k^2}\right]}$ for each
+mixture component, both computable from the variational Gaussian on
+the $k$th mixture component.
+
+Thus the variational update for the $i$th cluster assignment is
+EQDS115Q
+Notice it is only a function of the variational parameters for the
+mixture components.
+
+\subsection{The variational distribution of the mixture-component means}
+\label{sec:vardist-mixcomp-means}
+
+We turn to the variational distribution
+$q(\mu_k; \hat{\mu}_k, \hat{\sigma}_k^2)$ of the $k$th mixture
+component. Again we use Equation\nobreakspace \textup {(\ref {eq:optimal-qj})} and write down the joint
+density up to a normalizing constant,
+EQDS116Q
+We now calculate the unnormalized log of this coordinate-optimal
+$q(\mu_k)$. Recall $\varphi_{ik}$ is the probability that the $i$th
+observation comes from the $k$th cluster. Because $c_i$ is an
+indicator vector, we see that $\varphi_{ik} =
+{\mathbb{E}\left[{c_{ik}; \varphi_i}\right]}$. Now
+EQDM41Q
+This calculation reveals that the coordinate-optimal variational
+distribution of $\mu_k$ is an exponential family with sufficient
+statistics $\{ \mu_k, \mu_k^2 \}$ and natural parameters
+$\{ \sum_{i=1}^{n} \varphi_{ik} x_i, -1/2 \sigma^2 - \textstyle
+\sum_{i=1}^{n} \varphi_{ik} / 2 \}$,
+i.e., a Gaussian.  Expressed in terms of the variational mean and
+variance, the updates for $q(\mu_k)$ are
+EQDS122Q
+
+These updates relate closely to the complete conditional distribution
+of the $k$th component in the mixture model. The complete conditional
+is a posterior Gaussian given the data assigned to the $k$th
+component. The variational update is a weighted complete conditional,
+where each data point is weighted by its variational probability of
+being assigned to component $k$.
+
+\subsection{CAVI for the mixture of Gaussians}
+
+Algorithm\nobreakspace \ref {alg:gmm-cavi} presents coordinate-ascent variational inference
+for the Bayesian mixture of Gaussians.  It combines the variational
+updates in Equation\nobreakspace \textup {(\ref {eq:gmm-z-update})} and Equation\nobreakspace \textup {(\ref {eq:gmm-mu-update})}.  The
+algorithm requires computing the \gls{ELBO} of Equation\nobreakspace \textup {(\ref {eq:mog-elbo})}.  We
+use the \gls{ELBO} to track the progress of the algorithm and assess
+when it has converged.
+
+Once we have a fitted variational distribution, we can use it as we
+would use the posterior. For example, we can obtain a posterior
+decomposition of the data. We assign points to their most likely
+mixture assignment $\hat{c}_i = \operatorname*{arg\,max}_{k} \varphi_{ik}$ and estimate
+cluster means with their variational means $\hat{\mu}_k$.
+
+We can also use the fitted variational distribution to approximate the
+predictive distribution of new data.  This approximate predictive is a
+mixture of Gaussians,
+EQDS123Q
+where $p(x_{\textrm{new}} {\,\vert\,} \hat{\mu}_k)$ is a Gaussian with 
+mean $\hat{\mu}_k$ and unit variance.
+
+\subsection{Empirical study}
+\label{sec:gaussian-study}
+
+We present two analyses to demonstrate the mixture of Gaussians
+algorithm in action.  The first is a simulation study; the second is
+an analysis of a data set of natural images.
+
+\parhead{Simulation study.} Consider two-dimensional real-valued data
+${\mathbf{x}}$. We simulate $K=5$ Gaussians with random means, covariances, and
+mixture assignments. Figure\nobreakspace \ref {fig:gmm_2d} shows the data; each point is
+colored according to its true cluster.  Figure\nobreakspace \ref {fig:gmm_2d} also
+illustrates the initial variational distribution of the mixture
+components---each is a Gaussian, nearly centered, and with a wide
+variance; the subpanels plot the variational distribution of the
+components as the \gls{CAVI} algorithm progresses.
+
+The progression of the \gls{ELBO} tells a story.  We highlight key
+points where the \gls{ELBO} develops ``elbows'', phases of the
+maximization where the variational approximation changes its
+shape. These ``elbows'' arise because the \gls{ELBO} is not a convex
+function in terms of the variational parameters; \gls{CAVI} 
+iteratively reaches better plateaus.
+
+Finally, we plot the logarithm of the Bayesian predictive distribution
+as approximated by the variational distribution. Here we report the
+average across held-out data. Note this plot is smoother than
+the \gls{ELBO}.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=5in]{figs/gmm_2d.pdf}
+  \caption{A simulation study of a two dimensional Gaussian mixture model.
+  The ellipses are $2\sigma$ contours of the variational approximating factors.}
+  \label{fig:gmm_2d}
+\end{figure}
+
+\parhead{Image analysis.}  We now turn to an experimental
+study. Consider the task of grouping images according to their color
+profiles. One approach is to compute the color histogram of the
+images. Figure\nobreakspace \ref {fig:histo} shows the red, green, and blue channel
+histograms of two images from the image\textsc{clef} data
+\citep{villegas13_CLEF}. Each histogram is a vector of length 192;
+concatenating the three color histograms gives a 576-dimensional
+representation of each image, regardless of its original size in
+pixel-space.
+
+We use \gls{CAVI} to fit a Gaussian mixture model to image
+histograms. We randomly select two sets of ten thousand images from
+the image\textsc{clef} collection to serve as training and testing
+datasets.  Figure\nobreakspace \ref {fig:clusters} shows similarly colored images assigned
+to four randomly chosen clusters.  Figure\nobreakspace \ref {fig:image_logpred} shows the
+average log predictive accuracy of the testing set as a function of
+time. We compare \gls{CAVI} to an implementation in Stan
+\citep{stan-manual:2015}, which uses a Hamiltonian Monte Carlo-based
+sampler \citep{Hoffman-Gelman:2011}. (Details are in Appendix\nobreakspace \ref {app:cavi}.)
+\gls{CAVI} is orders of magnitude faster than this sampling
+algorithm.\footnote{This is not a definitive comparison between
+  variational inference and MCMC.  Other samplers, such as a collapsed
+  Gibbs sampler, may perform better than HMC.}
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=5in]{figs/histo.pdf}
+  \caption{Red, green, and blue channel image histograms for two images from
+  the image\textsc{clef} dataset. The top image lacks blue hues, which is
+  reflected in its blue channel histogram. The bottom image has a few
+  dominant shades of blue and green, as seen in the peaks of
+  its histogram.}
+  \label{fig:histo}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+  \begin{subfigure}[b]{1in}
+    \centering
+    \includegraphics[width=1in]{figs/clusters/cluster2.jpg}
+    \caption{Purple}
+    \label{sub:purple}
+  \end{subfigure}
+  \hspace*{0.1in}
+  \begin{subfigure}[b]{1in}
+    \centering
+    \includegraphics[width=1in]{figs/clusters/cluster7.jpg}
+    \caption{Green and White}
+    \label{sub:green_and_white}
+  \end{subfigure}
+  \hspace*{0.1in}
+  \begin{subfigure}[b]{1in}
+    \centering
+    \includegraphics[width=1in]{figs/clusters/cluster21.jpg}
+    \caption{Orange}
+    \label{sub:orange}
+  \end{subfigure}
+  \hspace*{0.1in}
+  \begin{subfigure}[b]{1in}
+    \centering
+    \includegraphics[width=1in]{figs/clusters/cluster27.jpg}
+    \caption{Grayish Blue}
+    \label{sub:grayish_blue}
+  \end{subfigure}
+  \caption{Example clusters from the Gaussian mixture model. We
+  assign each image to its most likely mixture cluster. The subfigures show nine
+  randomly sampled images from four clusters; their namings are subjective.
+  }
+  \label{fig:clusters}
+\end{figure}
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=5in]{figs/main-figure2.pdf}
+  \caption{Comparison of \gls{CAVI} to a Hamiltonian Monte Carlo-based sampling
+  technique. \gls{CAVI} fits a Gaussian mixture model to ten
+  thousand images in less than a minute.}
+  \label{fig:image_logpred}
+\end{figure}
+ \section{Variational inference with exponential families} \label{sec:ef}
+
+We described mean-field variational inference and derived \gls{CAVI},
+a general coordinate-ascent algorithm for optimizing the \gls{ELBO}.
+We demonstrated this approach on a simple mixture of Gaussians, where
+each coordinate update was available in closed form.
+
+The mixture of Gaussians is one member of the important class of
+models where each complete conditional is in the exponential family.
+This includes a number of widely-used models, such as Bayesian
+mixtures of exponential families, factorial mixture models, matrix
+factorization models, certain hierarchical regression models (e.g.,
+linear regression, probit regression, Poisson regression), stochastic
+blockmodels of networks, hierarchical mixtures of experts, and a
+variety of mixed-membership models (which we will discuss below).
+
+Working in this family simplifies variational inference: it is easier
+to derive the corresponding \gls{CAVI} algorithm, and it enables
+variational inference to scale up to massive data.  In
+Section\nobreakspace \ref {sec:exp-fam}, we develop the general case.  In
+Section\nobreakspace \ref {sec:cond-conj}, we discuss conditionally conjugate models, i.e.,
+the common Bayesian application where some latent variables are
+``local'' to a data point and others, usually identified with
+parameters, are ``global'' to the entire data set.  Finally, in
+Section\nobreakspace \ref {sec:svi}, we describe stochastic variational
+inference~\citep{Hoffman:2013}, a stochastic optimization algorithm
+that scales up variational inference in this setting.
+
+\subsection{Complete conditionals in the exponential family}
+\label{sec:exp-fam}
+
+Consider the generic model $p({\mathbf{x}}, {\mathbf{z}})$ of
+Section\nobreakspace \ref {sec:latent-var-models} and suppose each complete conditional is
+in the exponential family:
+EQDS124Q
+where $z_j$ is its own sufficient statistic, $h(\cdot)$ is a base
+measure, and $a(\cdot)$ is the log normalizer~\citep{Brown:1986}.
+Because this is a conditional distribution, the parameter
+$\eta_j({\mathbf{z}}_{-j}, {\mathbf{x}})$ is a function of the conditioning set.
+
+Consider mean-field variational inference for this class of models,
+where we fit $q({\mathbf{z}}) = \prod_{j} q_j(z_j)$.  The exponential family
+assumption simplifies the coordinate update of Equation\nobreakspace \textup {(\ref {eq:qstar})},
+EQDM45Q
+This update reveals the parametric form of the optimal variational
+factors.  Each one is in the same exponential family as its
+corresponding complete conditional.  Its parameter has the same
+dimension and it has the same base measure $h(\cdot)$ and log
+normalizer $a(\cdot)$.
+
+Having established their parametric forms, let $\nu_j$ denote the
+variational parameter for the $j$th variational factor.  When we
+update each factor, we set its parameter equal to the expected
+parameter of the complete conditional,
+EQDS128Q
+This expression facilitates deriving \gls{CAVI} algorithms for many
+complex models.
+ \subsection{Conditional conjugacy and Bayesian models}
+\label{sec:cond-conj}
+
+One important special case of exponential family models are
+\textit{conditionally conjugate models} with local and global
+variables. Models like this come up frequently in Bayesian statistics
+and statistical machine learning, where the global variables are the
+``parameters'' and the local variables are per-data-point latent
+variables.
+
+\parhead{Conditionally conjugate models.}  Let $\beta$ be a vector of
+\textit{global latent variables}, which potentially govern any of the
+data. Let ${\mathbf{z}}$ be a vector of \textit{local latent variables}, whose
+$i$th component only governs data in the $i$th ``context.'' The joint
+distribution is
+EQDS129Q
+The mixture of Gaussians of Section\nobreakspace \ref {sec:mog} is an example. The global
+variables are the mixture components; the $i$th local variable is the
+cluster assignment for data point $x_i$.
+
+We will assume that the modeling terms of~Equation\nobreakspace \textup {(\ref {eq:lg-joint})} are
+chosen to ensure each complete conditional is in the exponential
+family. In detail, we first assume the joint distribution of each
+$(x_i, z_i)$ pair, conditional on $\beta$, has an exponential family
+form,
+EQDS130Q
+where $t(\cdot, \cdot)$ is the sufficient statistic.
+
+Next, we take the prior on the global variables to be the
+corresponding conjugate prior~\citep{diaconis1979conjugate,Bernardo:1994},
+EQDS131Q
+This prior has natural (hyper)parameter
+$\alpha = [\alpha_1, \alpha_2]$ and sufficient statistics that
+concatenate the global variable and its log normalizer in the
+distribution of the local variables.
+
+With the conjugate prior, the complete conditional of the global
+variables is in the same family.  Its natural parameter is
+EQDM50Q
+
+Turn now to the complete conditional of the local variable
+$z_i$. Given $\beta$ and $x_i$, the local variable $z_i$ is
+conditionally independent of the other local variables ${\mathbf{z}}_{-i}$ and
+other data ${\mathbf{x}}_{-i}$.  This follows from the form of the joint
+distribution in Equation\nobreakspace \textup {(\ref {eq:lg-joint})}.  Thus
+EQDS134Q
+We further assume that this distribution is in an exponential family,
+EQDS135Q
+This is a property of the local likelihood term $p(z_i, x_i {\,\vert\,} \beta)$
+from~Equation\nobreakspace \textup {(\ref {eq:zi-xi-given-beta})}.  For example, in the mixture of
+Gaussians, the complete conditional of the local variable is a
+categorical.
+
+\parhead{Variational inference in conditionally conjugate models.}  We
+now describe \gls{CAVI} for this general class of models. Write
+$q(\beta {\,\vert\,} \lambda)$ for the variational posterior approximation on
+$\beta$; we call $\lambda$ the ``global variational parameter''.  It
+indexes the same exponential family distribution as the prior.
+Similarly, let the variational posterior $q(z_i {\,\vert\,} \varphi_i)$ on each
+local variable $z_i$ be governed by a ``local variational parameter''
+$\varphi_{i}$.  It indexes the same exponential family distribution as
+the local complete conditional.  \gls{CAVI} iterates between updating
+each local variational parameter and updating the global variational
+parameter.
+
+The local variational update is
+EQDS136Q
+This is an application of Equation\nobreakspace \textup {(\ref {eq:exp-fam-cavi})}, where we take the
+expectation of the natural parameter of the complete conditional in
+Equation\nobreakspace \textup {(\ref {eq:local-cc})}.
+
+The global variational update applies the same technique.  It is
+EQDM54Q
+Here we take the expectation of the natural parameter in
+Equation\nobreakspace \textup {(\ref {eq:hat-alpha})}.
+
+\gls{CAVI} optimizes the \gls{ELBO} by iterating between local updates
+of each local parameter and global updates of the global parameters.
+To assess convergence we can compute the \gls{ELBO} at each iteration
+(or at some lag), up to a constant that does not depend on the
+variational parameters,
+EQDS138Q
+This is the \gls{ELBO} in Equation\nobreakspace \textup {(\ref {eq:elbo})} applied to the joint in
+Equation\nobreakspace \textup {(\ref {eq:lg-joint})} and the corresponding mean-field variational
+distribution; we have omitted terms that do not depend on the
+variational parameters.  The last term is
+EQDS139Q
+Note that \gls{CAVI} for the mixtures of Gaussians (Section\nobreakspace \ref {sec:mog}) is
+an instance of this method.
+ \subsection{Stochastic variational inference}
+\label{sec:svi}
+
+Modern applications of probability models often require analyzing
+massive data.  However, most posterior inference algorithms do not
+easily scale. \gls{CAVI} is no exception, particularly in the
+conditionally conjugate setting of Section\nobreakspace \ref {sec:cond-conj}.  The reason
+is that the coordinate ascent structure of the algorithm requires
+iterating through the entire data set at each iteration.  As the data
+set size grows, each iteration becomes more computationally expensive.
+
+An alternative to coordinate ascent is gradient-based optimization,
+which climbs the \gls{ELBO} by computing and following its gradient at
+each iteration. This perspective is the key to scaling up variational
+inference using \gls{SVI}~\citep{Hoffman:2013}, a method that combines
+natural gradients~\citep{Amari:1998} and stochastic
+optimization~\citep{Robbins:1951}.
+
+\gls{SVI} focuses on optimizing the global variational parameters
+$\lambda$ of a conditionally conjugate model. The flow of computation
+is simple. The algorithm maintains a current estimate of the global
+variational parameters. It repeatedly (a) subsamples a data point from
+the full data set; (b) uses the current global parameters to compute
+the optimal local parameters for the subsampled data point; and (c)
+adjusts the current global parameters in an appropriate way. \gls{SVI}
+is detailed in Algorithm\nobreakspace \ref {alg:svi}.  We now show why it is a valid
+algorithm for optimizing the \gls{ELBO}.
+
+\parhead{The natural gradient of the \gls{ELBO}.}  In gradient-based
+optimization, the \textit{natural gradient} accounts for the geometric
+structure of probability parameters~\citep{Amari:1982,Amari:1998}.
+Specifically, natural gradients warp the parameter space in a sensible
+way, so that moving the same distance in different directions amounts
+to equal change in symmetrized \gls{KL} divergence.  The usual
+Euclidean gradient does not enjoy this property.
+
+In exponential families, we find the natural gradient with respect to
+the parameter by premultiplying the usual gradient by the inverse
+covariance of the sufficient statistic, $a''(\lambda)^{-1}$.  This is
+the inverse Riemannian metric and the inverse Fisher information
+matrix~\citep{Amari:1982}.
+
+Conditionally conjugate models enjoy simple natural gradients of the
+\gls{ELBO}.  We focus on gradients with respect to the global
+parameter $\lambda$.  \citet{Hoffman:2013} derive the Euclidean
+gradient of the \gls{ELBO},
+EQDS140Q
+where ${\mathbb{E}_{{\varphi}}\left[{\hat{\alpha}}\right]}$ is in Equation\nobreakspace \textup {(\ref {eq:lambda})}.
+Premultiplying by the inverse Fisher information gives the natural
+gradient $g(\lambda)$,
+EQDS141Q
+It is the difference between the coordinate updates
+${\mathbb{E}_{{\varphi}}\left[{\hat{\alpha}}\right]}$ and the variational parameters $\lambda$
+at which we are evaluating the gradient.  In addition to enjoying good
+theoretical properties, the natural gradient is easier to calculate
+than the Euclidean gradient.  For more on natural gradients and
+variational inference see~\citet{Sato:2001} and \citet{Honkela:2008}.
+
+We can use this natural gradient in a gradient-based optimization
+algorithm.  At each iteration, we update the global parameters,
+EQDS142Q
+where $\epsilon_t$ is a step size.
+
+Substituting Equation\nobreakspace \textup {(\ref {eq:nat-grad})} into the second term reveals a special
+structure,
+EQDS143Q
+Notice this does not require additional types of calculations other
+than those for coordinate ascent updates.  At each iteration, we first
+compute the coordinate update. We then adjust the current estimate to
+be a weighted combination of the update and the current variational
+parameter.
+
+Though easy to compute, using the natural gradient has the same cost
+as the coordinate update in Equation\nobreakspace \textup {(\ref {eq:lambda})}; it requires summing over
+the entire data set and computing the optimal local variational
+parameters for each data point.  With massive data, this is prohibitively expensive.
+
+\parhead{Stochastic optimization of the \gls{ELBO}.} Stochastic
+variational inference solves this problem by using the natural
+gradient in a stochastic optimization algorithm. Stochastic
+optimization algorithms follow noisy but cheap-to-compute gradients to
+reach the optimum of an objective function.  (In the case of the
+\gls{ELBO}, stochastic optimization will reach a local optimum.) In
+their seminal paper, \citet{Robbins:1951} proved results implying that
+optimization algorithms can successfully use noisy, unbiased
+gradients, as long as the step size sequence satisfies certain
+conditions.  This idea has
+blossomed~\citep{Spall:2003,Kushner:1997}. Stochastic optimization has
+enabled modern machine learning to scale to massive
+data~\citep{Bottou:2004}.
+
+Our aim is to construct a cheaply computed, noisy, unbiased natural
+gradient. We expand the natural gradient in Equation\nobreakspace \textup {(\ref {eq:nat-grad})} using
+Equation\nobreakspace \textup {(\ref {eq:hat-alpha})}
+EQDS144Q
+where $\varphi^*_i$ indicates that we consider the optimized local
+variational parameters (at fixed global parameters $\lambda$) in
+Equation\nobreakspace \textup {(\ref {eq:local-update})}.  We construct a noisy natural gradient by
+sampling an index from the data and then rescaling the second term,
+EQDM62Q
+The noisy natural gradient $\hat{g}(\lambda)$ is unbiased:
+${\mathbb{E}_{{t}}\left[{\hat{g}(\lambda)}\right]} = g(\lambda)$.  And it is cheap to
+compute---it only involves a single sampled data point and only one
+set of optimized local parameters.  (This immediately extends to
+minibatches, where we sample $B$ data points and rescale
+appropriately.)  Again, the noisy gradient only requires calculations
+from the coordinate ascent algorithm.  The first two terms of
+Equation\nobreakspace \textup {(\ref {eq:noisy-nat-grad})} are equivalent to the coordinate update in a
+model with $n$ replicates of the sampled data point.
+
+Finally, we set the step size sequence.  It must follow the conditions
+of~\citet{Robbins:1951},
+EQDS147Q
+Many sequences will satisfy these conditions, for example
+$\epsilon_t = t^{-\kappa}$ for $\kappa \in (0.5, 1]$.  The full
+\gls{SVI} algorithm is in Algorithm\nobreakspace \ref {alg:svi}.
+
+We emphasize that \gls{SVI} requires no new derivation beyond what is
+needed for \gls{CAVI}. Any implementation of \gls{CAVI} can be
+immediately scaled up to a stochastic algorithm.
+
+\parhead{Probabilistic topic models.} We demonstrate \gls{SVI} with a
+probabilistic topic model.  Probabilistic topic models are
+mixed-membership models of text, used to uncover the latent ``topics''
+that run through a collection of documents. Topic models have become a
+popular technique for exploratory data analysis of large
+collections~\citep{Blei:2012}.
+
+In detail, each latent topic is a distribution over terms in a
+vocabulary and each document is a collection of words that comes from
+a mixture of the topics.  The topics are shared across the collection,
+but each document mixes them with different proportions. (This is the
+hallmark of a mixed-membership model.)  Thus topic modeling casts
+topic discovery as a posterior inference problem. Posterior estimates
+of the topics and topic proportions can be used to summarize,
+visualize, explore, and form predictions about the documents.
+
+One motivation for topic modeling is to get a handle on massive
+collections of documents.  Early inference algorithms were based on
+coordinate ascent variational inference~\citep{Blei:2003b} and
+analyzed collections in the thousands or tens of thousands of
+documents.  With \gls{SVI}, topic models scale up to millions of
+documents; the details of the algorithm are in~\citet{Hoffman:2013}.
+Figure\nobreakspace \ref {fig:nyt} illustrates topics inferred from 1.8M articles from the
+\textit{New York Times}.  This analysis would not have been possible
+without \gls{SVI}.
+
+\begin{figure}[t]
+  \centering
+    \includegraphics[width=0.75\textwidth]{figs/nyt-topics.pdf}
+  \caption{\label{fig:nyt} Topics found in a corpus of 1.8M
+    articles from the New York Times.  Reproduced with permission
+    from~\citet{Hoffman:2013}.}
+\end{figure}
+
+\begin{algorithm}[t]
+\setstretch{1.25}
+\KwIn{Model $p({\mathbf{x}},{\mathbf{z}})$, data ${\mathbf{x}}$, and step size sequence $\epsilon_t$}
+\KwOut{Global variational distributions $q_{\lambda}(\beta)$}
+\textbf{Initialize:} Variational parameters $\lambda_0$\\
+\While{\textrm{TRUE}}{
+  Choose a data point uniformly at random, $t \sim \textrm{Unif}(1,
+  \ldots, n)$ \\
+  Optimize its local variational parameters $\varphi^*_t =
+  {\mathbb{E}}_{\lambda}\left[\eta(\beta, x_t)\right]$ \\
+  Compute the coordinate update as though $x_t$ was repeated $n$ times,
+  EQDS148Q \\
+  Update the global variational parameter, $\lambda_t = (1 -
+  \epsilon_t) \lambda_t + \epsilon_t \hat{\lambda}_t$ \\
+}
+\Return{$\lambda$}
+\caption{\gls{SVI} for conditionally conjugate models}
+\label{alg:svi}
+\end{algorithm}
+ \glsresetall{}
+\section{Discussion}
+\label{sec:discussion}
+
+We described variational inference, a method that uses optimization to
+make probabilistic computations.  The goal is to approximate the
+conditional distribution of latent variables ${\mathbf{z}}$ given observed
+variables ${\mathbf{x}}$, $p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$.  The idea is to posit a family of
+distributions ${\mathcal{Q}}$ and then to find the member $q^*(\cdot)$ that is
+closest in \gls{KL} divergence to the conditional of interest.
+Minimizing the \gls{KL} divergence is the optimization problem, and
+its complexity is governed by the complexity of the approximating
+family.
+
+We then described the mean-field family, i.e., the family of fully
+factorized distributions of the latent variables.  Using this family,
+variational inference is particularly amenable to coordinate-ascent
+optimization, which iteratively optimizes each factor. (This approach
+closely connects to the classical Gibbs
+sampler~\citep{Geman:1984,Gelfand:1990}.)  We showed how to use
+mean-field \gls{VI} to approximate the posterior distribution of a
+Bayesian mixture of Gaussians, discussed the special case of
+exponential families and conditional conjugacy, and described the
+extension to stochastic variational inference~\citep{Hoffman:2013},
+which scales mean-field variational inference to massive data.
+
+\subsection{Applications}
+
+Researchers in many fields have used variational inference to solve
+real problems. Here we focus on example applications of mean-field
+variational inference and structured variational inference based on
+the \gls{KL} divergence.  This discussion is not exhaustive; our intention
+is to outline the diversity of applications of variational inference.
+
+\parhead{Computational biology.} \gls{VI} is widely used in
+computational biology, where probabilistic models provide important
+building blocks for analyzing genetic data.  For example, \gls{VI} has
+been used in genome-wide association
+studies~\citep{Carbonetto:2012,Logsdon:2010}, regulatory network
+analysis~\citep{Sanguinetti:2006}, motif detection~\citep{Xing:2004},
+phylogenetic hidden Markov models~\citep{Jojic:2004a}, population
+genetics~\citep{Raj:2014}, and gene expression
+analysis~\citep{Stegle:2010}.
+
+\parhead{Computer vision and robotics.}  Since its inception,
+variational inference has been important to computer vision.  Vision
+researchers frequently analyze large and high-dimensional data sets of
+images, and fast inference is important to successfully deploy a
+vision system.  Some of the earliest examples included inferring
+non-linear image manifolds~\citep{Bishop:2000} and finding layers of
+images in videos~\citep{Jojic:2001}.  As other examples, variational
+inference is important to probabilistic models of
+videos~\citep{Chan:2009,Wang:2009c}, image
+denoising~\citep{Likas:2004}, tracking~\citep{Vermaak:2003,Yu:2005},
+place recognition and mapping for
+robotics~\citep{Cummins:2008,Ramos:2012}, and image segmentation with
+Bayesian nonparametrics~\citep{Sudderth:2008}.  \citet{Du:2009a} uses
+variational inference in a probabilistic model to combine the tasks of
+segmentation, clustering, and annotation.
+
+\parhead{Computational neuroscience.} Modern neuroscience research
+also requires analyzing very large and high-dimensional data sets,
+such as high-frequency time series data or high-resolution functional
+magnetic imaging data.  There have been many applications of
+variational inference to neuroscience, especially for autoregressive
+processes~\citep{Roberts:2002,Penny:2003,Penny:2005,Flandin:2007,Harrison:2010}.
+Other applications of variational inference to neuroscience include
+hierarchical models of multiple subjects~\citep{Woolrich:2004},
+spatial
+models~\citep{Sato:2004,Zumer:2007,Kiebel:2008,Wipf:2009a,Lashkari:2012},
+brain-computer interfaces~\citep{Sykacek:2004}, and factor
+models~\citep{Manning:2014,Gershman:2014}.  There is a software
+toolbox that uses variational methods for solving neuroscience and
+psychology research problems~\citep{Daunizeau:2014}.
+
+\parhead{Natural language processing and speech recognition.}  In
+natural language processing, variational inference has been used for
+solving problems such as parsing~\citep{Liang:2007,Liang:2009b},
+grammar induction~\citep{Kurihara:2006,Naseem:2010,Cohen:2010a},
+models of streaming text~\citep{Yogatama:2014}, topic
+modeling~\citep{Blei:2003b}, and hidden Markov models and part-of-speech
+tagging~\citep{Wang:2013b}.  In speech recognition, variational
+inference has been used to fit complex coupled
+hidden Markov models~\citep{Reyes-Gomez:2004} and switching dynamic
+systems~\citep{Deng:2004}.
+
+\parhead{Other applications.}  There have been many other applications
+of variational inference.  Fields in which it has been used include
+marketing~\citep{Braun:2010}, optimal control and reinforcement
+learning~\citep{Van-Den-Broek:2008, Furmston:2010}, statistical
+network analysis~\citep{Wiggins:2008,Airoldi:2008},
+astrophysics~\citep{Regier:2015}, and the social
+sciences~\citep{Erosheva:2007,Grimmer:2010a}.  General variational
+inference algorithms have been developed for a variety of classes of
+models, including shrinkage models~\citep{Armagan:2011a,Armagan:2011},
+general time-series
+models~\citep{Roberts:2004a,Barber:2006,Johnson:2014,Foti:2014},
+robust models~\citep{Tipping:2005,Wang:2015}, and Gaussian process
+models~\citep{Titsias:2010,Damianou:2011,Hensman:2014}.
+ 
+\subsection{Theory}
+\label{sec:theory}
+
+Though researchers have not developed much theory around variational
+inference, there are several threads of research about theoretical
+guarantees of variational approximations. As we mentioned in the
+introduction, one of our purposes for writing this paper is to
+catalyze research on the statistial theory around variational
+inference.
+
+Below, we summarize a variety of results.  In general, they are all of
+the following type: treat \gls{VI} posterior means as point estimates
+(or use \textsc{m}-step estimates from variational \gls{EM}) and
+confirm that they have the usual frequentist asymptotics. (Sometimes
+the research finds that they do not enjoy the same asymptotics.) Each
+result revolves around a single model and a single family of variational
+approximations.
+
+\citet{you2014variational} study the variational posterior for a
+classical Bayesian linear model. They put a normal prior on the
+coefficients and an inverse gamma prior on the response variance. They
+find that, under standard regularity conditions, the mean-field
+variational posterior mean of the parameters are consistent in the
+frequentist sense. Note that this is a conjugate model; one does not
+need to use variational inference in this setting. \citet{you2014}
+build on their earlier work with a spike-and-slab prior on the
+coefficients and find similar consistency results. This is a
+non-conjugate model.
+
+\citet{Hall:2011} examines a simple Poisson mixed-effects model, one
+with a single predictor and a random intercept. They use a Gaussian
+variational approximation and estimate parameters with variational
+\gls{EM}.  They prove consistency of these estimates at the parametric
+rate and show asymptotic normality with asymptotically valid standard
+errors.
+
+\citet{celisse2012consistency} and \citet{bickel2013asymptotic}
+analyze network data using stochastic blockmodels. They show
+asymptotic normality of parameter estimates obtained using a
+mean-field variational approximation. They highlight the computational
+advantages and theoretical guarantees of the variational approach over
+maximum likelihood for dense, sparse, and restricted variants of the
+stochastic blockmodel.
+
+\citet{Wang:2006} analyze variational approximations to mixtures of
+Gaussians. Specifically, they consider Bayesian mixtures with
+conjugate priors, the mean-field variational approximation, and an
+estimator that is the variational posterior mean. They confirm that
+\gls{CAVI} converges to a local optimum, that the \gls{VI} estimator
+is consistent, and that the \gls{VI} estimate and \gls{MLE} approach
+each other at a rate of $O(\nicefrac{1}{n})$. In \citet{Wang:2005}, they show
+that the asymptotic variational posterior covariance matrix is ``too
+small''---it differs from the \gls{MLE} covariance (i.e., the inverse
+Fisher information) by a positive-definite matrix.
+
+\citet{westling2015establishing} study the consistency of \gls{VI}
+through a connection to M-estimation. They focus on a broader class of
+models (with posterior support in real coordinate space) and analyze
+an automated \gls{VI} technique that uses a Gaussian variational
+approximation \citep{kucukelbir2015automatic}. They derive an
+asymptotic covariance matrix estimator and show its robustness to
+model misspecification.
+ 
+\subsection{Open problems}
+\label{sec:open-problems}
+
+There are many open avenues for statistical research in variational
+inference.
+
+Here we focused on models where the complete conditional is in the
+exponential family.  However, many models do not enjoy this property.
+(A simple example is Bayesian logistic regression.)  One fruitful
+avenue of research is to expand variational inference to such models.
+For example, \citet{Wang:2013} adapt Laplace approximations and the
+delta method to this end. In a similar vein, \citet{tan2014stochastic}
+extend \gls{SVI} to generalized linear mixed models.
+
+There has also been a flurry of recent work on methods that optimize
+the variational objective with Monte Carlo estimates of the gradient
+\citep{kingma2013auto,rezende2014stochastic,ranganath2014black,
+  salimans2014using,titsias2014doubly,Titsias:2015}.  These so-called
+``black box'' methods are designed for models with difficult complete
+conditionals; they avoid requiring any model-specific
+derivations. \citet{kucukelbir2015automatic} leverage these ideas
+toward an automatic \gls{VI} technique that works on any model written
+in the probabilistic programming system Stan \citep{stan-manual:2015}.
+This is a first step towards a derivation-free, easy-to-use \gls{VI}
+algorithm.
+
+We focused on optimizing ${\textsc{kl}\left({q({\mathbf{z}}) || p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})}\right)}$ as the
+variational objective function.  Another promising avenue of research
+is to develop variational inference methods that optimize other
+measures, such as $\alpha$-divergence measures.  As one example,
+expectation propagation~\citep{minka2001expectation} is inspired by
+the \gls{KL} divergence between $p({\mathbf{z}} {\,\vert\,} {\mathbf{x}})$ and $q({\mathbf{z}})$.  Other
+work has developed divergences based on lower bounds that are tighter
+than the \gls{ELBO}~\citep{Barber:1999,Leisink:2001}. Alternative
+divergences may be difficult to optimize but may also give better
+approximations \citep{minka2005divergence,opper2005expectation}.
+
+Though it is flexible, the mean-field family makes strong independence
+assumptions.  These assumptions help with scalable optimization but
+they limit the expressivity of the variational family.  (Further, they
+can exacerbate issues around local optima of the objective and
+underestimating posterior variances; see Figure\nobreakspace \ref {fig:accuracy}.) A third
+avenue of research is to develop better approximations while
+maintaining efficient optimization.  As examples,
+\citet{hoffman2014structured} use generic structured variational
+inference in a stochastic optimization algorithm;
+\citet{giordano2015linear} post-process the mean-field parameters to
+correct for underestimating the variance.
+
+Finally, the statistical properties of variational inference are not
+yet well understood, especially in contrast to the wealth of analysis
+of \gls{MCMC} techniques.  (Though there has been some progress; see
+Section\nobreakspace \ref {sec:theory}.)  A final open research problem is to understand
+variational inference as an estimator and to understand its
+statistical profile relative to the exact posterior.
+ 
+\clearpage
+\appendix
+\section{Gaussian Mixture Model of Image Histograms}
+\label{app:cavi}
+
+We present a multivariate, diagonal covariance \gls{GMM}.
+Write data as $X = \{x_1, \cdots, x_N \} \in {\mathbb{R}}^{(N \times D)}$ where
+each $x_n \in {\mathbb{R}}^D$. The latent variables similarly live in high
+dimensions. The assignment latent variables are
+$Z = \{z_1, \cdots, z_N \} \in {\mathbb{R}}^{(N \times K)}$ 
+where each $z_n$ is a ``one hot'' $K$-vector. The mean latent variables are
+$\mu = \{\mu_1, \cdots, \mu_K \} \in {\mathbb{R}}^{(K \times D)}$ where 
+each $\mu_k \in {\mathbb{R}}^D$ and the precision latent variables are
+$\tau = \{\tau_1, \cdots, \tau_K \} \in {\mathbb{R}}^{(K \times D)}$ where each
+$\tau_k \in {\mathbb{R}}^D$.
+
+The joint distribution of the model factorizes as
+EQDS149Q
+
+The likelihood is a Gaussian distribution, with precision parameterization,
+EQDS150Q
+
+The marginal over assignments is a Categorical distribution,
+EQDS151Q
+
+The prior over mixing parameters is a Dirichlet distribution,
+EQDS152Q
+
+The prior over mean and precision parameters is a Normal-Gamma distribution,
+EQDM68Q
+
+We use the following values for the parameters
+EQDS155Q
+
+\citet{Bishop:2006} derives a \gls{CAVI} algorithm for this
+model in Chapter 10.2.
+
+Figure\nobreakspace \ref {fig:code_gmm_diag} presents Stan code that implements this model. Since
+Stan does not support discrete latent variables, we marginalize over the
+assignment variables.
+
+\begin{figure}[htbp]
+\centering
+\begin{lstlisting}
+data {
+  int<lower=0> N; // number of data points in dataset
+  int<lower=0> K; // number of mixture components
+  int<lower=0> D; // dimension
+  vector[D] x[N]; // observations
+}
+
+transformed data {
+  vector<lower=0>[K] alpha0_vec;
+  for (k in 1:K) {           // convert the scalar dirichlet prior 1/K
+    alpha0_vec[k] <- 1.0/K;  // to a vector
+  }
+}
+
+parameters {
+  simplex[K] theta;             // mixing proportions
+  vector[D] mu[K];              // locations of mixture components
+  vector<lower=0>[D] sigma[K];  // standard deviations of mixture components
+}
+
+model {
+  // priors
+  theta ~ dirichlet(alpha0_vec);
+  for (k in 1:K) {
+      mu[k] ~ normal(0.0, 1.0/sigma[k]);
+      sigma[k] ~ inv_gamma(1.0, 1.0);
+  }
+
+  // likelihood
+  for (n in 1:N) {
+    real ps[K];
+    for (k in 1:K) {
+      ps[k] <- log(theta[k]) + normal_log(x[n], mu[k], sigma[k]);
+    }
+    increment_log_prob(log_sum_exp(ps));
+  }
+}
+\end{lstlisting}
+\caption{Stan code for the \gls{GMM} of image histograms.}
+\label{fig:code_gmm_diag}
+\end{figure}
+ 
+\clearpage
+\bibliographystyle{apa}
+\bibliography{bib}
+
+\end{document}
+

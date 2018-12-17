@@ -1,0 +1,859 @@
+\documentclass[doublecolumn]{IEEEtran}
+
+\usepackage{tikz, calc}
+\usetikzlibrary{shapes,arrows}
+\usepackage{pgfplots}
+\usepackage{theorem}
+\usepackage{tikz}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{amsfonts,amsmath,amssymb}
+\usepackage[space]{cite}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{subfigure}
+\usepackage{url}
+\usepackage{wrapfig,verbatim}
+
+\newtheorem{thm}{\bf \noindent Theorem}
+\newtheorem{cor}{\bf \noindent Corollary}
+\newtheorem{lem}{\bf \noindent Lemma}
+\newtheorem{prop}{\bf \noindent Proposition}
+\newtheorem{problem}{\bf \noindent Problem}
+\newtheorem{defn}{\bf \noindent Definition}
+\newtheorem{rem}{\bf \noindent Remark}
+
+ 
+
+\def\0b{\mathbf{0}}
+
+\allowdisplaybreaks
+
+\IEEEoverridecommandlockouts
+
+\sloppy
+
+\begin{document}
+
+\title{Complexity Certification of a Distributed Augmented Lagrangian Method}
+
+\author{Soomin~Lee*,~
+Nikolaos~Chatzipanagiotis,~
+and~Michael~M.~Zavlanos,~
+\thanks{Soomin Lee is with the Dept. of Industrial and Systems Engineering, Georgia Tech, Atlanta, GA, 30318, USA, {\tt\footnotesize soomin.lee@isye.gatech.edu}.
+Nikolaos Chatzipanagiotis and Michael M. Zavlanos are with the Dept. of Mechanical Engineering and Materials Science, Duke University, Durham, NC, 27708, USA, {\tt\footnotesize \{n.chatzip,michael.zavlanos\}@duke.edu}. This work is supported by NSF under grant CNS \#1261828, and by ONR under grant \#N000141410479.
+}}
+
+\maketitle
+
+\begin{abstract}
+In this paper we present complexity certification results for a distributed Augmented Lagrangian (AL) algorithm
+used to solve convex optimization problems involving globally coupled linear constraints.
+Our method relies on the Accelerated Distributed Augmented Lagrangian (ADAL) algorithm,
+which can handle the coupled linear constraints in a distributed manner based on local estimates of the AL.
+We show that
+the theoretical complexity of ADAL
+to reach an $\epsilon$-optimal solution both in terms of suboptimality and infeasibility is $O(\frac{1}{\epsilon})$ iterations. Moreover, we provide a valid upper bound for the optimal dual multiplier which enables us to explicitly specify these complexity bounds.
+We also show how to choose the stepsize parameter to minimize the bounds on the convergence rates.
+Finally, we discuss a motivating example, a model predictive control (MPC) problem, involving a finite number of subsystems which interact with each other via a general network.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Augmented Lagrangian methods, computational complexity,
+distributed model predictive control.
+\end{IEEEkeywords}
+
+\section{Introduction}\label{sec_introduction}
+
+\IEEEPARstart{D}{istributed} optimization methods
+decompose large-scale problems into more manageable subproblems that can be efficiently solved in parallel. Moreover, distributed algorithms allow for better load balancing among the available computational resources (inexpensive devices or subsystems) and they also
+alleviate drawbacks of centralized systems, such as the cost, fragility, and privacy associated with centralized coordination.
+For this reason, they  are widely  used to solve  large-scale problems arising in areas as diverse as  optimal control, wireless communications,  machine learning, computational biology, finance and statistics, to name a few.
+
+Classic decomposition algorithms utilize the separable structure of the dual function.
+These methods have low computational cost, but they suffer from slow convergence due to the non-differentiability of the dual functions induced by the ordinary Lagrangian \cite[Chapter 2.6]{Berts1}.
+Although this drawback can be avoided by using the Augmented Lagrangian (AL) framework \cite[Chapter 2.1]{Bert_Constrained},
+AL based methods lose the decomposable structure of the ordinary Lagrangian,
+which makes distributed computation difficult.
+This calls for the development of specialized AL decomposition techniques.
+
+Early specialized techniques that allow for decomposition of the AL can be traced back to the works \cite{Tatjewski,Watanabe,Teboulle}. More recent literature involves the \emph{Diagonal Quadratic Approximmation} (DQA) algorithm  \cite{Mulvey,Rus} and the \emph{Alternating Direction Method of Multipliers} (ADMM) \cite{Eck_DR,Eck_Monotrop,Boyd_ADMM}.
+The DQA method replaces each minimization step in the augmented Lagrangian algorithm   by a separable approximation of the AL function. The ADMM methods are based on the relations between splitting methods for monotone operators, such as Douglas-Rachford splitting, and the proximal point algorithm  \cite{Glow,Eck_DR}.
+Recently, the convergence rate of ADMM has been studied extensively;
+see e.g. \cite{WYin2015} and references therein.
+Most of these results assume either smoothness, strong convexity, or
+strict convexity of the objective function.
+Although the results in \cite{He2012,He2015} do not require such properties, the convergence rates are given either in terms of the violation of optimality conditions \cite{He2012}  or the relative change in consecutive iterates \cite{He2015}.
+
+The contributions of this paper are the following:
+
+\noindent 1)  We revisit the general purpose AL method ADAL, first developed for convex optimization problems \cite{Nikos_math_prog,Nikos_ACC2015} and later extended to non-convex problems \cite{Nikos_nonconvexADAL} and problems with noise \cite{Nikos_SADAL}, which relies on local estimates of the AL to handle globally coupled linear constraints in a distributed manner.
+We provide computational complexity certifications
+for the ADAL method in terms of primal suboptimality and primal infeasibility.
+Specifically, we show that
+the number of iterations
+to reach an $\epsilon$-optimal and $\epsilon$-feasible solution
+is $O(\frac{1}{\epsilon})$, under the assumption that the objective function is generally convex and not necessarily differentiable.
+This analysis can benefit many practical applications, such as model predictive control (MPC), one of the most successful control frameworks implemented on embedded systems.
+As the sampling times for embedded systems are very short,
+any iterative optimization algorithm implemented on such systems must be able to precondition the execution time  by providing an explicit number of iterations needed to obtain a reasonably good solution in terms of suboptimality and infeasibility.
+For this reason, there has been a growing interest recently in enhancing MPC methods by providing the worst-case computational complexity \cite{RichterConf,RichterTAC,PatrinosTAC,PontusThesis,QuocInexact}.
+
+\noindent 2) Since the complexity bounds above depend on the optimal dual multiplier ${\boldsymbol{\lambda}}^*$, we provide a valid upper bound for ${\boldsymbol{\lambda}}^*$.
+Our bound holds for any general convex problems with Lipschitz gradients involving linear constraints.
+Tighter bounds for quadratic problems have been studied in \cite{RichterConf,RichterTAC,PatrinosTAC}.
+
+\noindent 3) We show how to select the algorithm parameter $\rho$, which is the stepsize used in the dual gradient step.
+To the best of our knowledge, such parameter selection has been  studied
+only when the objective function is quadratic or has special properties like strong convexity and smoothness \cite{PontusMetric,admmParam}.
+
+\section{Accelerated Distributed AL\label{sec_alg}}
+This section describes the Accelerated Distributed Augmented Lagrangian (ADAL for short)
+method, a specialized \emph{Augmented Lagrangian} (AL) decomposition technique which was proposed in \cite{Nikos_math_prog},
+for solving optimization problems of the form:
+\begin{align}\label{P}
+\min_{{ {\bf x} }_i}  ~& ~ \sum\nolimits_{i=1}^N f_i({ {\bf x} }_i) \notag\\
+\text{subject to } ~&~ \sum\nolimits_{i=1}^N { {\bf A} }_i { {\bf x} }_i = { {\bf b} }, \\
+ &~~ { {\bf x} }_i \in \mathcal{X}_i,\quad i=1,2,\dots,N,\notag
+\end{align}
+where ${ {\bf x} }_i \in \mathbb{R}^{n_i}$ denotes the decision variables that belong to subsystem $i$,
+and $f_i:\mathbb{R}^{n_i} \to \mathbb{R}$ is its local objective function.
+Problem \eqref{P} models situations where a set $\mathcal{I}=\{ 1,2,\dots,N\}$ of decision makers, henceforth referred to as agents, need to determine local decisions ${ {\bf x} }_i\in\mathcal{X}_i$ that minimize the summation of the local functions $f_i({ {\bf x} }_i)$, while respecting a set of affine coupling constraints $\sum_{i=1}^N { {\bf A} }_i { {\bf x} }_i = { {\bf b} }$.
+Here, we assume the functions $f_i: \mathbb{R}^{n_i}\rightarrow \mathbb R$ are convex (not necessarily differentiable)
+for all $i\in\mathcal{I}$, the local sets $\mathcal{X}_{i}\subseteq {\mathbb R}^{n_i}$ for $i\in\mathcal{I}$ are convex, closed and bounded, ${ {\bf A} }_i \in \mathbb{R}^{m\times n_i}$, ${ {\bf b} } \in \mathbb{R}^m$, and $n=\sum_{i=1}^N n_i$.
+
+Furthermore, we let
+\[
+F({ {\bf x} }) :=  \sum\nolimits_{i=1}^{N} f_i({ {\bf x} }_i),
+\]
+where $\mathbf{x} = [ { {\bf x} }_1^\top,\dots, { {\bf x} }_N^\top]^\top \in \mathbb{R}^n$. Denoting ${ {\bf A} } = [ { {\bf A} }_1 \dots { {\bf A} }_N ] \in{\mathbb R}^{m\times n}$,  the constraint $\sum_{i=1}^{N} { {\bf A} }_i { {\bf x} }_i = { {\bf b} }$ in problem \eqref{P} becomes ${ {\bf A} } { {\bf x} } = { {\bf b} }$.
+Also, we define the maximum degree $q$ as a measure of sparsity of the matrix ${ {\bf A} }$, i.e.,
+for each constraint $j = 1, \ldots, m$, we denote by $q_j$ the number of all $i \in { \mathcal{I} }$ such that $[{ {\bf A} }_i]_j \neq \0b$, where $[{ {\bf A} }_i]_j$ is the $j$-th row of matrix ${ {\bf A} }_i$ and $\0b$ stands for a vector of all zeros.
+Then, $q$ is defined as:
+\begin{align}\label{eqn:q}
+q = \max_{j = 1,\ldots,m} q_j.
+\end{align}
+It will be shown below that $q$ plays a critical role in the convergence properties of the
+proposed method.
+
+\subsection{Preliminaries: AL Framework}
+Associating Lagrange multipliers ${\boldsymbol{\lambda}}\in{\mathbb R}^m$ with the affine constraint ${ {\bf A} } { {\bf x} } = { {\bf b} }$, the Lagrangian for \eqref{P}  is defined as
+\begin{align}\label{ord_lagr}
+L({ {\bf x} },{\boldsymbol{\lambda}}) &= F({ {\bf x} }) + \langle {\boldsymbol{\lambda}}, { {\bf A} } { {\bf x} } -{ {\bf b} }\rangle
+= \sum\nolimits_{i=1}^{N} L_i ({ {\bf x} }_i,{\boldsymbol{\lambda}}) -\langle { {\bf b} },{\boldsymbol{\lambda}}\rangle,
+\end{align}
+where $L_i ({ {\bf x} }_i,{\boldsymbol{\lambda}}) = f_i({\bf x}_i) + \langle  {\boldsymbol{\lambda}} , { {\bf A} }_i { {\bf x} }_i\rangle$, and $\langle\cdot,\cdot\rangle$ denotes inner product. Then, the dual function is defined as
+\begin{equation}\label{dual_functional}
+g({\boldsymbol{\lambda}}) = \inf_{{ {\bf x} }\in\mathcal{ X}} ~L({ {\bf x} },{\boldsymbol{\lambda}}) = \sum\nolimits_{i=1}^{N} g_i({\boldsymbol{\lambda}}) -\langle { {\bf b} },{\boldsymbol{\lambda}}\rangle,
+\end{equation}
+where $\mathcal{X}= \mathcal{X}_{1}\times\mathcal{X}_{2}\dots\times\mathcal{X}_{N}$, and
+\begin{equation*}\label{dual_functionals}
+g_i({\boldsymbol{\lambda}}) = \inf_{{ {\bf x} }_i\in\mathcal{ X}_i} \Big[  f_i({\bf x}_i) + \langle  {\boldsymbol{\lambda}} , {\bf A}_i {\bf x}_i\rangle \Big].
+\end{equation*}
+The dual function is decomposable with respect to ${ {\bf x} }_i$'s and this gives rise to decomposition methods that address the  \emph{dual problem} \cite[Chapter 2.6]{Berts1}
+\begin{equation}\label{D}
+\max_{{\boldsymbol{\lambda}}\in\mathbb{R}^m} \, \sum\nolimits_{i=1}^{N} g_i({\boldsymbol{\lambda}}) -\langle { {\bf b} },{\boldsymbol{\lambda}}\rangle.
+\end{equation}
+
+Such dual methods suffer from well-documented disadvantages, the most notable one being their exceedingly slow convergence rates due to the nondifferentiability of the dual function \eqref{dual_functional}. These drawbacks can be alleviated by the AL framework \cite[Chapter 2.1]{Bert_Constrained}.
+The AL is obtained by adding a quadratic penalty term to the ordinary Lagrangian.
+The AL associated with problem \eqref{P} is
+\begin{align}\label{augm_lagr}
+\Lambda_{\rho}({ {\bf x} },{\boldsymbol{\lambda}}) ~&=~ F({ {\bf x} }) ~+~ \langle {\boldsymbol{\lambda}} , {\bf A} { {\bf x} } - { {\bf b} }\rangle ~+~ \frac{\rho}{2}\| {\bf A}{ {\bf x} } - { {\bf b} } \|^2,
+\end{align}
+where $\rho>0$ is a penalty parameter. We recall that the standard Augmented Lagrangian method is also referred to as the \emph{Method of Multipliers} in the literature \cite[Chapter 2.1]{Bert_Constrained}. 
+A major drawback of the Augmented Lagrangian Method stems from the fact that \eqref{augm_lagr} is not  separable with respect to each ${ {\bf x} }_i$ due to the additional quadratic penalty term.
+
+\subsection{The ADAL Algorithm}
+
+The lack of decomposability of the AL calls for the development of specialized AL decomposition techniques.
+ADAL is a primal-dual iterative method utilizing a local AL function $\Lambda_{\rho}^i$ which is defined as:
+\begin{align}\label{local_lagr}
+\Lambda_{\rho}^i({ {\bf x} }_i,{ {\bf x} }_{-i}^k,{\boldsymbol{\lambda}}) ~=&~ f_i({ {\bf x} }_i) ~+~ \langle {\boldsymbol{\lambda}} ,{\bf A}_i{ {\bf x} }_i \rangle \\
+&\qquad ~+~ \frac{\rho}{2}\| {\bf A}_i{ {\bf x} }_i + \sum\nolimits_{j\in\mathcal{I}}^{j\neq i} {\bf A}_j{ {\bf x} }_j^k - { {\bf b} }\|^2, \notag
+\end{align}
+where ${ {\bf x} }_{-i}^k = [{ {\bf x} }_1^k, \ldots, { {\bf x} }_{i-1}^k,{ {\bf x} }_{i+1}^k,\ldots,{ {\bf x} }_N^k]^{\top}$.
+The ADAL method is summarized in Alg. \ref{ADAL}.
+ADAL has two parameters: a positive penalty parameter $\rho$ and a stepsize parameter
+$\tau \in (0,1/q)$.
+Each iteration of ADAL consists of three steps: i) every agent solves a local subproblem in a parallel
+fashion based on the local approximation of the AL in \eqref{local_lagr}; 
+ii) the agents update and communicate their primal variables to neighboring agents;
+and iii) they update their dual variables based on the values of the communicated primal variables.
+
+We emphasize here that the quantities ${\bf A}_j{ {\bf x} }_j^k$, appearing in the penalty term of the local AL \eqref{local_lagr}, correspond to the local primal variables of agent $j$ that are communicated to agent $i$. With respect to agent $i$, these are considered fixed parameters. The penalty term of each $\Lambda_{\rho}^i$ can be equivalently expressed as
+\begin{align*}
+&\| {\bf A}_i{ {\bf x} }_i + \sum\nolimits_{j\in\mathcal{I}}^{j\neq i} {\bf A}_j{ {\bf x} }_j^k - { {\bf b} } \|^2 ~= \\
+&  \qquad\qquad =~ \sum\nolimits_{l=1}^m \Big(  \big[{\bf A}_i{ {\bf x} }_i\big]_l + \sum\nolimits_{j\in\mathcal{I}}^{j\neq i} \big[{\bf A}_j{ {\bf x} }_j^k\big]_l - b_l \Big)^2.
+\end{align*}
+The above penalty term is present only in the  minimization computation \eqref{ADAL_1}, in Alg. \ref{ADAL}. Hence, for those $l$ such that $[{\bf A}_i]_l = {\mathbf 0}$, the terms $\sum_{j\in\mathcal{I}}^{j\neq i} \big[{\bf A}_j{ {\bf x} }_j^k\big]_l -b_l$  are just constant terms in the minimization step, and can be neglected. Here, $[{\bf A}_i]_l$ denotes the $l$-th row of ${ {\bf A} }_i$  and ${\bf 0}$ stands for a zero vector of proper dimension. This implies that agent $i$ needs access only to the decisions $ \big[{\bf A}_j{ {\bf x} }_j^k\big]_l$ from all agents $j\neq i$ that are present in the same constraints $l$ as $i$. Moreover, regarding the term $\langle {\boldsymbol{\lambda}} ,{\bf A}_i{ {\bf x} }_i \rangle$ in \eqref{local_lagr}, we have that $\langle {\boldsymbol{\lambda}} ,{\bf A}_i{ {\bf x} }_i \rangle ~=~ \sum_{j=1}^m \lambda_j [{\bf A}_i{ {\bf x} }_i]_j$. Hence, we see that, in order to compute \eqref{ADAL_1}, each agent $i$ needs access only to those $\lambda_j$ for which $[{\bf A}_i]_j\neq {\mathbf 0}$.
+
+\begin{algorithm}[t]\caption{Accelerated Distributed Augmented Lagrangians (ADAL)}\label{ADAL}
+Set $k=0$, $\tau \in (0,\frac{1}{q})$ and define initial Lagrange multipliers ${\boldsymbol{\lambda}}^0$ and initial primal variables ${ {\bf x} }^0$.
+\begin{enumerate}
+\item[1.] For fixed Lagrange multipliers $\boldsymbol{\lambda}^k$, determine ${\hat{\mathbf x}}_i^k$ for every $i\in\mathcal{I}$ as the solution of the following problem:
+\begin{equation}\label{ADAL_1}
+\begin{aligned}
+\min_{{ {\bf x} }_i \in \mathcal{X}_i}\, &\, \Lambda_{\rho}^i({ {\bf x} }_i,{ {\bf x} }_{-i}^k,{\boldsymbol{\lambda}}^k).
+\end{aligned}
+\end{equation}
+\item[2.] Set for every $i\in\mathcal{I}$
+\begin{equation}\label{ADAL_2}
+{ {\bf x} }_i^{k+1} = { {\bf x} }_i^k + \tau ({\hat{\mathbf x}}_i^k -  { {\bf x} }_i^k ).
+\end{equation}
+\item[3.] If the constraints $\sum_{i=1}^{N}{\bf A}_i { {\bf x} }_i^{k+1} = { {\bf b} } $ are satisfied and ${ {\bf A} }_i\hat{ {\bf x} }_i^{k} = { {\bf A} }_i{ {\bf x} }_i^{k}$ for all $i\in\mathcal{I}$,
+then stop (optimal solution found). Otherwise, set:
+\begin{equation}\label{ADAL_3}
+{\boldsymbol{\lambda}}^{k+1} = {\boldsymbol{\lambda}}^k + \rho\tau \Big(  \sum\nolimits_{i=1}^{N} {\bf A}_i { {\bf x} }^{k+1}_i - { {\bf b} }\Big),
+\end{equation}
+increase $k$ by one and return to Step 1.
+\end{enumerate}
+\end{algorithm}
+
+\subsection{A Motivating Example: Distributed Model Predictive Control (DMPC) with linear coupling constraints\label{subsec:mpc}}
+Consider a discrete-time linear dynamical system expressed in terms of the dynamics of
+a set ${ \mathcal{I} }=\{1,\dots,N\}$ of individual subsystems as
+\begin{align}\label{local}
+&{ {\bf x} }_i^{t+1} = {\sum\nolimits}_{j\in{\mathcal{C}}_i^t} \left({ {\bf A} }_{ij}^t { {\bf x} }_j^t + {\mathbf{B}}_{ij}^t {\mathbf{u}}_j^t \right)	\nonumber\\
+&{ {\bf x} }_i^{t}\in{ \mathcal{X} }_i^{t}, \quad {\mathbf{u}}_i^t\in{\mathcal{U}}_i^t, \quad \forall ~i\in{ \mathcal{I} },
+\end{align}
+where  ${ {\bf x} }_i^t\in{ \mathcal{X} }_i^t\subseteq {\mathbb R}^{n_i}$ and ${\mathbf{u}}_i^t\in{\mathcal{U}}_i^t\subseteq{\mathbb R}^{p_i}$ represent a local state and input at time $t$. We assume that the local constraint sets ${ \mathcal{X} }_i^t,~{\mathcal{U}}_i^t$ satisfy ${ \mathcal{X} }^t = { \mathcal{X} }_1^t \times \cdots \times { \mathcal{X} }_N^t$, ${\mathcal{U}}^t = {\mathcal{U}}_1^t \times \cdots \times {\mathcal{U}}_N^t$, and $n=\sum_{i\in{ \mathcal{I} }} n_i$, $p=\sum_{i\in{ \mathcal{I} }} p_i$.
+The dynamic interconnections at time $t$ among the subsystems are modeled by a directed graph $\mathcal{G}^t=(\mathcal{I},\mathcal{E}^t)$. The set of edges $\mathcal{E}^t\subseteq \mathcal{I}\times\mathcal{I}$ contains a directed edge $(v_i,v_j)$ if the state or input of subsystem $i$ at time $t$ affects the dynamics of subsystem $j$ at time $t+1$. More formally, $(v_j,v_i)\in \mathcal{E}^t$ if and only if  ${ {\bf A} }_{ij}^t \neq 0 ~\vee~ {\mathbf{B}}_{ij}^t \neq 0$, where the matrices ${ {\bf A} }_{ij}^t \in{\mathbb R}^{n_i\times n_j}$ and ${\mathbf{B}}_{ij}^t\in{\mathbb R}^{n_i\times p_j}$, define the dynamic coupling between subsystems $i$ and $j$ at time $t$.
+We define the coupling in-neighborhood $\mathcal{C}_i^t$ (resp. out-neighborhood ${\tilde{\mathcal{C}}}_i^t$) of subsystem $i$ at time $t$ as the set of sybsystems $j$ whose dynamics at $t$ affect (resp. is affected by) the evolution of subsystem $i$, i.e.,  ${\mathcal{C}}_i^t = \{ j\in{ \mathcal{I} } : (v_j,v_i)\in \mathcal{E}^t \}$ (resp. ${\tilde{\mathcal{C}}}_i^t = \{ j\in{ \mathcal{I} } : (v_i,v_j)\in \mathcal{E}^t \}$).
+
+Determining optimal control sequences for \eqref{local} using MPC consists of  solving online a finite horizon open-loop optimal control problem, subject to the aforementioned system dynamics and constraints that involve states and control inputs.
+Specifically,  the MPC problem for the dynamical system \eqref{local} is parametric to the initial state ${ {\bf x} }^1$ and can be formulated as
+\begin{align}\label{DMPC1}
+\min_{{ {\bf x} },{\mathbf{u}}} &	~~\sum_{i=1}^N \bigg[ \sum_{t=1}^{H-1} \ell^t_i({ {\bf x} }_i^t,{\mathbf{u}}_i^t) + { \mathcal{F} }_i({ {\bf x} }_i^{H}) \bigg] \nonumber\\
+\text{s.t.} \quad &{ {\bf x} }_i^{t+1} = {\sum\nolimits}_{j\in{\mathcal{C}}_i^t} \left({ {\bf A} }_{ij}^t { {\bf x} }_j^t + {\mathbf{B}}_{ij}^t {\mathbf{u}}_j^t \right),	\\
+&{ {\bf x} }_i^{t+1}\in{ \mathcal{X} }_i^{t+1}, \quad {\mathbf{u}}_i^t\in{\mathcal{U}}_i^{t},\nonumber\\
+& \forall ~i\in{ \mathcal{I} } ~\text{and} ~t\in\{1,\dots,H-1\}.  \nonumber
+\end{align}
+where the functions  $\ell^t_i({ {\bf x} }_i^t,{\mathbf{u}}_i^t): {\mathbb R}^{n_i} \times {\mathbb R}^{p_i} \to {\mathbb R}$ denote the running cost and the function ${ \mathcal{F} }_i({ {\bf x} }_i^H): {\mathbb R}^{n_i}\to {\mathbb R}$ denotes the terminal cost of subsystem $i$.
+
+To use the ADAL framework in Alg. \ref{ADAL} to solve \eqref{DMPC1}, we introduce a local AL for each subsystem $i$ as
+\begin{align}\label{local_AL}
+	&\Lambda_{\rho}^i({ {\bf x} }_i,{\mathbf{u}}_i,{\boldsymbol{\lambda}}) ~=~   \sum_{t=1}^{H-1} \ell^t_i({ {\bf x} }_i^t,{\mathbf{u}}_i^t) ~+ { \mathcal{F} }_i({ {\bf x} }_i^{H})    \\
+	& +\sum_{t=1}^{H-1} \Bigg[ ({\boldsymbol{\lambda}}_i^{t+1})^T{ {\bf x} }_i^{t+1} -  \sum_{j\in{\tilde{\mathcal{C}}}_i^t} ({\boldsymbol{\lambda}}_j^{t+1})^T \left({ {\bf A} }_{ji}^t { {\bf x} }_i^t + {\mathbf{B}}_{ji}^t {\mathbf{u}}_i^t\right)  \nonumber\\
+	& + \frac{\rho}{2}\| { {\bf x} }_i^{t+1} - { {\bf A} }_{ii}^t { {\bf x} }_i^t - {\mathbf{B}}_{ii}^t {\mathbf{u}}_i^t -\sum_{j\in{\mathcal{C}}_i^t\backslash\{i\}} \left({ {\bf A} }_{ij}^t {\tilde{\mathbf{x}}}_j^t + {\mathbf{B}}_{ij}^t {\tilde{\mathbf{u}}}_j^t \right) \|^2  \nonumber\\
+	& + \sum_{j\in{\tilde{\mathcal{C}}}_i^t}\frac{\rho}{2}\| {\tilde{\mathbf{x}}}_j^{t+1} - { {\bf A} }_{ji}^t { {\bf x} }_i^t - {\mathbf{B}}_{ji}^t {\mathbf{u}}_i^t \nonumber\\
+	& \qquad \qquad \qquad\qquad- \sum_{m\in{\mathcal{C}}_j^t\backslash\{i\}}\left({ {\bf A} }_{jm}^t {\tilde{\mathbf{x}}}_m^t + {\mathbf{B}}_{jm}^t {\tilde{\mathbf{u}}}_m^t\right) \|^2 \Bigg],  \nonumber
+\end{align}
+where  ${\tilde{\mathbf{x}}}_j,{\tilde{\mathbf{u}}}_j$ denote the primal variables that are controlled by subsystem $j$  but communicated to subsystem $i$ for optimization of its local Lagrangian $\Lambda_{\rho}^i$. With respect to subsystem $i$, these are just considered as fixed parameters.
+That is, the local AL is created by taking all the terms involving ${ {\bf x} }_i$ in the original AL and setting the remaining variables as fixed parameters, i.e., ${ {\bf x} }_j$ as $\tilde{ {\bf x} }_j$ for all $i \neq j$.
+
+Observe that the local AL \eqref{local_AL} of each subsystem $i$ includes only locally available information. Regarding  the dual variables, the necessary information includes ${\boldsymbol{\lambda}}_i^{t+1}$ and  all ${\boldsymbol{\lambda}}_j^{t+1}$ for every $t\in\{1,\dots,H-1\}$ and $j\in {\tilde{\mathcal{C}}}_i^t$, i.e., the dual variables corresponding to the dynamical constraints of $i$ and also those of the out-neighbors of subsystem $i$ in all coupling graphs $\mathcal{E}^t$. Regarding the primal variables, the necessary information for the local AL of subsystem $i$ includes all ${\tilde{\mathbf{x}}}^t_j,~{\tilde{\mathbf{u}}}^t_j$ for every $t\in\{1,\dots,H\}$ from the in-neighbors $j\in{\mathcal{C}}_i^t$, the out-neighbors $j\in{\tilde{\mathcal{C}}}_i^t$, and  the in-neighbors  of the out-neighbors of $i$, namely $\{m\in{ \mathcal{I} }: m\in{\mathcal{C}}_j^t, ~\forall j\in{\tilde{\mathcal{C}}}_i^t\}$ for all the coupling graphs $\mathcal{E}^t$. In other words, each subsystem $i$ needs to be able to exchange messages with all subsystems $j$ that belong to its 2-hop communication neighborhood ${ \mathcal{I} }_i = \bigcup_{t=1}^{H}\left( {\mathcal{C}}_i^t \cup {\tilde{\mathcal{C}}}_i^t \cup \{m\in{ \mathcal{I} }: m\in{\mathcal{C}}_j^t, ~\forall j\in{\tilde{\mathcal{C}}}_i^t\} \right)$.
+
+In practice \eqref{DMPC1} is solved repeatedly, and after each solve, the first few inputs are applied to \eqref{local} and the horizon is shifted accordingly, providing a new initial condition for a subsequent solution of \eqref{DMPC1}. In this framework, solving \eqref{DMPC1} until convergence is time consuming. Therefore, early termination is highly desired, while ensuring a good quality solution.
+
+\section{Rate of Convergence\label{sec:rate}}
+In this section we characterize the rate of convergence of the ADAL method.
+{{{In what follows, we denote the subgradient of a convex function $f$ at a point ${ {\bf x} } \in \mathcal{X}$ by ${\mathbf{s}}_{ {\bf x} }$, i.e.,
+a vector ${\mathbf{s}}_{ {\bf x} } \in \mathbb{R}^n$ is a subgradient of $f$ at ${ {\bf x} } \in \mathcal{X}$ if
+\begin{align*}
+f({ \tilde{\bf x} }) \ge f({ {\bf x} }) + \langle {\mathbf{s}}_{ {\bf x} }, { \tilde{\bf x} }-{ {\bf x} }\rangle,\quad \forall { \tilde{\bf x} } \in \mathcal{X}.
+\end{align*}
+We also denote the convex subdifferential of $f$ at ${ {\bf x} } \in \mathcal{X}$ by $\partial f ({ {\bf x} })$,
+which is the set of all subgradients ${\mathbf{s}}_{ {\bf x} }$.}}}
+
+The convergence of ADAL relies on the following three assumptions, which are typically required in the analysis of convex optimization methods:
+\begin{itemize}
+\item[(A1)] The functions  $f_i$ are convex, and the sets $\mathcal{X}_i$ are convex, closed, and bounded for all $i\in\mathcal{I}$ .
+\item[(A2)]
+The Lagrangian function $L$ has a saddle point $({ {\bf x} }^*,{\boldsymbol{\lambda}}^*)\in {\mathbb R}^n\times{\mathbb R}^m$ so that
+\begin{equation*}
+L({ {\bf x} }^*,{\boldsymbol{\lambda}})\leq L({ {\bf x} }^*,{\boldsymbol{\lambda}}^*)\leq L({ {\bf x} },{\boldsymbol{\lambda}}^*),~ \forall  ~{ {\bf x} }\in { \mathcal{X} },\,~ {\boldsymbol{\lambda}}\in{\mathbb R}^m.
+\end{equation*}
+\item[(A3)] All subproblems \eqref{ADAL_1} are exactly solvable at every iteration.
+\end{itemize}
+
+Assumption (A1) implies that there exists a constant $D_{ \mathcal{X} }$ such that
+\begin{align}\label{eqn:DX}
+D_{ \mathcal{X} } := \max\nolimits_{{ {\bf x} },{ \tilde{\bf x} } \in { \mathcal{X} }} \|{ {\bf x} }-{ \tilde{\bf x} }\|
+\end{align}
+and also Lipschitz subgradients, i.e., there exists a constant $G$ such that for all $i \in { \mathcal{I} }$
+\begin{align}\label{eqn:G}
+\|{\mathbf{s}}_{ {\bf x} }\| \le G, \quad \forall {\mathbf{s}}_{ {\bf x} } \in \partial f_i({ {\bf x} }),~ { {\bf x} } \in { \mathcal{X} }.
+\end{align}
+Assumption (A2) implies that the point ${ {\bf x} }^*$ is a solution of problem \eqref{P} and the point ${\boldsymbol{\lambda}}^*$ is a solution of \eqref{D}.
+Since \eqref{P} is a convex program with linear constraints,
+strong duality holds, i.e., the optimal values of the primal and dual problems are equal, as long as \eqref{P} is feasible without the need of any constraint qualification.
+Assumption (A3) is satisfied for most MPC problems, see e.g., \cite[Section V]{RichterConf},
+or for general problems with simple constraint sets ${ \mathcal{X} }$, e.g., boxes or balls.
+
+\subsection{Lemmas}
+In this subsection, we provide a few lemmas that will help us prove the convergence of ADAL.
+Our analysis relies on the ergodic average of the primal variables up to iteration $k$:
+\begin{align*}
+{ \tilde{\bf x} }^k := \frac{1}{k}\sum\nolimits_{p=0}^{k-1} {\hat{\mathbf x}}^p.
+\end{align*}
+To avoid cluttering the notation, we will use $\sum_i$ to denote summation over all $i\in\mathcal{I}$, i.e., $\sum_i = \sum_{i=1}^N$, unless explicitly noted otherwise.
+We define the \emph{residual} ${ {\bf r} }({ {\bf x} }) \in\mathbb{R}^m$  as the vector containing the amount of all constraint violations with respect to primal variable ${ {\bf x} }$, i.e.,
+\begin{align}\label{eqn:residual}
+{ {\bf r} }({ {\bf x} }) = \sum\nolimits_i { {\bf A} }_i { {\bf x} }_i - { {\bf b} }.
+\end{align}
+We also define the auxiliary dual variable $\bar{\boldsymbol{\lambda}}^k$ as
+\begin{align}\label{lambda_bar}
+\bar{\boldsymbol{\lambda}}^k ~:=~ {\boldsymbol{\lambda}}^k  +\rho(1-\tau){ {\bf r} }({ {\bf x} }^k).
+\end{align}
+In the next lemma, we obtain an iterative relation for $\bar{\boldsymbol{\lambda}}^k$.
+The proof can be found in \cite[Theorem 1]{Nikos_math_prog}.
+
+\begin{lem}\label{lem:lbar}
+The dual update step \eqref{ADAL_3} of ADAL is equivalent to the update rule
+\begin{equation*}
+\bar{\boldsymbol{\lambda}}^{k+1} ~=~ \bar{\boldsymbol{\lambda}}^{k}+\tau\rho { {\bf r} }(\hat{ {\bf x} }^k).
+\end{equation*}
+\end{lem}
+\vspace{3pt}
+
+In the next lemma, we utilize Lemma \ref{lem:lbar} and the first order optimality conditions for each local subproblem \eqref{ADAL_1} to
+bound the function value at each iteration, which later will allow us to obtain a telescoping sum.
+For this, we make use of the Lyapunov/Merit function
+\begin{align}\label{phi}
+\phi^k({\boldsymbol{\lambda}}) ~=~ \rho\sum\nolimits_{i}\| { {\bf A} }_i ({ {\bf x} }_i^k -{ {\bf x} }_i^*) \|^2 + \frac{1}{\rho}\|\bar{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} \|^2,
+\end{align}
+for all $k \ge 0$ and any arbitrary ${\boldsymbol{\lambda}} \in \mathbb{R}^m$.
+A similar result whose Lyapunov/Merit function $\phi^k$ does not depend on ${\boldsymbol{\lambda}}$
+can be found in \cite{Nikos_ACC2015}. Note that dependence of $\phi^k({\boldsymbol{\lambda}})$ on ${\boldsymbol{\lambda}}$ is key to obtain the convergence rates presented in this paper.
+
+\begin{lem}\label{lemma3}
+Assume (A1)--(A3). Then, for any ${\boldsymbol{\lambda}} \in \mathbb{R}^m$ and $k \ge 0$, the following holds:
+\begin{align*}
+F({\hat{\mathbf x}}^k) -  F({ {\bf x} }^*) + \langle {\boldsymbol{\lambda}}, { {\bf r} }({\hat{\mathbf x}}^k)\rangle
+\leq~
+\frac{1}{2\tau}\big( \phi^k({\boldsymbol{\lambda}}) - \phi^{k+1}({\boldsymbol{\lambda}}) \big).
+\end{align*}
+\end{lem}
+The proof of this lemma can be found in Appendix \ref{app:B}.
+
+\subsection{Primal Optimality and Feasibility}
+Using Lemma \ref{lemma3} and the properties of convex functions, we now provide two theorems regarding the convergence rate of ADAL.
+More specifically, in Theorem \ref{thm1},
+we consider the objective value difference $F({ \tilde{\bf x} }^k)-F({ {\bf x} }^*)$ and the constraint violation $\| { {\bf A} } { \tilde{\bf x} }^k - \bf b\|$ together and show that their sum decreases at a worst-case $O(1/k)$ rate.
+In Theorem \ref{thm2}, we upper bound the objective value difference and constraint violation separately, and show that each one of them decreases at a worst-case $O(1/k)$ rate.
+
+\begin{thm}\label{thm1}
+Assume (A1)--(A3). Recall that ${ \tilde{\bf x} }^k = \frac{1}{k}\sum_{p=0}^{k-1} {\hat{\mathbf x}}^p $ denotes the ergodic average of the primal variable sequence generated by ADAL up to iteration $k$
+and ${ {\bf r} }({ {\bf x} }) = { {\bf A} }{ {\bf x} } - { {\bf b} }$ denotes the residual at ${ {\bf x} }$.
+Then, for all $k$
+\begin{align}\label{thm_eq}
+F({ \tilde{\bf x} }^k) -  F({ {\bf x} }^*) + \|{ {\bf r} }( { \tilde{\bf x} }^k)\| ~\leq~ \frac{1}{2k\tau} \phi,
+\end{align}
+where $\phi = \sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 +\frac{1}{\rho}(\|\bar{\boldsymbol{\lambda}}^0\|+1)^2$.
+\end{thm}
+\begin{proof}
+Summing the relation in Lemma \ref{lemma3} for all $p=0,\dots,k-1$, we get
+\begin{align}\label{10}
+& \sum\nolimits_{p=0}^{k-1}F(\hat{ {\bf x} }^p)  ~-~ \sum\nolimits_{p=0}^{k-1} F({ {\bf x} }^*) ~+~ \sum\nolimits_{p=0}^{k-1}\Big\langle {\boldsymbol{\lambda}}, { {\bf r} }({\hat{\mathbf x}}^p) \Big\rangle\notag\\
+&  \leq~ \frac{1}{2\tau} \Big( \phi^0({\boldsymbol{\lambda}}) - \phi^{k}({\boldsymbol{\lambda}})\Big).
+\end{align}
+By the convexity of $F$, we have that
+\begin{align*}
+\sum\nolimits_{p=0}^{k-1}  \frac{1}{k} F(\hat{ {\bf x} }^p) ~\geq~  F \Big( \sum\nolimits_{p=0}^{k-1} \frac{1}{k}{\hat{\mathbf x}}^p \Big),
+\end{align*}
+which implies that $\sum\nolimits_{p=0}^{k-1}F(\hat{ {\bf x} }^p) ~\geq~  k F ( { \tilde{\bf x} }^k  )$. The analogous relation holds for $\sum_{p=0}^{k-1}{ {\bf r} }({\hat{\mathbf x}}^p) \geq k { {\bf r} }( { \tilde{\bf x} }^k  ) $, since it is a linear (convex) mapping. We also have that $\sum_{p=0}^{k-1} F({ {\bf x} }^*) = kF({ {\bf x} }^*)$. Hence, \eqref{10} can be expressed as
+\begin{align*}
+ kF( { \tilde{\bf x} }^k  )  - kF({ {\bf x} }^*) + k\langle {\boldsymbol{\lambda}}, { {\bf r} }( { \tilde{\bf x} }^k )\rangle~\leq~ \frac{1}{2\tau} \Big( \phi^0({\boldsymbol{\lambda}}) - \phi^{k}({\boldsymbol{\lambda}})\Big),
+\end{align*}
+or,
+\begin{align}\label{eqn:ergodic}
+ F( { \tilde{\bf x} }^k  ) - F({ {\bf x} }^*) + \langle {\boldsymbol{\lambda}}, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle  ~\leq~ \frac{1}{2k\tau}   \phi^0({\boldsymbol{\lambda}}),
+\end{align}
+because for any ${\boldsymbol{\lambda}} \in \mathbb{R}^m$, we have $\phi^{k}({\boldsymbol{\lambda}}) \geq 0$.
+
+The above inequality is true for all ${\boldsymbol{\lambda}} \in \mathbb{R}^m$, hence it must also hold for any point in the ball $\mathcal{B} = \{{\boldsymbol{\lambda}} \mid \|{\boldsymbol{\lambda}}\| \le 1\}$. We now let ${\boldsymbol{\lambda}} = \tilde{\boldsymbol{\lambda}}^k \triangleq \operatorname*{arg\,max}_{{\boldsymbol{\lambda}} \in \mathcal{B}} \langle {\boldsymbol{\lambda}}, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle$ and rewrite the above relation as
+\begin{align*}
+ F( { \tilde{\bf x} }^k  )  - F({ {\bf x} }^*) +  \|{ {\bf r} }( { \tilde{\bf x} }^k  )\| ~\leq~ \frac{1}{2k\tau}   \phi^0(\tilde{\boldsymbol{\lambda}}^k),
+\end{align*}
+where we used $\langle \tilde{\boldsymbol{\lambda}}^k, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle = \|{ {\bf r} }( { \tilde{\bf x} }^k  )\|$.
+Finally, the term on the right-hand side can be bounded as
+\begin{align*}
+\phi^0(\tilde{\boldsymbol{\lambda}}^k) = &\sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 +\frac{1}{\rho}\|\bar{\boldsymbol{\lambda}}^0-\tilde{\boldsymbol{\lambda}}^k\|^2\\
+\le &\sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 +\frac{1}{\rho}(\|\bar{\boldsymbol{\lambda}}^0\|+1)^2,
+\end{align*}
+which gives the desired result.
+\end{proof}
+\vspace{3pt}
+
+The importance of this bound is that
+the computation complexity can be specified in advance as long as the diameters of the primal constraint sets $\mathcal{X}_i$ can be determined.
+However, when the primal solution ${ \tilde{\bf x} }^k$ is not feasible, it is possible that $F({ \tilde{\bf x} }^k) -F^* < 0$.
+In this case, the bound in \eqref{thm_eq} can  still be useful if the primal residual can be tightly bounded
+as pointed out in \cite{LanDBnd}, i.e., if $\|\mathbf{A}{ \tilde{\bf x} }^k-\mathbf{b}\| < \delta$ for a relatively small $\delta >0$,
+then a lower bound of $F({ \tilde{\bf x} }^k) -F^*$ is given by
+\begin{align*}
+F({ \tilde{\bf x} }^k) -  F({ {\bf x} }^*)  \ge \langle \boldsymbol{\lambda}^*, \mathbf{A}{ \tilde{\bf x} }^k-\mathbf{b}\rangle \ge - \delta\|\boldsymbol{\lambda}^*\|,
+\end{align*}
+where $\boldsymbol{\lambda}^*$ is a component of the saddle point $(\mathbf{x}^*,\boldsymbol{\lambda}^*)$ of \eqref{ord_lagr}.
+
+\begin{thm}\label{thm2}
+Assume (A1)--(A3). Recall that ${ \tilde{\bf x} }^k = \frac{1}{k}\sum_{p=0}^{k-1} {\hat{\mathbf x}}^p $ denotes  the ergodic average of the primal variable sequence generated by ADAL up to iteration $k$
+and ${ {\bf r} }({ {\bf x} }) = { {\bf A} }{ {\bf x} } - { {\bf b} }$ denotes the residual at ${ {\bf x} }$.
+Let $({ {\bf x} }^*,{\boldsymbol{\lambda}}^*)$ be a saddle point of \eqref{ord_lagr}.
+Then, for all $k$\vspace{2mm}
+\begin{itemize}
+{  \ifx\relax(a)\relax  \item \else \item[(a)] \fi
+  \abovedisplayskip=0pt\abovedisplayshortskip=0pt~\vspace*{-\baselineskip}}{align*}
+|F({ \tilde{\bf x} }^k) -  F({ {\bf x} }^*)| \le \frac{1}{2k\tau} \max\{\phi^0(\0b),\phi^0(2{\boldsymbol{\lambda}}^*)\},
+\end{align*}
+where $\phi^0({\boldsymbol{\lambda}}) = \sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 +\frac{1}{\rho}\|\bar{\boldsymbol{\lambda}}^0-{\boldsymbol{\lambda}}\|^2$.\\
+{  \ifx\relax(b)\relax  \item \else \item[(b)] \fi
+  \abovedisplayskip=0pt\abovedisplayshortskip=0pt~\vspace*{-\baselineskip}}{align*}
+\|{ {\bf r} }( { \tilde{\bf x} }^k)\|\le &~\frac{1}{2k\tau} \bigg[\sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 \\ &~+\frac{2}{\rho}\left(\|\bar{\boldsymbol{\lambda}}^0-{\boldsymbol{\lambda}}^*\|^2 + 1\right)\bigg].
+\end{align*}
+\end{itemize}
+\end{thm}
+\begin{proof}
+\noindent (a)
+The inequality \eqref{eqn:ergodic} is true for all ${\boldsymbol{\lambda}} \in \mathbb{R}^m$, hence
+letting ${\boldsymbol{\lambda}} = \mathbf{0}$ yields
+\begin{align}\label{eqn:thm1eq0}
+ F( { \tilde{\bf x} }^k  ) - F({ {\bf x} }^*)   ~\leq~ \frac{1}{2k\tau}   \phi^0(\mathbf{0}).
+\end{align}
+Let ${\boldsymbol{\lambda}}^*$ be a dual optimal solution. Then, from the saddle point inequality, we have
+\begin{align}\label{eqn:thm1eq1}
+F({ {\bf x} }^*)  ~\leq~  F( { \tilde{\bf x} }^k  ) + \langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle,
+\end{align}
+which implies
+\begin{align}\label{eqn:thm1eq2}
+F({ {\bf x} }^*)  - F( { \tilde{\bf x} }^k  ) ~\leq~  \langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle.
+\end{align}
+Next, we find an upper bound of the term $\langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle$.
+We add $\langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle$ to both sides of \eqref{eqn:thm1eq1} to obtain
+\begin{align*}
+\langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle  ~\leq~  F( { \tilde{\bf x} }^k  )- F({ {\bf x} }^*) + \langle 2{\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle.
+\end{align*}
+Using relation \eqref{eqn:ergodic} again with ${\boldsymbol{\lambda}} = 2{\boldsymbol{\lambda}}^*$ to bound the right-hand side of the above equation, we obtain
+\begin{align*}
+\langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle  ~\leq~  \frac{1}{2k\tau}   \phi^0(2{\boldsymbol{\lambda}}^*).
+\end{align*}
+Combining this with relation \eqref{eqn:thm1eq2}, we further obtain
+\begin{align*}
+F({ {\bf x} }^*)  - F( { \tilde{\bf x} }^k  )  ~\leq~  \frac{1}{2k\tau}   \phi^0(2{\boldsymbol{\lambda}}^*).
+\end{align*}
+Combining this with relation \eqref{eqn:thm1eq0}, the desired result follows. \\
+
+\noindent (b)
+We next bound the residual $\|{ {\bf r} }( { \tilde{\bf x} }^k  )\|$.
+Using relation \eqref{eqn:ergodic} with ${\boldsymbol{\lambda}} = {\boldsymbol{\lambda}}^* + \frac{{ {\bf r} }( { \tilde{\bf x} }^k  )}{\|{ {\bf r} }( { \tilde{\bf x} }^k  )\|}$, we have
+\begin{align}\label{eqn:thm1eq4}
+& F( { \tilde{\bf x} }^k  ) - F({ {\bf x} }^*) + \langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle  + \|{ {\bf r} }( { \tilde{\bf x} }^k  )\|\nonumber\\
+& ~\leq~ \frac{1}{2k\tau}   \phi^0\left({\boldsymbol{\lambda}}^* + \frac{{ {\bf r} }( { \tilde{\bf x} }^k  )}{\|{ {\bf r} }( { \tilde{\bf x} }^k  )\|}\right).
+\end{align}
+Using the saddle point inequality together with the fact that $({ {\bf x} }^*,{\boldsymbol{\lambda}}^*)$ is a primal-dual optimal pair,
+we obtain
+\begin{align*}
+F( { \tilde{\bf x} }^k  ) + \langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle \ge F({ {\bf x} }^*) + \langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { {\bf x} }^*  )\rangle,
+\end{align*}
+which implies
+\begin{align*}
+F( { \tilde{\bf x} }^k  ) -F({ {\bf x} }^*) +  \langle {\boldsymbol{\lambda}}^*, { {\bf r} }( { \tilde{\bf x} }^k  )\rangle \ge 0.
+\end{align*}
+Combining this with relation \eqref{eqn:thm1eq4}, we obtain
+\begin{align*}
+\|{ {\bf r} }( { \tilde{\bf x} }^k  )\|
+ ~\leq~ \frac{1}{2k\tau}   \phi^0\left({\boldsymbol{\lambda}}^* + \frac{{ {\bf r} }( { \tilde{\bf x} }^k  )}{\|{ {\bf r} }( { \tilde{\bf x} }^k  )\|}\right).
+\end{align*}
+From the definition of the Lyapunov/Merit function $\phi^k({\boldsymbol{\lambda}})$ in \eqref{phi},
+the right-hand side can be represented as
+\begin{align*}
+&\phi^0\left({\boldsymbol{\lambda}}^* + \frac{{ {\bf r} }( { \tilde{\bf x} }^k  )}{\|{ {\bf r} }( { \tilde{\bf x} }^k  )\|}\right) \\
+&~ = \sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 +\frac{1}{\rho}\left\|\bar{\boldsymbol{\lambda}}^0-{\boldsymbol{\lambda}}^* + \frac{{ {\bf r} }( { \tilde{\bf x} }^k  )}{\|{ {\bf r} }( { \tilde{\bf x} }^k  )\|}\right\|^2\\
+&~ = \sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 +\frac{2}{\rho}\left(\|\bar{\boldsymbol{\lambda}}^0-{\boldsymbol{\lambda}}^*\|^2 + 1\right),
+\end{align*}
+from which the desired result follows.
+
+\end{proof}
+
+Theorem \ref{thm2} characterizes the suboptimality and infeasibility of the solution obtained when the algorithm is terminated before reaching the optimal solution. That is, the theoretical complexity
+for the algorithm to reach an $\epsilon$-optimal solution both in terms of objective value and feasibility
+is $O(\frac{1}{\epsilon})$ iterations.
+This result is particularly useful for MPC applications where frequent re-optimization for different time horizons is often required in practice, as discussed in Section \ref{subsec:mpc}.
+In order to explicitly specify the complexity in advance, however, these bounds require an estimation on the dual optimal solution ${\boldsymbol{\lambda}}^*$.
+
+\section{Certification of Complexity\label{sec:cert}}
+In this section, we provide a valid upper bound for ${\boldsymbol{\lambda}}^*$,
+which is a corresponding dual multiplier for the optimal solution ${ {\bf x} }^*$ of problem \eqref{P}.
+
+\begin{thm}\label{thm3}
+Assume (A1)-(A3) and that ${ {\bf A} }$ is full column rank. Let $({ {\bf x} }^*,{\boldsymbol{\lambda}}^*)$ be a primal-dual optimal pair of \eqref{P} and \eqref{D}.
+Then,
+\begin{align*}
+\|{\boldsymbol{\lambda}}^*\| \le \frac{\sqrt{N}G}{\tilde\sigma_{\min}({ {\bf A} })},
+\end{align*}
+where $\tilde\sigma_{\min}({ {\bf A} })$ is the smallest nonzero singular value of ${ {\bf A} }$.
+\end{thm}
+
+\begin{proof}
+Define a value function ${\mathcal{V}}:\mathbb{R}^m \to \mathbb{R}$ as
+\begin{align*}
+{\mathcal{V}}({\boldsymbol{\delta}}) := \min_{{ {\bf x} } \in { \mathcal{X} }, { {\bf A} }{ {\bf x} }={ {\bf b} } + {\boldsymbol{\delta}}} F({ {\bf x} }).
+\end{align*}
+By Lagrangian duality, this can be equivalently represented as
+\begin{align*}
+{\mathcal{V}}({\boldsymbol{\delta}}) = \max_{{\boldsymbol{\lambda}}\in\mathbb{R}^m} {\langle} {\boldsymbol{\lambda}}, { {\bf b} }+{\boldsymbol{\delta}}{\rangle} + \min_{{ {\bf x} } \in { \mathcal{X} }} F({ {\bf x} }) + {\langle} {\boldsymbol{\lambda}}, -{ {\bf A} }{ {\bf x} } {\rangle}.
+\end{align*}
+Let the function above attain its  value at $ {\boldsymbol{\lambda}} = {\boldsymbol{\lambda}}^*({\boldsymbol{\delta}})$. Then, ${\boldsymbol{\lambda}}^*({\boldsymbol{\delta}})\in \partial {\mathcal{V}}({\boldsymbol{\delta}})$.
+To bound the dual multiplier ${\boldsymbol{\lambda}}^* ={\boldsymbol{\lambda}}^*(\0b)$, therefore, it suffices to show that any vector in $\partial {\mathcal{V}}({\boldsymbol{\delta}})$ is bounded.
+Let ${\mathbf{s}} \in \partial {\mathcal{V}}(\0b)$. Then, from the convexity of ${\mathcal{V}}(\cdot)$, we have that for any $\epsilon > 0$
+\begin{align}\label{L1}
+{\mathcal{V}}\left(\epsilon \frac{\mathbf{s}}{\|{\mathbf{s}}\|}\right) - {\mathcal{V}}(\0b) \ge \left{\langle} {\mathbf{s}}, \epsilon \frac{\mathbf{s}}{\|{\mathbf{s}}\|}\right{\rangle} = \epsilon \|{\mathbf{s}}\|.
+\end{align}
+Let ${ {\bf x} }_{\epsilon}^*$ be defined such that
+\begin{align*}
+{ {\bf x} }_{\epsilon}^*:= \operatorname*{arg\,min}_{{ {\bf x} }_i \in { \mathcal{X} }, { {\bf A} } { {\bf x} } ={ {\bf b} }+\epsilon \frac{\mathbf{s}}{\|{\mathbf{s}}\|}} F({ {\bf x} }).
+\end{align*}
+Then, we have
+${ {\bf A} }({ {\bf x} }^*-{ {\bf x} }_{\epsilon}^*) = - \epsilon \frac{\mathbf{s}}{\|{\mathbf{s}}\|}$,
+ from which we obtain
+\begin{align}\label{L2}
+\|{ {\bf x} }^*-{ {\bf x} }_{\epsilon}^*\| \le \frac{\epsilon}{\tilde\sigma_{\min}({ {\bf A} })},
+\end{align}
+where $\tilde\sigma_{\min}({ {\bf A} })$ is the smallest nonzero singular value of ${ {\bf A} }$.
+From \eqref{L2} and \eqref{eqn:G}, we obtain
+\begin{align*}
+&\left\|{\mathcal{V}}\left(\epsilon \frac{\mathbf{s}}{\|{\mathbf{s}}\|}\right) - {\mathcal{V}}(\0b)\right\|
+= \|F({ {\bf x} }_{\epsilon}^*)-F({ {\bf x} }^*)\| \\
+&~~\le G \sum_{i=1}^N\|{ {\bf x} }_{i,\epsilon}^*-{ {\bf x} }^*_i\|
+\le  \sqrt{N}G\sqrt{\|{ {\bf x} }_{\epsilon}^*-{ {\bf x} }^*\|^2}
+\le \frac{\epsilon\sqrt{N}L}{\tilde\sigma_{\min}({ {\bf A} })}.
+\end{align*}
+In view of this relation and \eqref{L1}, and the fact that ${\mathbf{s}}$ represents any arbitrary vector in $\partial {\mathcal{V}}(\0b)$,
+we obtain the desired result.
+\end{proof}
+\vspace{3pt}
+
+Using the bound above, in the following two propositions,
+we provide an explicit number of iterations for the ADAL method
+to obtain an $\epsilon$-optimal solution
+as well as a selection of the algorithm parameter $\rho$.
+Since the bound on the right-hand side of Theorem \ref{thm1} depends on ${ {\bf x} }^*$,
+we further upper bound this using relation \eqref{eqn:DX} as
+\begin{align}\label{eqn:ubnd1}
+\sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0\hspace{-0.5mm}-\hspace{-0.5mm}{ {\bf x} }_i^*)\|^2 \hspace{-0.5mm}+\hspace{-0.5mm}\frac{1}{\rho}
+\le \rho N\sigma_{\max}^2({ {\bf A} })D_{ \mathcal{X} }^2 \hspace{-0.5mm}+\hspace{-0.5mm} \frac{1}{\rho},
+\end{align}
+where we set $\bar {\boldsymbol{\lambda}}^0 = \0b$.
+
+\begin{prop}
+Assume (A1)-(A3) and that ${ {\bf A} }$ is full column rank. Let $\bar {\boldsymbol{\lambda}}^0 = \0b$.
+Then, the parameter $\rho^*$ minimizing the bound in \eqref{eqn:ubnd1} is
+\begin{align*}
+\rho^* = \frac{1}{\sqrt{N}\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} }}.
+\end{align*}
+Furthermore, the number of iterations required to decrease the bound \eqref{thm_eq} less than $\epsilon$ is
+\begin{align*}
+k_{\epsilon,1} = \left\lceil \frac{\sqrt{N}\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} }}{\epsilon\tau}\right\rceil.
+\end{align*}
+\end{prop}
+\begin{proof}
+Note that the right-hand side of relation \eqref{eqn:ubnd1} is convex with respect to $\rho$.
+Therefore, it is easy to see that the parameter $\rho$ which minimizes the right-hand side can be chosen as
+$\rho^* = \frac{1}{\sqrt{N}\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} }}$.
+By using this parameter for the bound in Theorem \ref{thm1}, we obtain
+\begin{align*}
+F({ \tilde{\bf x} }^k) -  F({ {\bf x} }^*) + \|{ {\bf r} }( { \tilde{\bf x} }^k)\| ~\leq~ \frac{1}{k\tau} \sqrt{N}\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} },
+\end{align*}
+from which the desired result follows.
+\end{proof}
+\vspace{3pt}
+This result shows that the number of required iterations depends on the number of network agents,
+the diameter of the constraint set ${ \mathcal{X} }$,
+the maximum singular value of ${ {\bf A} }$, and
+the sparsity of the matrix ${ {\bf A} }$, which is encoded in the parameter $\tau \in (0,1/q)$ (cf. Eq. \eqref{eqn:q}).
+
+Similarly, from relation \eqref{eqn:DX} and Theorem \ref{thm3}, the right-hand side of Theorem \ref{thm2}(a), which is larger than that of Theorem \ref{thm2}(b), can be further upper bounded as
+\begin{align}\label{eqn:ubnd2}
+&\sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^0-{ {\bf x} }_i^*)\|^2 +\frac{4}{\rho}\|{\boldsymbol{\lambda}}^*\|^2\\
+&~~\le \rho N\sigma_{\max}^2({ {\bf A} })D_{ \mathcal{X} }^2 + \frac{4}{\rho}\frac{NG^2}{\tilde\sigma_{\min}^2({ {\bf A} })},\nonumber
+\end{align}
+where we set $\bar {\boldsymbol{\lambda}}^0 = \0b$.
+
+\begin{prop}
+Assume (A1)-(A3) and that ${ {\bf A} }$ is full column rank. Let $\bar {\boldsymbol{\lambda}}^0 = \0b$.
+Then, the parameter $\rho^*$ minimizing the bound in \eqref{eqn:ubnd2} is
+\begin{align*}
+\rho^* = \frac{2G}{\tilde\sigma_{\min}({ {\bf A} })\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} }}.
+\end{align*}
+Furthermore, the number of iterations required to obtain an $\epsilon$-optimal and feasible solution is
+\begin{align*}
+k_{\epsilon,2} =\left\lceil  \frac{2GN\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} }}{\epsilon\tau\tilde\sigma_{\min}({ {\bf A} })}
+\right\rceil.
+\end{align*}
+\end{prop}
+\begin{proof}
+Since the right-hand side of relation \eqref{eqn:ubnd2} is convex with respect to $\rho$,
+it is easy to see that the parameter $\rho$ which minimizes the right-hand side can be chosen as
+$\rho^* = \frac{2G}{\tilde\sigma_{\min}({ {\bf A} })\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} }}$.
+By using this parameter for the bound in Theorem \ref{thm2}(a), we obtain
+\begin{align*}
+|F({ \tilde{\bf x} }^k) -  F({ {\bf x} }^*)| ~\leq~ \frac{1}{2k\tau} \frac{4GN\sigma_{\max}({ {\bf A} })D_{ \mathcal{X} }}{\tilde\sigma_{\min}({ {\bf A} })},
+\end{align*}
+from which the desired result follows.
+\end{proof}
+\vspace{3pt}
+
+As expected, $k_{\epsilon,2} \ge k_{\epsilon,1}$ since the conditions imposed by Theorem \ref{thm2} are more strict.
+More specifically, due to the dependence of the bounds on the optimal dual multiplier ${\boldsymbol{\lambda}}^*$, $k_{\epsilon,2}$ also depends on the Lipschitz constant $G$.
+
+\section{Conclusions}\label{sec_concl}
+
+In this paper, we presented an Augmented Lagrangian decomposition method (ADAL)
+and characterized its computational complexity. We showed that the algorithm generates an $\epsilon$-optimal and feasible solution using the ergodic average of the sequence of primal variables under some mild assumptions such as the general convexity of the problems.
+We also provided an explicit upper bound on the optimal dual multiplier, from which the number of iterations can be explicitly given for any general convex problems involving linear constraints.
+The results in this paper have the potential to significantly improve the performance of distributed MPC problems,
+where preconditioning of computational complexity is important.
+
+\appendix
+
+\subsection{Proof of Lemma \ref{lemma3}}\label{app:B}
+Let ${\mathbf{s}}_i^k$ be a subgradient of $f_i$ at $\hat{ {\bf x} }_i^k$, i.e., $ {\mathbf{s}}_i^k \in \partial f_i(\hat{ {\bf x} }_i^k)$.
+Then, the first order optimality conditions \cite[Proposition 4.7.1]{Berts1} for each local problem \eqref{ADAL_1} imply that for any ${ {\bf x} }_i \in \mathcal{X}_i$
+\begin{align*}
+0\leq  \Big\langle {\mathbf{s}}_i^k  +  { {\bf A} }_i^\top \Big[ {\boldsymbol{\lambda}}^k + \rho  \big({ {\bf A} }_i\hat{ {\bf x} }_i^k + \sum_{j\neq i}{ {\bf A} }_j { {\bf x} }_j^k -{ {\bf b} }\big)\Big], { {\bf x} }_i-\hat{ {\bf x} }_i^k  \Big\rangle .
+\end{align*}
+By letting ${ {\bf x} }_i = { {\bf x} }_i^*$ and substituting ${\boldsymbol{\lambda}}^k$ with $\hat{\boldsymbol{\lambda}}^k:={\boldsymbol{\lambda}}^k+\rho { {\bf r} }(\hat{ {\bf x} }^k)$ in the above, we get
+\begin{align}\label{1}
+0\leq  \Big\langle {\mathbf{s}}_i^k  +  { {\bf A} }_i^\top \Big[ \hat{\boldsymbol{\lambda}}^k + \rho  \sum_{j\neq i}{ {\bf A} }_j ( { {\bf x} }_j^k - \hat{ {\bf x} }_j^k )\Big], { {\bf x} }_i^*-\hat{ {\bf x} }_i^k  \Big\rangle .
+\end{align}
+By the definition of ${\mathbf{s}}_i^k$, we have the relation
+\begin{align}\label{subgr}
+f_i({ {\bf x} }_i^*) - f_i(\hat{ {\bf x} }_i^k) ~\geq~ \left\langle {\mathbf{s}}_i^k, { {\bf x} }_i^* - \hat{ {\bf x} }_i^k \right\rangle.
+\end{align}
+Substituting this into \eqref{1}, we get
+\begin{align*}
+& f_i({ {\bf x} }_i^*) - f_i(\hat{ {\bf x} }_i^k) ~+~  \Big\langle \hat{\boldsymbol{\lambda}}^k , { {\bf A} }_i \big({ {\bf x} }_i^*-\hat{ {\bf x} }_i^k \big) \Big\rangle  \\
+& \qquad +~ \rho \Big\langle { {\bf A} }_i\big(  { {\bf x} }_i^*-\hat{ {\bf x} }_i^k \big) ,  \sum\nolimits_{j\neq i} { {\bf A} }_j \big( { {\bf x} }_j^{k} - {\hat{\mathbf x}}_j^k\big) \Big\rangle   ~\geq~ 0.\notag
+\end{align*}
+Summing over all $i$, we get
+\begin{align*}
+& F({ {\bf x} }^*) - F(\hat{ {\bf x} }^k) ~+~  \Big\langle \hat{\boldsymbol{\lambda}}^k , \sum\nolimits_i{ {\bf A} }_i \big({ {\bf x} }_i^*-\hat{ {\bf x} }_i^k \big) \Big\rangle  \\
+&~+~ \rho \sum\nolimits_i \Big\langle { {\bf A} }_i\big({ {\bf x} }_i^*-\hat{ {\bf x} }_i^k\big) , \sum\nolimits_{j\neq i}{ {\bf A} }_j \big( { {\bf x} }_j^k- \hat{ {\bf x} }_j^k \big)\Big\rangle  ~\geq~ 0.
+\end{align*}
+Substituting $ \sum_i { {\bf A} }_i\big({ {\bf x} }_i^*-\hat{ {\bf x} }_i^k\big) =  { {\bf b} } - \sum_i { {\bf A} }_i  \hat{ {\bf x} }_i^k = -{ {\bf r} }({\hat{\mathbf x}}^k)$, adding and subtracting $\langle{\boldsymbol{\lambda}}, { {\bf r} }({\hat{\mathbf x}}^k) \rangle$, and rearranging terms in the above inequality  we get
+\begin{align*}
+&   -\Big\langle \hat{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} , { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle   ~\geq~  F(\hat{ {\bf x} }^k) - F({ {\bf x} }^*) + \langle{\boldsymbol{\lambda}}, { {\bf r} }({\hat{\mathbf x}}^k) \rangle\\
+&\qquad+~ \rho \sum\nolimits_{i} \Big\langle { {\bf A} }_i\big(\hat{ {\bf x} }_i^k - { {\bf x} }_i^*\big) , \sum\nolimits_{j\neq i}{ {\bf A} }_j \big( { {\bf x} }_j^k- \hat{ {\bf x} }_j^k \big)\Big\rangle. \notag
+\end{align*}
+To avoid cluttering the notation, we temporarily disregard the term $F(\hat{ {\bf x} }^k) - F({ {\bf x} }^*) + \langle{\boldsymbol{\lambda}}, { {\bf r} }({\hat{\mathbf x}}^k) \rangle$, i.e., we consider only the terms
+\begin{align*}
+&   -\Big\langle \hat{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} , { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle   ~\geq~ \\
+&\qquad\rho \sum\nolimits_{i} \Big\langle { {\bf A} }_i\big(\hat{ {\bf x} }_i^k - { {\bf x} }_i^*\big) , \sum\nolimits_{j\neq i}{ {\bf A} }_j \big( { {\bf x} }_j^k- \hat{ {\bf x} }_j^k \big)\Big\rangle. \notag
+\end{align*}
+Add the term ${\rho}\sum_i\big\langle { {\bf A} }_i( {\hat{\mathbf x}}_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \big\rangle$ to both sides of the above inequality, and group the terms on the right-hand side by their common factor to get
+\begin{align}\label{2}
+& {\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( {\hat{\mathbf x}}_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \Big\rangle - \Big\langle \hat{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} ,  { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle \nonumber\\
+&  \geq~ {\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( {\hat{\mathbf x}}_i^k -{ {\bf x} }_i^*) , \sum\nolimits_j { {\bf A} }_j({ {\bf x} }_j^k-{\hat{\mathbf x}}_j^k) \Big\rangle.\notag\\
+& =~ {\rho}\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  , { {\bf r} }({ {\bf x} }^k) - { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle,
+\end{align}
+where the last equality is from $\sum_j{ {\bf A} }_j({ {\bf x} }_j^k-\hat{ {\bf x} }_j^k) = { {\bf r} }({ {\bf x} }^k)-{ {\bf r} }(\hat{ {\bf x} }^k)$.
+Next, we represent
+\begin{gather*}
+{ {\bf A} }_i\hat{ {\bf x} }_i^k-{ {\bf A} }_i{ {\bf x} }_i^* = ({ {\bf A} }_i { {\bf x} }_i^k-{ {\bf A} }_i { {\bf x} }_i^*)+({ {\bf A} }_i\hat{ {\bf x} }_i^k-{ {\bf A} }_i{ {\bf x} }_i^k) ~~\text{and}\\
+{\hat{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} = ({\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}})+(\hat{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}}^k)} = ({\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}}) + \rho { {\bf r} }({\hat{\mathbf x}}^k),
+\end{gather*}
+in the left-hand side of \eqref{2} to obtain
+\begin{align*}
+& {\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( { {\bf x} }_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \Big\rangle - \Big\langle {\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} ,  { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle  \notag\\
+& ~~~~\geq~  {\rho} \sum\nolimits_i \|{ {\bf A} }_i({ {\bf x} }_i^{k}-\hat{ {\bf x} }_i^k)\|^2 ~+~ {\rho}\| { {\bf r} }({\hat{\mathbf x}}^k) \|   ^2 \\
+& \qquad\qquad\qquad\qquad~~~+~ {\rho}\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  , { {\bf r} }({ {\bf x} }^k) - { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle.  \nonumber
+\end{align*}
+Adding $ -(1-\tau)\rho\big\langle { {\bf r} }({ {\bf x} }^k),{ {\bf r} }(\hat{ {\bf x} }^k)\big\rangle$ to both sides of the above inequality and recalling the definition of $\bar{\boldsymbol{\lambda}}^k$ in \eqref{lambda_bar}, we get
+\begin{align}\label{4}
+& {\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( { {\bf x} }_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \Big\rangle - \Big\langle \bar{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} ,  { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle  \notag\\
+&~ \geq~  {\rho} \sum\nolimits_i \|{ {\bf A} }_i({ {\bf x} }_i^{k}-\hat{ {\bf x} }_i^k)\|^2 ~+~ {\rho}\| { {\bf r} }({\hat{\mathbf x}}^k) \|   ^2 \\
+&  ~~~+~ {\rho}\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  , { {\bf r} }({ {\bf x} }^k) - { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle  -(1-\tau)\rho\Big\langle { {\bf r} }({ {\bf x} }^k),{ {\bf r} }(\hat{ {\bf x} }^k)\Big\rangle.  \nonumber
+\end{align}
+Considering only the last two terms on the right hand side of \eqref{4}, we can write
+\begin{align}\label{6}
+& {\rho}\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  , { {\bf r} }({ {\bf x} }^k) - { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle  - (1-\tau)\rho\Big\langle { {\bf r} }({ {\bf x} }^k),{ {\bf r} }(\hat{ {\bf x} }^k)\Big\rangle  \nonumber\\
+&=~{\rho}\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  , { {\bf r} }({ {\bf x} }^k) - { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle   \\\nonumber
+&\qquad \qquad - (1-\tau)\rho\Big\langle { {\bf r} }({ {\bf x} }^k)- { {\bf r} }({\hat{\mathbf x}}^k) +{ {\bf r} }({\hat{\mathbf x}}^k),{ {\bf r} }(\hat{ {\bf x} }^k)\Big\rangle  \\\nonumber
+&=~ \tau\rho\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  , { {\bf r} }({ {\bf x} }^k) - { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle  -(1-\tau)\rho\|{ {\bf r} }(\hat{ {\bf x} }^k)\|^2.
+\end{align}
+We now consider the last term of the above equality. Each one of the summands in this term is bounded below by
+\begin{align*}
+& \tau\rho\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  ,  { {\bf A} }_i({ {\bf x} }_i^k-\hat{ {\bf x} }_i^k) \Big\rangle = \tau\rho\sum_{j=1}^m  \big[{ {\bf r} }({\hat{\mathbf x}}^k)\big]_j  \big[ { {\bf A} }_i( { {\bf x} }_i^k-\hat{ {\bf x} }_i^k )\big]_j \\
+&~\geq~ -\frac{1}{2} \sum\nolimits_{j=1}^m \Big(\rho\Big[{ {\bf A} }_i({ {\bf x} }_i^k-\hat{ {\bf x} }_i^k)\Big]_j^2 ~+~ \tau^2\rho\big[{ {\bf r} }({\hat{\mathbf x}}^k)\big]_j^2\Big).
+\end{align*}
+Note, however, that some of the rows of ${ {\bf A} }_i$ might be zero. If $[{ {\bf A} }_i]_j = \mathbf{0}$, then it follows that $ \big[{ {\bf r} }({\hat{\mathbf x}}^k)\big]_j  \big[ { {\bf A} }_i( { {\bf x} }_i^k-\hat{ {\bf x} }_i^k )\big]_j = 0$.   Hence,  denoting the set of nonzero rows of ${ {\bf A} }_i$ as $\mathcal{Q}_i$, i.e., $\mathcal{Q}_i = \{ j = 1,\dots,m : [{ {\bf A} }_i ]_j \neq \mathbf{0} \}$, we can obtain a tighter lower bound for each $\tau\rho\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  ,  { {\bf A} }_i({ {\bf x} }_i^k-\hat{ {\bf x} }_i^k) \Big\rangle$ term as
+\begin{align*}
+&\tau\rho\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  ,  { {\bf A} }_i({ {\bf x} }_i^k-\hat{ {\bf x} }_i^k) \Big\rangle  ~\geq~ \\
+&-\frac{1}{2} \sum\nolimits_{j\in\mathcal{Q}_i} \Big(\rho\Big[{ {\bf A} }_i({ {\bf x} }_i^k-\hat{ {\bf x} }_i^k)\Big]_j^2 ~+~ {\tau^2}{\rho}\big[{ {\bf r} }({\hat{\mathbf x}}^k)\big]_j^2\Big).\notag
+\end{align*}
+Recalling that $q$ denotes the maximum number of non-zero blocks $[ { {\bf A} }_i ]_j$ over all $j$, and summing inequality \eqref{6} over all $i$, we observe that each quantity $[{ {\bf r} }({\hat{\mathbf x}}^k)]_j^2$ is included in the summation at most $q$ times. This leads us to the bound
+\begin{align}\label{7}
+& \tau\rho \Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  ,  { {\bf r} }({ {\bf x} }^k) - { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle  \notag\\
+&\quad ~=~  \sum\nolimits_i\tau\rho\Big\langle { {\bf r} }({\hat{\mathbf x}}^k)  ,  { {\bf A} }_i({ {\bf x} }_i^k-\hat{ {\bf x} }_i^k) \Big\rangle\\
+& \quad~\geq~ -  \frac{\rho}{2}\sum\nolimits_i  \| { {\bf A} }_i({ {\bf x} }_i^k-\hat{ {\bf x} }_i^k) \|^2 ~-~ \frac{\tau^2q\rho}{2}\| { {\bf r} }({\hat{\mathbf x}}^k) \|^2 .\notag
+\end{align}
+Substituting \eqref{6}-\eqref{7} back into \eqref{4}, we arrive at
+\begin{align}\label{8}
+& {\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( { {\bf x} }_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \Big\rangle - \Big\langle \bar{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} ,  { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle  \notag\\
+& \geq  \frac{\rho}{2} \sum\nolimits_i \|{ {\bf A} }_i({ {\bf x} }_i^{k}-\hat{ {\bf x} }_i^k)\|^2 + \rho(\tau-\frac{\tau^2q}{2}) \| { {\bf r} }({\hat{\mathbf x}}^k) \|   ^2.
+\end{align}
+Recall that until now we have disregarded the term $F(\hat{ {\bf x} }^k) - F({ {\bf x} }^*) + \langle{\boldsymbol{\lambda}}, { {\bf r} }({\hat{\mathbf x}}^k) \rangle$. Reinstating this term in \eqref{8}, we get
+\begin{align}\label{lemma3_eq}
+&F({\hat{\mathbf x}}^k) -  F({ {\bf x} }^*) + \langle {\boldsymbol{\lambda}}, { {\bf r} }({\hat{\mathbf x}}^k)\rangle \\
+&\leq~
+{\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( { {\bf x} }_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \Big\rangle -  \Big\langle \bar{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} ,  { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle \notag\\
+&    - \frac{\rho}{2} \sum\nolimits_i \|{ {\bf A} }_i(\hat{ {\bf x} }_i^k-{ {\bf x} }_i^{k})\|^2 - \rho(\tau-\frac{\tau^2 q}{2})\| { {\bf r} }({\hat{\mathbf x}}^k) \|^2.\notag
+\end{align}
+
+We now represent the right-hand side of the desired result using the definition of $\bar{\boldsymbol{\lambda}}^k$ in (\ref{lambda_bar}) and Lemma \ref{lem:lbar}. For all $k$,
+we have:
+\begin{align*}
+& \phi^k({\boldsymbol{\lambda}}) - \phi^{k+1}({\boldsymbol{\lambda}})  =  \sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^k-{ {\bf x} }_i^*)\|^2 +\frac{1}{\rho}\|\bar{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}}\|^2 \notag\\
+& \qquad - \sum\nolimits_{i=1}^N {\rho}\|{ {\bf A} }_i({ {\bf x} }_i^{k+1}-{ {\bf x} }_i^*)\|^2 -\frac{1}{\rho}\|\bar{\boldsymbol{\lambda}}^{k+1}-{\boldsymbol{\lambda}}\|^2\notag\\
+&=2\tau \bigg[ {\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( { {\bf x} }_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \Big\rangle - \notag\\
+&  \Big\langle \bar{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} ,  { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle \bigg] - \tau^2 \bigg[\sum_i {\rho}\|{ {\bf A} }_i(\hat{ {\bf x} }_i^k-{ {\bf x} }_i^{k})\|^2 + {\rho}\| { {\bf r} }({\hat{\mathbf x}}^k) \|^2\bigg].\notag
+\end{align*}
+Rearranging terms in the above equation, we get that
+\begin{align*}
+&\frac{1}{2\tau}\big( \phi^k({\boldsymbol{\lambda}}) - \phi^{k+1}({\boldsymbol{\lambda}}) \big) \\
+& \ge {\rho}\sum\nolimits_i\Big\langle { {\bf A} }_i( { {\bf x} }_i^k -{ {\bf x} }_i^*) , { {\bf A} }_i({ {\bf x} }_i^k-{\hat{\mathbf x}}_i^k) \Big\rangle -  \Big\langle \bar{\boldsymbol{\lambda}}^k-{\boldsymbol{\lambda}} ,  { {\bf r} }({\hat{\mathbf x}}^k) \Big\rangle \notag\\
+&    - \frac{\rho}{2} \sum\nolimits_i \|{ {\bf A} }_i(\hat{ {\bf x} }_i^k-{ {\bf x} }_i^{k})\|^2 - \rho(\tau-\frac{\tau^2 q}{2})\| { {\bf r} }({\hat{\mathbf x}}^k) \|^2   ,\notag
+\end{align*}
+where the last inequality follows from  $\tau \in (0,\frac{1}{q})$. Recall that $\tau$ is the stepsize parameter used in the second step of ADAL (cf. Eq. \eqref{ADAL_2}). Therefore, combining this with \eqref{lemma3_eq}, we arrive at the desired result.
+
+\begin{thebibliography}{10}
+
+\bibitem{Berts1}
+D.~Bertsekas, A.~Nedic, and A.~Ozdaglar, ``Convex analysis and optimization,''
+  in \emph{Series in Computational Mathematics}.\hskip 1em plus 0.5em minus
+  0.4em\relax Athena Scientific, 2003.
+
+\bibitem{Bert_Constrained}
+D.~Bertsekas, \emph{Constrained Optimization and Lagrange Multiplier Methods
+  (Optimization and neural computation series)}.\hskip 1em plus 0.5em minus
+  0.4em\relax Athena Scientific, 1996.
+
+\bibitem{Tatjewski}
+P.~Tatjewski, ``New dual-type decomposition algorithm for nonconvex separable
+  optimization problems,'' \emph{Automatica}, vol.~25, no.~2, pp. 233--242,
+  1989.
+
+\bibitem{Watanabe}
+N.~Watanabe, Y.~Nishimura, and M.~Matsubara, ``Decomposition in large system
+  optimization using the method of multipliers,'' \emph{Journal of Optimiz.
+  Theory and Applic.}, vol.~25, no.~2, pp. 181--193, 1978.
+
+\bibitem{Teboulle}
+G.~Chen and M.~Teboulle, ``A proximal-based decomposition method for convex
+  minimization problems,'' \emph{Mathematical Programming}, vol.~64, pp.
+  81--101, 1994.
+
+\bibitem{Mulvey}
+J.~Mulvey and A.~Ruszczy\'nski, ``A diagonal quadratic approximation method for
+  large scale linear programs,'' \emph{Operations Research Letters}, vol.~12,
+  pp. 205--215, 1992.
+
+\bibitem{Rus}
+A.~Ruszczy\'nski, ``On convergence of an {Augmented Lagrangian} decomposition
+  method for sparse convex optimization,'' \emph{Mathematics of Operations
+  Research}, vol.~20, pp. 634--656, 1995.
+
+\bibitem{Eck_DR}
+J.~Eckstein and D.~P. Bertsekas, ``On the {Douglas-Rachford} splitting method
+  and the proximal point algorithm for maximal monotone operators,''
+  \emph{Mathematical Programming,}, vol.~55, pp. 293--318, 1992.
+
+\bibitem{Eck_Monotrop}
+------, ``An alternating direction method for linear programming.''\hskip 1em
+  plus 0.5em minus 0.4em\relax LIDS, MIT, 1990.
+
+\bibitem{Boyd_ADMM}
+S.~Boyd, N.~Parikh, E.~Chu, B.~Peleato, and J.~Eckstein, ``Distributed
+  optimization and statistical learning via the alternating direction method of
+  multipliers,'' \emph{Foundations and Trends in Machine Learning}, vol.~3,
+  no.~1, pp. 1--122, 2011.
+
+\bibitem{Glow}
+M.~Fortin and R.~Glowinski, \emph{Augmented Lagrangian Methods: Applications to
+  the Numerical Solution of Boundary-Value Problems.}\hskip 1em plus 0.5em
+  minus 0.4em\relax Amsterdam: North-Holland, 1983.
+
+\bibitem{WYin2015}
+W.~Deng and W.~Yin, ``On the global and linear convergence of the generalized
+  alternating direction method of multipliers,'' \emph{Journal of Scientific
+  Computing}, pp. 1--28, 2015.
+
+\bibitem{He2012}
+B.~He and X.~Yuan, ``On the ${O}(1/n)$ convergence rate of the
+  {D}ouglas-{R}achford alternating direction method,'' \emph{SIAM Journal on
+  Numerical Analysis}, vol.~50, no.~2, pp. 700--709, 2012.
+
+\bibitem{He2015}
+------, ``On non-ergodic convergence rate of {D}ouglas-{R}achford alternating
+  direction method of multipliers,'' \emph{Numer. Math.}, vol. 130, no.~3, pp.
+  567--577, July 2015.
+
+\bibitem{Nikos_math_prog}
+N.~Chatzipanagiotis, D.~Dentcheva, and M.~M. Zavlanos, ``An augmented
+  {Lagrangian} method for distributed optimization,'' \emph{Mathematical
+  Programming}, vol. 152, no. 1-2, pp. 405--434, 2015.
+
+\bibitem{Nikos_ACC2015}
+N.~Chatzipanagiotis and M.~Zavlanos, ``On the convergence rate of a distributed
+  augmented lagrangian optimization algorithm,'' in \emph{American Control
+  Conference (ACC)}, July 2015, pp. 541 -- 546.
+
+\bibitem{Nikos_nonconvexADAL}
+N.~Chatzipanagiotis and M.~M. Zavlanos, ``On the convergence of a distributed
+  augmented lagrangian method for non-convex optimization,'' \emph{IEEE
+  Transactions on Automatic Control}, 2017, {DOI}: 10.1109/TAC.2017.2658438.
+
+\bibitem{Nikos_SADAL}
+------, ``A distributed algorithm for convex constrained optimization under
+  noise,'' \emph{IEEE Transactions on Automatic Control}, vol.~61, no.~9, pp.
+  2496--2511, 2016.
+
+\bibitem{RichterConf}
+S.~Richter, M.~Morari, and C.~Jones, ``Towards computational complexity
+  certification for constrained {MPC} based on lagrange relaxation and the fast
+  gradient method,'' in \emph{50th IEEE Conference on Decision and Control and
+  European Control Conference}, Dec 2011, pp. 5223--5229.
+
+\bibitem{RichterTAC}
+S.~Richter, C.~Jones, and M.~Morari, ``Computational complexity certification
+  for real-time {MPC} with input constraints based on the fast gradient
+  method,'' \emph{IEEE Transactions on Automatic Control}, vol.~57, no.~6, pp.
+  1391--1403, June 2012.
+
+\bibitem{PatrinosTAC}
+P.~Patrinos and A.~Bemporad, ``An accelerated dual gradient-projection
+  algorithm for embedded linear model predictive control,'' \emph{IEEE
+  Transactions on Automatic Control}, vol.~59, no.~1, pp. 18--33, Jan 2014.
+
+\bibitem{PontusThesis}
+P.~Giselsson, ``Gradient-based distributed model predictive control,'' Ph.D.
+  dissertation, Lund University, Nov 2012.
+
+\bibitem{QuocInexact}
+V.~Nedelcu, I.~Necoara, and Q.~Tran-Dinh, ``Computational complexity of inexact
+  gradient augmented {L}agrangian methods: Application to constrained mpc,''
+  \emph{SIAM J. Optimization and Control}, vol.~52, no.~5, pp. 3109--3134,
+  2014.
+
+\bibitem{PontusMetric}
+P.~Giselsson and S.~Boyd, ``Linear convergence and metric selection in
+  douglas-rachford splitting and {ADMM},'' \emph{IEEE Transactions on Automatic
+  Control}, vol.~PP, no.~99, pp. 1--1, 2016.
+
+\bibitem{admmParam}
+E.~Ghadimi, A.~Teixeira, I.~Shames, and M.~Johansson, ``Optimal parameter
+  selection for the alternating direction method of multipliers ({ADMM}):
+  quadratic problems,'' https://arxiv.org/pdf/1306.2454.pdf, 2014.
+
+\bibitem{LanDBnd}
+G.~Lan and R.~D.~C. Monteiro, ``Iteration-complexity of first-order penalty
+  methods for convex programming,'' \emph{Math. Program.}, vol. 138, pp.
+  115--139, 2013.
+
+\end{thebibliography}
+
+\end{document}
+

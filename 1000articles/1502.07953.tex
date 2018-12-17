@@ -1,0 +1,2144 @@
+
+
+\documentclass{mcom-l}
+
+\usepackage{array}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{bm}
+\usepackage{pgfplots}
+\usepackage{caption}
+\usepackage{url}
+\usepackage{comment}
+\usepackage{longtable}
+
+\newcolumntype{H}{>{\setbox0=\hbox\bgroup}c<{\egroup}@{}}
+
+\setlongtables
+
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{cor}[thm]{Corollary}
+\newtheorem{conj}[thm]{Conjecture}
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{prop}[thm]{Proposition}
+\newtheorem{prob}[thm]{Problem}
+
+\theoremstyle{definition}
+\newtheorem{defin}[thm]{Definition}
+
+\begin{document}
+
+\title[Unconditional Class Group Tabulation to $2^{40}$]{Unconditional
+  Class Group Tabulation of Imaginary Quadratic Fields to $|\Delta| < 2^{40}$}
+
+\author{A.~S.\ Mosunov}
+\address{University of Waterloo \\
+                200 University Ave W,
+                Waterloo, Ontario \\ Canada N2L 3G1}
+\email{amosunov@uwaterloo.ca}
+\thanks{The first author's research was supported by ``Alberta Innovates Technology Futures'', Canada.}
+
+\author{M.~J.\ Jacobson, Jr.}
+\address{University of Calgary \\
+                2500 University Drive NW,
+                Calgary, Alberta \\ Canada T2N 1N4}
+\email{jacobs@cpsc.ucalgary.ca}
+\thanks{The second author's research is supported by NSERC of Canada.}
+
+\subjclass[2010]{Primary 11R29; Secondary 11R11, 11Y40}
+\keywords{binary quadratic form, class group, tabulation, out-of-core
+  multiplication, Cohen-Lenstra heuristics}
+
+\begin{abstract}
+We present an improved algorithm for tabulating class groups of
+imaginary quadratic fields of bounded discriminant.  Our method uses
+classical class number formulas involving theta-series to compute the
+group orders unconditionally for all $\Delta \not \equiv 1 \pmod{8}.$ The
+group structure is resolved using the factorization of the group
+order.  The $1 \bmod 8$ case was handled using the methods of
+\cite{jacobson}, including the batch verification method based on the
+Eichler-Selberg trace formula to remove dependence on the Extended
+Riemann Hypothesis.  Our new method enabled us to extend the
+previous bound of $|\Delta| < 2 \cdot 10^{11}$ to $2^{40}$.
+Statistical data in support of a variety conjectures is presented,
+along with new examples of class groups with exotic structures.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction} \label{sec:intro}
+
+The class group of an imaginary quadratic field ${{\mathbb{{Q}}}}(\sqrt{\Delta})$ with
+discriminant $\Delta,$ denoted by $Cl_\Delta,$ has been studied
+extensively over the past two centuries.  Many things are known about
+the class group. For example, if we know the \emph{class number}
+$h(\Delta)$, which is defined as the size of $Cl_\Delta$, we can find
+a non-trivial factor of $\Delta$. Also, from the prime factorization
+of $\Delta$ we can determine the parity of $h(\Delta)$, as well as the
+rank of the $2$-Sylow subgroup of $Cl_\Delta.$
+
+However, the number of open questions about $Cl_\Delta$ most certainly
+exceeds the number of answered. For example, computing the class
+number is believed to be computationally difficult; it is known to be at
+least as hard as integer factorization, and is currently harder.  The
+heuristics of Cohen and Lenstra \cite{cohen2} allow us to make certain
+predictions regarding divisibility properties of $h(\Delta)$ and the
+structure of $Cl_\Delta,$ but most of these, especially with respect
+to odd primes, remain unproved.  Another question of interest is to
+provide tight bounds on $h(\Delta)$.  This has been answered by
+Littlewood \cite{littlewood}, but the result is \emph{conditional};
+that is, it depends on the \emph{Extended Riemann Hypothesis} (ERH).
+
+Due to the lack of unconditional proof on such basic arithmetic
+properties on $Cl_\Delta,$ it is of interest to provide numerical
+evidence supporting the heuristics and conditional results.
+Tabulating $Cl_\Delta$ for as many small discriminants as possible
+provides such evidence.  The first major work on class group
+tabulation is due to Buell, who in a series of papers culminating in
+\cite{buell}, computed all $Cl_\Delta$ for negative $\Delta$
+satisfying $|\Delta| < 2.2\cdot 10^9$. In his work, Buell gathered
+statistics on Littlewood's bounds on $L(1, \chi_\Delta)$
+\cite{littlewood}, Bach's bound on the size of the generators required
+to produce $Cl_\Delta$ \cite{bach1}, and the Cohen-Lenstra heuristics
+\cite{cohen2}. He also provided a table of first occurrences of
+so-called ``exotic'' groups. These groups possess interesting group
+structures, such as non-cyclic $p$-Sylow subgroups for odd primes $p$,
+which according to the Cohen-Lenstra heuristics are quite rare.
+Such groups are of interest, for example, in the context of class field
+theory, as the towers of field extensions for them have interesting,
+non-trivial properties \cite{meyer}.
+
+The next and also most recent work of interest is due to Jacobson et
+al.\ \cite{jacobson}, who used a baby-step giant-step algorithm to
+tabulate all class groups to $10^{11}$
+\cite[Algorithm~4.1]{buchmann}. The bound was further extended to
+$2\cdot 10^{11}$ in the Master's thesis of Ramachandran
+\cite{ramachandran}. The authors used Bach's averaging method in order
+to determine a \emph{conditional} lower bound $h^*$ on $h(\Delta)$,
+such that \mbox{$h^* \leq h(\Delta) \leq 2h^*$} \cite{bach2}. Due to the
+nature of the baby-step giant-step algorithm, knowing this bound was
+sufficient to be certain that the whole group was generated, assuming
+the ERH. In order to eliminate the ERH dependency, they applied the
+Eichler-Selberg trace formula \cite{schoof}, which relates sums of
+Hurwitz class numbers to the trace of a certain Hecke operator
+\cite[Formula~2.2]{jacobson}. Following Buell, the authors gathered
+statistics on various hypotheses regarding $Cl_\Delta$.
+
+In this paper, we push the feasibility limit further by tabulating
+class groups for all negative $\Delta$ such that $|\Delta| < 2^{40} =
+1.09951\ldots \times 10^{12}$. Using certain class number generating
+functions \cite{watson}, we were able to compute all class numbers
+$h(\Delta)$ for $\Delta \not \equiv 1 \pmod{8}$ via a product of two
+large-degree power series; this method was inspired by that of Hart et
+al.\ to tabulate all congruent numbers to $10^{12}$ \cite{hart}.
+Computing the class numbers first allowed us to further achieve a
+significant speedup in class group tabulation for these $\Delta$ by
+only resolving the structure of possibly non-cyclic subgroups, i.e.,
+for which all prime divisors of the order occur with multiplicity
+greater than one.  The discriminants $\Delta \equiv 1 \pmod{8}$ were
+handled separately using the previous technique of Jacobson et
+al.\ \cite{jacobson}. In the end, we observed that the class groups
+with $\Delta \not \equiv 1 \pmod{8}$ were computed over 4.72 times
+faster than class groups with $\Delta \equiv 1 \pmod{8}.$
+
+Unfortunately, the improved running time did not come for free, as we
+were no longer able to test Bach's bound on the size of generators
+required to produce the whole group \cite{bach1}. Nevertheless, we
+were still able to gather extensive computational evidence in support
+of Littlewood's bounds \cite{littlewood}, the Cohen-Lenstra heuristics
+\cite{cohen2}, and Euler's hypothesis on idoneal numbers
+\cite{kani}. We also further extended Buell's table of exotic groups
+\cite{buell}.
+
+Our paper is organized as follows. In Section \ref{sec:clnum}, we
+present three formulas suitable for the tabulation of class numbers
+$h(\Delta)$ with $\Delta \not \equiv 1
+\pmod{8}$. Section~\ref{sec:out-of-core} is dedicated to the
+out-of-core polynomial multiplication technique due to Hart et
+al.\ \cite{hart}, which allows to compute the product of two large
+polynomials that cannot fit into memory all together. Section
+\ref{sec:clgrp} gives a brief overview of the techniques that were
+used in order to tabulate $Cl_\Delta$ for $\Delta \equiv 1
+\pmod{8}$. Section \ref{sec:performance} discusses the performance of our program.
+In Section \ref{sec:results}, we present our numerical
+results, which include statistics on various hypotheses regarding
+$Cl_\Delta$ and the refined table of exotic groups. Section
+\ref{sec:furtherwork} concludes the paper by giving a discussion of
+various techniques, which can further accelerate the class number and
+class group tabulation.
+
+\section{Preliminaries} \label{sec:preliminaries}
+
+Our method for computing the class numbers relies on classical
+results related to binary quadratic forms.  Hence, our algorithms will
+be described in the language of forms, and we will use the fact that
+the ideal class group of the field ${{\mathbb{{Q}}}}(\sqrt{\Delta})$ of discriminant
+$\Delta < 0$ is isomorphic to the group of equivalence classes of
+binary quadratic forms of discriminant $\Delta.$
+
+In particular, we consider binary quadratic forms from two different
+perspectives. We use $(a, b, c)$ to denote a \emph{modern} binary
+quadratic form, i.e.\ form which possesses a \emph{discriminant}
+$\Delta = b^2 - 4ac$. We also use $(a, 2b, c)$ to denote a
+\emph{classical} binary quadratic form of \emph{determinant} $D = b^2
+- ac$, studied by Gau\ss\, \cite[Chapter 5]{gauss}.  In the first case,
+the set of equivalence classes with respect to invertible integral
+linear changes of variables forms a group under composition of forms.
+An analogous observation can be made regarding the set of \emph{properly
+primitive} (to be defined) classical quadratic forms.
+In the first case, the class group of modern forms is isomorphic to
+the ideal class group of ${{\mathbb{{Q}}}}(\sqrt{\Delta})$ whenever $\Delta$ is a
+field discriminant (square-free integer congruent to $1 \bmod 4$ or
+$4$ times a square-free number).  The second case is closely related; 
+as the formula (\ref{eq:h}) suggests, the resulting group order
+corresponding to determinant $D$ differs from $h(\Delta)$ by a factor
+of three if $\Delta \equiv 5 \pmod{8}$, $\Delta \neq -3$ and is equal to $h(\Delta)$
+otherwise.
+
+We also require the following classifications of classical forms:
+\begin{defin} \label{defin:primitive_form} \emph{\cite[\textsection 226]{gauss}}
+Consider a quadratic form $(a, 2b, c)$ and its \emph{divisor} $\delta
+= \gcd(a, b, c)$. Then $(a, 2b, c)$ is called \emph{primitive} if
+$\delta = 1$, and \emph{derived} otherwise.
+\end{defin}
+
+\begin{defin} \label{defin:proper_form} \emph{\cite{kronecker}}
+A primitive quadratic form $(a, 2b, c)$ is called \emph{uneven} if
+$\gcd(a, 2b, c) = 1$, i.e., its coefficients $a$ and $c$ are not both
+even; it is called \emph{even} otherwise. A derived form of divisor
+$\delta$ is uneven when $(a/\delta, 2b/\delta, c/\delta)$ is uneven;
+otherwise it is even.
+\end{defin}
+
+By $F(n)$ and $F_1(n)$ Kronecker denoted the total number of uneven
+and even equivalence classes of forms of determinant $D = -n$,
+respectively. We extend his notation by writing $\tilde{F}(n)$ and
+$\tilde{F}_1(n)$ for the total number of \emph{primitive} uneven and
+even equivalence classes of determinant $D = -n$, respectively. Note
+that there exists a straightforward connection between $F(n)$ and
+$\tilde{F}(n)$, and between $F_1(n)$ and $\tilde{F}_1(n).$ In
+particular, if we write $n = g^2e$, where $e$ is square-free, then
+\begin{equation} \label{eq:F_and_F_tilde}
+F(n) = \sum\limits_{t\,|\,g}\tilde{F}\left(\frac{n}{t^2}\right) \,\,\, \textnormal{and} \,\,\, F_1(n) = \sum\limits_{t\,|\,g}\tilde{F}_1\left(\frac{n}{t^2}\right).
+\end{equation}
+To see this, observe that when $\gcd(a, b, c) = t > 1$, from every
+uneven primitive form $(a/t, 2b/t, c/t)$ of determinant $-n/t^2$ we
+can obtain every uneven derived form $(a, 2b, c)$ of determinant $D
+= -n$ and divisor $\delta = t$. By counting all uneven primitive
+forms with all uneven derived ones, we obtain $F(n)$. A similar
+reasoning allows us to deduce the formula for $F_1(n)$.
+
+\section{Class Number Tabulation Formulas} \label{sec:clnum}
+
+We begin by considering the following Jacobi theta series:
+$$
+\vartheta_2(q) = 2\sum_{k = 0}^\infty q^{\left(k + \frac{1}{2}\right)^2} = 2q^{\frac{1}{4}} + 2q^{\frac{9}{4}} + 2q^{\frac{25}{4}} +  2q^{\frac{49}{4}} + \ldots\,\,\,;
+$$ 
+$$
+\vartheta_3(q) = 1 + 2\sum_{k = 1}^\infty q^{k^2} = 1 + 2q + 2q^4 + 2q^9 + 2q^{16} + \ldots \,\,.
+$$ 
+In 1860, Kronecker found the connection that exists between
+$\vartheta_3(q)$ and classical quadratic forms. We summarize his
+result in Theorem \ref{thm:kronecker}.
+\begin{thm}[{\cite{kronecker}}]\label{thm:kronecker}
+Let $F(n)$ and $F_1(n)$ count equivalence classes $\left[(1,2\!\cdot\!
+  0, 1)\right]$ and $[(2, 2\!\cdot\! 1, 2)]$, and classes derived from
+them, as $1/2$ and $1/3$, respectively. Define $E(0) = 1/12$, $E(4n) =
+E(n)$ for $n \neq 0$, and $E(n) = F(n) - F_1(n)$ for $n \not \equiv 0
+\pmod{4}$. Then
+\begin{equation} \label{eq:kronecker}
+\vartheta_3^3(q) = 12\sum\limits_{n = 0}^\infty E(n)q^n.
+\end{equation}
+\end{thm}
+Though not obvious at first sight, the formula (\ref{eq:kronecker})
+allows us to tabulate class numbers $h(\Delta)$. Recall Gau\ss's result
+that $\tilde{F}(n)$ is a multiple of $\tilde{F}_1(n)$
+\cite[\textsection 256]{gauss}:
+\begin{equation} \label{eq:F1_and_F}
+\tilde{F}_1(n) = \begin{cases}
+\tilde{F}(n), & \textnormal{when $n \equiv 7 \pmod{8}$ or $n = 3$};\\
+\tilde{F}(n)/3, & \textnormal{when $n \equiv 3 \pmod{8}$ and $n \neq 3$};\\
+0, & \textnormal{when $n \not \equiv 3 \pmod{4}$.}
+\end{cases}
+\end{equation}
+We may now prove Theorem \ref{thm:h_and_F}, which connects $h(\Delta)$
+to $\tilde{F}(n)$, where $\Delta = -4n$ or $\Delta = -n$, depending on
+the congruence class of $\Delta$ modulo 4.
+\begin{thm} \label{thm:h_and_F}
+For $\Delta < 0$ the following relation holds:
+\begin{equation} \label{eq:h}
+h(\Delta) = \begin{cases}
+\tilde{F}(n), & \textnormal{when $\Delta \equiv 0, 1, 4 \pmod{8}$ or $\Delta = -3$};\\
+\tilde{F}(n)/3, & \textnormal{when $\Delta \equiv 5 \pmod{8}$ and $\Delta \neq -3$},
+\end{cases}
+\end{equation}
+where
+\begin{equation} \label{eq:n_delta}
+n = \begin{cases}
+-\Delta / 4, & \textnormal{if $\Delta \equiv 0 \pmod{4}$;}\\
+-\Delta, & \textnormal{if $\Delta \equiv 1 \pmod{4}$.}
+\end{cases}
+\end{equation}
+\end{thm}
+\begin{proof}
+Consider a primitive binary quadratic form $(a, 2b, c)$ of determinant $D = -n$,
+where $n$ is positive. When $D \equiv 1 \pmod{4}$ and $(a, 2b, c)$ is
+even, i.e.\ $a$, $c$ are even and $b$ is odd, this form can be
+transformed into a form $(a/2,b,c/2)$ with discriminant $\Delta \equiv
+1 \pmod{4}$. This map is bijective, since every form $(a, b, c)$ of
+discriminant $\Delta$ with odd $b$ corresponds to a primitive even
+form $(2a, 2b, 2c)$ of determinant $D$. We conclude that $h(\Delta) =
+\tilde{F}_1(n)$. When $D \not\equiv 1 \pmod{4}$, there are no
+primitive even forms, and a primitive uneven form $(a, 2b, c)$ with
+determinant $D$ already has a fundamental discriminant $\Delta =
+4D$. There are no other forms $(a, b, c)$ of discriminant $\Delta$
+with $\gcd(a, b, c) = 1$, besides those of determinant $D$, so
+$h(\Delta) = \tilde{F}(n)$. In the end, we obtain the relation
+(\ref{eq:h}).
+\end{proof}
+
+According to Theorems \ref{thm:kronecker} and \ref{thm:h_and_F}, by
+cubing $\vartheta_3(q)$ we can tabulate $h(\Delta)$ for every
+fundamental discriminant $\Delta$, except for $\Delta \equiv 1
+\pmod{8}$, because in this case we have $F(n) = F_1(n)$ and thus $E(n)
+= 0.$
+
+Before proceeding further, recall the definition of a Hurwitz class number $H(n)$.
+\begin{defin} \label{defin:hurwitz}
+Let
+\begin{equation} \label{eq:h_omega}
+h_\omega(\Delta) = \begin{cases}
+h(\Delta), & \textnormal{if $\Delta < -4$;}\\
+1/2, & \textnormal{if $\Delta = -4$;}\\
+1/3, & \textnormal{if $\Delta = -3$,}\\
+\end{cases}
+\end{equation}
+and consider negative $\Delta = f^2 \Delta_1$, where $\Delta_1$ is a
+fundamental discriminant. Then
+$$
+H\left(|\Delta|\right) = \sum\limits_{t\,|\,f}h_\omega\left(\frac{\Delta}{t^2}\right),
+$$
+is called the \emph{Hurwitz class number}.
+\end{defin}
+
+In Theorem \ref{thm:h_and_F} we determined the connection that exists
+between $h(\Delta)$ and the number of \emph{primitive} uneven classes
+$\tilde{F}(n)$. However, the formula (\ref{eq:kronecker}) has $F(n)$
+instead of $\tilde{F}(n)$, which also take the \emph{derived} uneven
+classes into account. In fact, it is not hard to prove that $F(n) =
+\tilde{F}(n)$ and $F_1(n) = \tilde{F}_1(n)$ hold if and only if $n$ is
+square-free. In order to establish this connection for an arbitrary
+$n$, we aim to prove Theorem \ref{thm:E_and_H}, which relates $F(n)$
+to the Hurwitz class number $H(n)$ or $H(4n)$, depending on the
+congruence class of $n$ modulo 4. To the best of our knowledge, the
+formula (\ref{eq:E_and_H}) is not present in any literature available,
+though its statement for the special case of square-free $n > 4$ is well known
+and can be found, for example, in the monograph of Grosswald \cite[Chapter~4, Theorem~2]{grosswald}.
+
+\begin{thm} \label{thm:E_and_H}
+Let $E(n)$ be as in Theorem \ref{thm:kronecker}. Then
+\begin{equation} \label{eq:E_and_H}
+E(n) = \begin{cases}
+1/12, & \textnormal{when $n = 0$;}\\
+E(n/4), & \textnormal{when $n \equiv 0 \pmod{4}$ and $n \neq 0$};\\
+H(4n), & \textnormal{when $n \equiv 1, 2 \pmod{4}$;}\\
+2H(n), & \textnormal{when $n \equiv 3 \pmod{8}$;}\\
+0, & \textnormal{when $n \equiv 7 \pmod{8}$},
+\end{cases}
+\end{equation}
+where $H(n)$ denotes the Hurwitz class number.
+\end{thm}
+\begin{proof}
+Consider the following two cases, corresponding to square-free values of $n$:
+\begin{enumerate}
+\item Let $n \equiv 1, 2 \pmod{4}$. For $n = 1$, we can verify that
+  the formula (\ref{eq:E_and_H}) gives us the correct result. For $n
+  \neq 1$, from (\ref{eq:F1_and_F}) we know that $\tilde{F}_1(n) = 0$,
+  and from (\ref{eq:h}) we know that $h(\Delta) = \tilde{F}(n)$, where
+  $\Delta = -4n$ according to the relation
+  (\ref{eq:n_delta}). Therefore, $E(n) = \tilde{F}(n) - \tilde{F}_1(n)
+  = h_\omega(-4n)$;
+
+\item Let $n \equiv 3 \pmod{8}$. For $n = 3$, we can verify that the
+  formula (\ref{eq:E_and_H}) gives us the correct result. For $n \neq
+  3$, from (\ref{eq:F1_and_F}) we know that $\tilde{F}(n) =
+  3\tilde{F}_1(n)$, and from (\ref{eq:h}) we know that $h(\Delta) =
+  \tilde{F}_1(n)$, where $\Delta = -n$ according to the relation
+  (\ref{eq:n_delta}). We obtain $E(n) = \tilde{F}(n)-\tilde{F}_1(n) =
+  2h_\omega(-n)$.
+\end{enumerate}
+
+Now, consider an arbitrary $n = g^2e$, where $e$ is square-free. If we
+now recall formulas from (\ref{eq:F_and_F_tilde}), then by
+Definition~\ref{defin:hurwitz} we obtain formulas for $n \equiv 1, 2$ (mod 4) and
+$n \equiv 3$ (mod 8):
+\begin{align*}
+E(n) &= \sum\limits_{t\,|\,g}\left[\tilde{F}\left(\frac{n}{t^2}\right)
+  - \tilde{F}_1\left(\frac{n}{t^2}\right)\right] \\
+&= \begin{cases}
+\sum\limits_{t\,|\,g}h_\omega\left(\frac{-4n}{t^2}\right) = H(4n), &
+\textnormal{if $n \equiv 1, 2 \pmod{4}$;}\\
+2\sum\limits_{t\,|\,g}h_\omega\left(\frac{-n}{t^2}\right) = 2H(n), &
+\textnormal{if $n \equiv 3 \pmod{8}$. \qedhere} \\
+\end{cases}
+\end{align*}
+\end{proof}
+
+According to Theorem~\ref{thm:E_and_H}, by cubing $\vartheta_3(q)$ we
+can tabulate Hurwitz class numbers $H(n)$. However, the formula
+(\ref{eq:kronecker}) is quite inefficient for our purposes, as we are
+interested in only fundamental discriminants $\Delta$, which
+correspond to coefficients of $\vartheta_3^3(q)$ of the form $16k +
+4$, $16k + 8$, $8k + 3$ and $8k + 7$ for some non-negative integer
+$k$.  We expect to have around $(3/\pi^2)N \approx 0.304 N$
+fundamental discriminants, satisfying $|\Delta| < N$ \cite[Section
+  5.10]{cohen3}. Fortunately, there exist three alternative formulas,
+namely (1.13), (1.12) and (1.14) of \cite{watson}, which can be
+derived easily from (\ref{eq:kronecker}) \cite{bell}:
+\begin{equation}  \label{eq:2mod4}
+\sum_{k = 0}^\infty F(4k+2)q^{k} = \nabla^2(q^2)\vartheta_3(q);
+\end{equation}
+\begin{equation}  \label{eq:1mod4}
+2\sum_{k = 0}^\infty F(4k+1)q^k =  \nabla(q^2)\vartheta_3^2(q);
+\end{equation}
+\begin{equation} \label{eq:3mod8}
+\sum_{k = 0}^\infty F(8k+3)q^{k} = \nabla^3(q),
+\end{equation}
+where
+\begin{align*}
+\nabla(q) &= \frac{1}{2}\vartheta_2(\sqrt q)q^{-\frac{1}{8}} \\
+&= \frac{1}{2}\cdot 2\sum_{k = 0}^\infty {\sqrt q}^{\left(k +
+  \frac{1}{2}\right)^2} \cdot q^{-\frac{1}{8}} \\
+&= \sum_{k = 0}^\infty q^{\frac{k(k+1)}{2}} = 1 + q + q^3 + q^6 + q^{10} + \ldots \,\, .
+\end{align*}
+In order to tabulate all class numbers corresponding to fundamental
+$\Delta \not \equiv 1 \pmod{8}$ and $|\Delta| < N$, it is sufficient
+to compute (\ref{eq:2mod4}) and (\ref{eq:1mod4}) to degrees $\lfloor N
+/ 16 \rfloor$, and (\ref{eq:3mod8}) to degree $\lfloor N / 8
+\rfloor$. This can be done by multiplying polynomials, obtained by
+truncating series on the right sides of the equations above to a
+specific degree.
+
+Although this idea of reducing the class number tabulation problem
+sounds good in theory, there are significant practical obstacles when
+large bounds on the discriminant are considered.  In particular, the
+polynomials involved are too large to fit into computer memory, so we
+have to perform our multiplication out-of-core, i.e.\ with the usage
+of the hard disk. We discuss the out-of-core polynomial multiplication
+technique in Section \ref{sec:out-of-core}.
+
+\section{Out-of-Core Multiplication} \label{sec:out-of-core}
+
+In order to compute $h(\Delta)$ for all fundamental discriminants
+$\Delta < 0$, satisfying $|\Delta| < N$ and $\Delta \not \equiv 1
+\pmod{8}$, we aim to compute relations (\ref{eq:2mod4}),
+(\ref{eq:1mod4}) and (\ref{eq:3mod8}) to degrees $\lfloor N / 16
+\rfloor$, $\lfloor N / 16 \rfloor$ and $\lfloor N / 8 \rfloor$,
+respectively.
+
+In our computations, $N$ was chosen to be $2^{40}$. If we assume that
+each coefficient of some polynomial $f(x)$ of degree $\lfloor N / 8
+\rfloor$ fits into 4 bytes, then we would require 512 GB to fit $f(x)$
+into memory. Hence, in order to store two polynomials, $f(x)$ and
+$g(x)$, as well as the resulting polynomial $h(x)$, we need 1.5 TB,
+not to mention that the Fast-Fourier Transform (FFT), which we use to
+multiply polynomials, requires a lot of memory for intermediate
+results. Such an intensive memory requirement forces us to perform
+polynomial multiplication \emph{out-of-core}, i.e., with the usage of
+the hard disk.
+
+The first step is to reduce the degree of the polynomials to be
+multiplied.  Following Hart et al.\ \cite{hart}, we convert
+polynomials of large degree with small coefficients into polynomials
+of small degree with large coefficients by utilizing \emph{Kronecker
+  substitution}. Consider the polynomial
+$$
+f(x) = f_0  + f_1x + f_2x^2 + \ldots + f_{N - 1}x^{N-1} \in \mathbb{Z}[x]
+$$
+of degree $N - 1$. Fix a \emph{bundling parameter} $B$, dividing $N$,
+and let $N_0 = N/B$. Then we can write $\hat f(x, y)$, satisfying
+$\hat f(x^B, x) = f(x)$, as follows:
+$$
+\hat f(x, y) = \sum_{n = 0}^{N_0 - 1} F_n(y)x^{n} = F_0(y) + F_1(y)x +
+F_2(y)x^{2} + \ldots + F_{N_0 - 1}(y)x^{N_0 - 1}, 
+$$
+where
+$$
+F_n(y) = f_{nB} + f_{nB + 1}y + \ldots + f_{(n+1)B - 1}y^{B - 1}.
+$$
+If all the coefficients of $f(x)$ fit into $s$ bits, we can
+\emph{bundle} them by evaluating each $F_n(y)$ at $2^s$, and obtain
+the following \emph{bundled polynomial} $F(x)$:
+\begin{equation} \label{eq:bundled_poly}
+F(x) = \sum_{n = 0}^{N_0 - 1} F_n\left(2^s\right)x^n.
+\end{equation}
+While $f(x)$ has coefficients of size $s$ bits and degree $N - 1$, the
+bundled polynomial $F(x)$ has coefficients of size $Bs$ bits and a
+smaller degree $N_0 - 1$. Now, in order to perform
+a multiplication $h(x) = f(x) \times g(x)$, one has to bundle
+coefficients of $g(x)$ with the same parameters $B$ and $s$, and
+obtain a bundled polynomial $G(x)$. The polynomial $H(x) = F(x) \times
+G(x)$, the coefficients of which fit into $(2B-1)s$ bits, will
+therefore embed information on coefficients of $h(x)$.
+
+As a technical point, note that $H(x)$ is \emph{not} a bundled
+polynomial of $h(x)$.  In order to extract the coefficients of $h(x) =
+\sum_{k = 0}^{N-1}h_kx^k$ from $H(x) = \sum_{n = 0}^{N_0 - 1}H_nx^n$,
+a simple computation reveals that the summands of $h_k = \sum_{i =
+  0}^k f_ig_{k-i}$ with $nB \leq k \leq nB + B - 2$ occur in both
+$H_{n-1}$ and $H_n$ for some positive integer $n$. In fact, if we let
+$H_n = \sum_{j = 0}^{2B-2}H_n^{(j)}2^{js}$, where $H_n^{(j)}$ are all
+positive, then $h_k = H_{n}^{(k)} + H_{n-1}^{(B + k)}$. The only
+exceptions correspond to $h_k = H_0^{(k)}$ for $k < B$, and for
+$h_{tB-1} = H_{t-1}^{(tB-1)}$ for some integer $t > 1$.  Nevertheless,
+it is a simple matter to recover the $h_k$ given $H(x).$
+
+At this point we have reduced the problem to a multiplication of
+smaller-degree polynomials, but with much larger coefficients.  The
+next step is to reduce the coefficient sizes to the point that the
+polynomials involved can be fit into available memory.  This is
+accomplished via many \emph{Number Theoretic Transforms} (NTT) with
+\emph{Chinese Remainder Theorem} (CRT) reconstitution\footnote{The
+  paper of Hart contains a good survey on various out-of-core FFT
+  methods and their applications \cite[Section 3]{hart}.}. The idea is
+simple: in order to multiply two bundled polynomials $F(x)$ and $G(x)$
+with large coefficients, one chooses $n$ many primes $p_0, \ldots,
+p_{n-1}$, and performs reduction of coefficients of $F(x)$ and $G(x)$
+modulo each $p_i$ for $0 \leq i < n$ using a \emph{remainder tree}
+\cite{borodin}.  After that, $n$ pairs of polynomials are multiplied
+(possibly in parallel) over each finite field $\mathbb F_{p_i}$, and
+as a result, each polynomial will contain residues of $H(x) = F(x)
+\times G(x)$ modulo $p_i$. In the end, the coefficients of $H(x)$ can
+be reconstructed with the Chinese Remainder Theorem, and this
+procedure can also be easily parallelized. Note that the intermediate
+results, namely reduced polynomials and the result of polynomial
+multiplications, are stored in $m$ files on the hard disk. We observed
+that the choice of the number of files does not affect the performance
+of our program, and suggest to set $m$ to be an integer multiple of
+number of threads used for computations. In our computations, we used
+64 threads and produced $m = 2^{12} = 4096$ files for each congruence
+class of $\Delta.$  With this choice of $m$, each file contains at
+most 10.3 million class groups, providing a reasonable balance
+between file size and total number of files.
+
+In order for the technique described previously to work one has to
+know ahead an upper bound $C$ on coefficients of $h(x)$, and choose
+primes such that $C < \prod_{i = 0}^{n-1}p_i$.
+Depending on the amount of memory available, each $p_i$ is chosen in
+such a way that the reduced polynomials in $\mathbb{F}_{p_i}[x]$ can
+be comfortably multiplied in main memory.
+
+\subsection{Computational Parameters} \label{subsec:parameters}
+
+The choices of a bundling parameter $B$ and number of CRT primes can
+be optimized based on the amount of computer memory available. In
+order to make a proper choice of the \emph{bit size parameter} $s$, we
+need to know how many bits are required to represent coefficients of
+(\ref{eq:2mod4}), (\ref{eq:1mod4}) and (\ref{eq:3mod8}). In other
+words, we need to determine an explicit, unconditional upper bound on
+$H(n)$. To this end, consider the analytic class number formula
+$$
+h_\omega(\Delta) = \frac{1}{\pi}\sqrt{|\Delta|}L(1,\chi_\Delta), \,\,\, \textnormal{where} \,\,\, L(1,\chi_\Delta) = \sum_{m = 1}^\infty \frac{1}{m}\left(\frac{\Delta}{m}\right),
+$$
+$h_\omega(\Delta)$ is defined in (\ref{eq:h_omega}), and $\left(\frac{\Delta}{m}\right)$ is the Dirichlet symbol. To find the bit size of $h(\Delta)$, we utilize Ramar\'e's unconditional bound on $L(1, \chi_\Delta)$ \cite{ramare}:
+\begin{equation} \label{eq:bound}
+L(1,\chi_\Delta) \leq a \log |\Delta| + b,
+\end{equation}
+where
+$$
+\begin{array}{l l}
+a = \frac{1}{4}, b = \frac{5}{4} - \frac{\log 3}{2}, & \textnormal{if
+  $\Delta \equiv 0 \pmod{4}$};\\
+a = \frac{1}{2}, b = \frac{5}{2} - \log{6}, & \textnormal{if $\Delta
+  \equiv 1 \pmod{4}$}.
+\end{array}
+$$
+We may now apply Ramar\'e's bounds (\ref{eq:bound}) to determine an
+upper bound on $H(n)$ for every $n < N$ of the form $n = g^2e$, where $e$ is square-free:
+$$
+H(n) \leq \frac{1}{\pi}\sum_{t\,|\,g}\sqrt{\frac{n}{t^2}}\left(a\log\frac{n}{t^2} + b\right) < \frac{1}{\pi}\sqrt{n}(a\log|\Delta| + b)\sum_{t\,|\,g}\frac{1}{t}.
+$$
+To estimate the sum $\sum_{t\,|\,g}\frac{1}{t}$ for $N = 2^{40}$, we
+picked the largest possible $g = 605395$, and found the integer $n =
+554400$ that does not exceed $g$, which has the largest value of
+$\sum_{t\,|\,n}\frac{1}{t} = \frac{1209}{275}$.  Then, for
+\begin{equation} \label{eq:CN}
+C_N = \left\lfloor \frac{1209}{275}\cdot \frac{1}{\pi}\sqrt{N}\left(a\log N + b\right) \right\rfloor, \,\,\, \textnormal{where}\,\,\, N \leq 2^{40},
+\end{equation}
+and $a$ and $b$ as in (\ref{eq:bound}), we have that $H(n) < C_N$ for all $n < N$.
+
+Now we can explain how to compute the bit size parameter $s$. Recall
+that the main class number tabulation formulas (\ref{eq:2mod4}),
+(\ref{eq:1mod4}) and (\ref{eq:3mod8}) require $C_N$, $2C_N$ and $3C_N$
+as their upper bounds, respectively. Considering this, the formula for
+$s$ is given as
+\begin{equation} \label{eq:s}
+s = \begin{cases}
+\lceil\log_2C_N\rceil, & \textnormal{for (\ref{eq:2mod4})};\\
+\lceil\log_2(2C_N)\rceil, & \textnormal{for (\ref{eq:1mod4});} \,\,\,\,\,\, \textnormal{where $N \leq 2^{40}$.}\\
+\lceil\log_2(3C_N)\rceil, & \textnormal{for (\ref{eq:3mod8}),}
+\end{cases}
+\end{equation}
+
+Finally, we need to determine how many primes to choose with respect
+to the bundling parameter $B$ in order to restore coefficients of
+$H(x) = F(x) \times G(x)$, which all fit into $s$ bits. Recall that
+each coefficient of $H(x)$ has size $(2B - 1)s$. In order to restore
+coefficients of $H(x)$ with the CRT algorithm, we need to pick the
+primes $p_0, \ldots, p_{n-1}$ so that $(2B-1)s < \log_2(p_0 \cdot
+\ldots \cdot p_{n-1})$. In our implementation, we chose the smallest
+prime $p_0$ exceeding some positive lower bound $P$, and $n - 1$
+primes $p_1, \ldots, p_{n-1}$, which consecutively follow after
+$p_0$. We choose $n$ so that
+$$
+(2B-1)s \leq n\log_2p_0 < \sum_{i = 0}^{n-1} \log_2p_i,
+$$
+i.e.\
+\begin{equation} \label{eq:n}
+n = \left\lceil\frac{(2B - 1)s}{\log_2 p_0}\right\rceil.
+\end{equation}
+Note that for large $p_0$ and small $n$, the difference between
+$n\log_2p_0$ and $\sum_{i = 0}^{n-1} \log_2p_i$ becomes
+negligible. Following Hart et al. \cite{hart}, we chose $p_0$ to be
+the smallest prime exceeding $P = 2^{62}$, which fits into a single
+machine word on a 64-bit system.
+
+\subsection{Complexity Analysis} \label{subsec:complexity}
+
+Before proceeding to the complexity analysis, we first summarize the
+process of computation of $h(x) = f(x) \times g(x)$. Given two
+polynomials, $f(x)$ and $g(x)$, both of degree $N - 1$, the bundling
+parameter $B$ (which for convenience divides $N$), the bit size
+parameter $s$, and $n$ primes $p_0, \ldots, p_{n-1}$, we compute the
+product of two polynomials in five stages:
+\begin{enumerate}
+  \item Compute the bundled polynomials $F(x)$ and $G(x)$ of $f(x)$
+    and $g(x)$, respectively, using Kronecker substitution;
+
+  \item Reduce the coefficients of $F(x)$ and $G(x)$ modulo primes
+    $p_0, \ldots, p_{n-1}$ using the remainder tree \cite{borodin} in
+    order to obtain the reduced polynomials $F_{p_i}(x)$ and
+    $G_{p_i}(x)$ in $\mathbb F_{p_i}[x]$ for $0 \leq i < n$;
+
+  \item Compute $H_{p_i}(x) = F_{p_i}(x) \times G_{p_i}(x)$ in
+    $\mathbb F_{p_i}[x]$ for each $0 \leq i < n$;
+
+  \item Compute $H(x)$ (which is equal to $F(x) \times G(x)$) by
+    reconstructing its coefficients from $H_{p_0}(x), \ldots,
+    H_{p_{n-1}}(x)$ with the CRT algorithm;
+
+  \item Extract the coefficients of $h(x) = f(x) \times g(x)$ from
+    $H(x)$.
+\end{enumerate}
+
+The pseudocode of this algorithm can be found in the original paper of
+Hart et al.\ \cite[Section 4.1]{hart}. Note that their algorithm
+corresponds to the case $s = 16$. The generalized version of the
+algorithm for an arbitrary positive integer $s$ can be found in
+\cite[Section 4.2]{mosunov1}. In Theorem \ref{thm:complexity1}, we
+give the asymptotic bit-complexity of this algorithm as a function of
+the polynomial degree ($N$) and the bundling and bit size parameters.
+\begin{thm} \label{thm:complexity1}
+Consider two polynomials, $f(x)$ and $g(x)$, both of degree $N - 1$,
+whose coefficients can be initialized in $O(N)$ bit operations. Using
+the technique described above, the product $h(x) = f(x) \times g(x)$
+can be computed in
+\begin{equation} \label{eq:o1}
+O\left(Ns\left(\log(Bs)\right)^{2+\varepsilon} + Ns\left(\log \frac{N}{B}\right)^{1+\varepsilon}\right)
+\end{equation}
+bit operations, where $B$ is the bundling parameter, and $s$ is the
+bit size parameter.
+\end{thm}
+\begin{proof}
+We analyze each of the five stages of the algorithm.  The computation
+of bundled polynomials $F(x)$ and $G(x)$ in stage (1) consists of
+sequential applications of logical shifts and ORs, and requires $O(N)$
+bit operations. Each bundled polynomial has $N / B$ coefficients, so
+the multimodular reduction phase (2) requires $N/B$ reductions modulo
+$n$ primes $p_0, \ldots, p_{n-1}$. We use a \emph{remainder tree} to
+reduce each coefficient $C$ of a bundled polynomial modulo $p_0,
+\ldots, p_{n-1}$. This technique allows us to compute $C \bmod p_0, C
+\bmod p_1, \ldots, C \bmod p_{n-1}$ in $O\left(t\left(\log
+t\right)^{2+\varepsilon}\right)$ bit operations, where $t$ is the
+total number of bits in $C, p_0, \ldots, p_{n-1}$ \cite[Section
+  3]{borodin}. Since each coefficient of a bundled polynomial fits
+into $Bs$ bits, we conclude that the multimodular reduction phase requires
+$$
+O\left(\frac{N}{B}\cdot t\left(\log t\right)^{2+\varepsilon}\right) = O\left(\frac{N}{B} \cdot Bs\left(\log (Bs)\right)^{2+\varepsilon}\right) = O\left(Ns\left(\log(Bs)\right)^{2+\varepsilon}\right).
+$$
+bit operations.
+
+In stage (3), the multiplication of $n$ pairs of polynomials of degree
+$N/B - 1$ is performed with the Sch\"onhage-Strassen algorithm
+\cite[Sections 8.2 -- 8.4]{gathen}. This algorithm requires $O(N\log N
+\log\log N)$ bit operations to multiply two polynomials of degree $N$.
+Hence, stage (3) requires
+$$
+O\left(n\frac{N}{B}\log\frac{N}{B}\log\log\frac{N}{B}\right) = O\left(Bs\frac{N}{B}\log\frac{N}{B}\log\log\frac{N}{B}\right) = O\left(Ns\left(\log\frac{N}{B}\right)^{1+\varepsilon}\right)
+$$
+bit operations.
+
+Finally, consider stages (4) and (5), i.e., the CRT reconstitution and
+extraction of coefficients. Though the latter involves certain
+sophisticated techniques, it simply iterates over all $N$ coefficients
+of the resulting polynomial $H(x)$, and therefore requires $O(N)$ bit
+operations. Now, consider the CRT reconstitution in stage (4). For the
+CRT, we use the divide-and-conquer technique
+\cite[Section~4]{hart}. For $n_1$ integer coefficients of size $n_2$
+bits, this approach allows us to complete the restoration of a
+coefficient in
+$O\left(n_2\left(\log(n_1n_2)\right)^{2+\varepsilon}\right)$ bit
+operations. In our case, $n_2$ is constant and $n_1 = n$, where $n$ is
+the number of primes in use. In total, there are $N/B$ coefficients to
+restore, which means that the number of bit operations required is in
+$$
+O\left(\frac{N}{B}(\log n)^{2+\varepsilon}\right) =
+O\left(\frac{N}{B}\left(\log (Bs)\right)^{2+\varepsilon}\right).
+$$
+
+Since $s > \log^{-1}B$, the asymptotic running time of the
+initialization phase dominates the running time for the CRT
+reconstitution phase. Combining the costs for the initialization and
+multiplication phases yields the result (\ref{eq:o1}).
+\end{proof}
+
+Note that the class number tabulation formulas (\ref{eq:2mod4}),
+(\ref{eq:1mod4}) and (\ref{eq:3mod8}) require \emph{two} polynomial
+multiplications. For example, in order to determine (\ref{eq:3mod8}),
+we first have to perform the multiplication $\nabla^2(q) = \nabla(q)
+\times \nabla(q)$, followed by the computation of $\nabla^3(q) =
+\nabla^2(q) \times \nabla(q)$. In practice, we use a different
+approach; that is, we initialize $\vartheta_3^2(q)$ (or $\nabla^2(q)$,
+or $\nabla^2(q^2)$) \emph{directly}, which allows us to evaluate the
+formula using one polynomial multiplication instead of two.
+
+We describe the initialization mechanism for the example of
+$\vartheta_3(q)$. A similar approach can be used to initialize
+$\nabla(q)$ and $\nabla(q^2)$. We compute the first $N$ coefficients
+of $\vartheta_3(q)$ block by block, using a certain \emph{partition
+  size} $S$ dividing $N$. The initialization algorithm for the block of
+$S$ coefficients from $M$ to $M + S - 1$ requires $O(\sqrt{M+S})$ bit
+operations, as there are precisely $\left\lfloor \sqrt{M+S} -
+\sqrt{S}\right\rfloor$ perfect squares between $M$ and $M+S-1$; we can
+easily iterate over all of them within a single loop. Summing over
+$N/S$ blocks, we obtain that the initialization of $N$ coefficients of
+$\vartheta_3(q)$ requires $O(\sqrt S) + O(\sqrt{2S}) + \ldots +
+O(\sqrt N) = O(N\sqrt N / S)$ bit operations. In order to achieve a
+linear time for initialization, we choose $S = O(\sqrt N)$.
+
+In turn, the initialization of a block of coefficients of
+$\vartheta_3^2(q)$ requires two nested loops, which result in $O(S)$
+bit operations. Summing $O(S) + O(2S) + \ldots + O(N) = O(N^2 / S)$,
+we conclude that $S$ has to grow proportionally to $N/(\log N)^k$ for
+some non-negative integer $k$ in order for $\vartheta_3^2(q)$ to be
+initialized in linear or pseudo-linear time. Of course, this is
+unreasonable. However, for small $N,$ initializing $\vartheta_3^2(q)$
+directly works well in practice, even though it is worse
+asymptotically than using two sequential polynomial
+multiplications. 
+
+We now state the asymptotic complexity of the complete class
+number tabulation method without including the initialization costs of
+$\vartheta_3^2(q)$, $\nabla^2(q)$ or $\nabla^2(q^2)$ mentioned
+above. We obtain Corollary~\ref{cor:complexity2} by applying the
+formula for $s$ in (\ref{eq:s}) to Theorem~\ref{thm:complexity1}.
+\begin{cor} \label{cor:complexity2}
+The class number tabulation algorithm requires
+\begin{equation} \label{eq:o2}
+O\left(N\log N (\log B)^{2+\varepsilon} + N\log N\left(\log\frac{N}{B}\right)^{1 + \varepsilon}\right)
+\end{equation}
+bit operations.
+\end{cor}
+
+In theory, all steps of the algorithm can be parallelized trivially,
+yielding a speed-up of $T$ using $T$ threads --- see
+\cite[Chapter~4]{mosunov1} for a complete description and analysis.
+In practice, such optimal speedup is difficult to achieve due to the
+cost of managing the threads and the assumption that all disk I/O is
+being done in parallel, both reading \emph{and} writing.  Special hard
+disks designed for large-scale parallel applications, such as those
+used in our experiments, are necessary to get the most out of
+parallelization.
+
+The method described by Ramachandran
+et.\ al.\ \cite{jacobson,ramachandran} has bit complexity
+$O(|\Delta|^{1/4+\varepsilon})$ for each discriminant, and thus
+$O(N^{5/4+\varepsilon})$ for all $|\Delta| < N,$ including the
+ERH-verification step.  Our new algorithm computes the class numbers
+asymptotically faster, but we can only use it for $\Delta \not \equiv
+1 \pmod{8}$ and require a more expensive method for the remaining
+congruence class.  In addition, Ramachandran's method also computes
+the class group structures.  We describe our approach to this part of
+the problem in the next section.
+
+\section{Unconditional Class Group Tabulation} \label{sec:clgrp}
+
+The class number tabulation technique, described in
+Sections~\ref{sec:clnum} and \ref{sec:out-of-core}, allows us to
+compute unconditionally all class numbers $h(\Delta)$ with $\Delta
+\not \equiv 1 \pmod{8}$ and $|\Delta| < N$. To resolve the structure
+of each class group $Cl_\Delta,$ we use the algorithm due to Buchmann,
+Jacobson, and Teske (BJT) \cite[Algorithm 4.1]{buchmann}, suitable for
+any generic group $G$. This algorithm iteratively builds up the set of
+generators $\bm{\alpha}$ of $G$, and terminates whenever the size of
+the subgroup $\langle \bm{\alpha} \rangle$ generated by $\bm{\alpha}$
+matches $|G|$.
+
+Note that tabulating class numbers for $\Delta \not \equiv 1
+\pmod{8}$ has another major advantage, aside from the fact that we
+were able to produce the size of each $Cl_\Delta$ unconditionally and
+did not require an additional verification step. Given the
+factorization of $h(\Delta) = p_1^{e_1}\cdot p_2^{e_2} \cdot \ldots
+\cdot p_k^{e_k}$, we can ignore those primes $p_i$ for $1 \leq i
+\leq k$ which have $e_i = 1$, as it means that the $p_i$-group of
+$Cl_\Delta$ is guaranteed to be cyclic. We can therefore resolve
+the structure of a smaller subgroup $G$ of $Cl_\Delta$, satisfying
+$$
+|G| = \prod\limits_{p_i^2 | h(\Delta)} p_i^{e_i}.
+$$
+In practice, $|G|$ was much smaller than $h(\Delta)$ frequently, so
+this method worked very well.
+
+For $\Delta \equiv 1 \pmod{8}$, where our tabulation method does not
+produce any class numbers, we used the same method as in
+\cite{jacobson}.  The Buchmann-Jacobson-Teske algorithm can still be
+used to compute class groups without knowing the class numbers a
+priori.  In this case, it is sufficient to provide a lower bound $h^*$
+such that $h^* \leq h(\Delta) \leq 2h^*$ in order to be certain that
+the whole group was generated --- once the size of the subgroup
+$\langle \bm{\alpha} \rangle$ generated by $\bm{\alpha}$ exceeds
+$h^*,$ we know that we have the entire group.
+
+As described in \cite{jacobson}, the main issue with this approach is
+that the best method to determine the lower bound $h^*$ requires the
+ERH-dependent averaging method of Bach \cite{bach1}.  To eliminate the
+ERH dependency, we again followed \cite{jacobson} and applied the
+Eichler-Selberg trace formula. This formula gives an expression for
+the trace of the Hecke operator $T_n$ acting on the space of cusp
+forms $S_k(\Gamma_0(N),\chi).$ When applied to the case where $k=2,$
+$N=1,$ and $\chi$ the trivial character, the trace formula reduces to
+the following equality involving Hurwitz class numbers:
+\begin{equation} \label{eq:verify}
+H(4n) + 2\sum_{t = 1}^{\lfloor \sqrt{4n} \rfloor}H(4n-t^2) = 2\left(\sum_{\substack{d\,|\,n\\d \geq \sqrt n}} d\right) - \sigma(n)\sqrt n + \frac{1}{6}\chi(n),
+\end{equation}
+where $\sigma(n)$ is the indicator function, which is 1 whenever $n$
+is a perfect square and 0 otherwise \cite[Formula 2.2]{jacobson}. Due to the
+nature of the BJT algorithm, the size of the class group computed will
+always divide $h(\Delta)$. Therefore, if one or more of our computed
+class numbers are wrong, then (\ref{eq:verify}) will detect this
+because the left hand side will be less than the right hand side.
+Note that in our case the only class numbers $h(\Delta)$ that require
+verification are those with $\Delta \equiv 1 \pmod{8}$, so it is
+sufficient in our case to verify that the equality (\ref{eq:verify})
+holds only for \emph{even} values of $n$.
+
+One method to use (\ref{eq:verify}) to verify all $h(\Delta_1)$ with
+$\Delta_1$ fundamental and $|\Delta_1| < N,$ as suggested in
+\cite{jacobson}, is to first compute the smallest set of $n$ values
+such that every fundamental discriminant $\Delta_1$ divides at least
+one Hurwitz class number in the formula.  However, a more efficient
+approach was later suggested by Ramachandran \cite{ramachandran},
+based on simplifying the computation of (\ref{eq:verify}) for all
+values of $n$ between $1$ and $\lfloor N / 4 \rfloor.$ 
+
+Following Ramachandran \cite[Formulas~4.10, 4.11]{ramachandran}, but
+adjusting for the fact that we only need to verify discriminants
+congruent to $1 \bmod 8,$ we define two quantities, $LHS$ and $RHS$,
+as follows:
+\begin{equation} \label{eq:lhs}
+LHS = \left(\sum_{\substack{\Delta \equiv 0 \pmod 8\\ |\Delta| \leq 8X}}H(|\Delta|)\right) + 2\left(\sum_{\substack{\Delta \equiv 0, 1 \pmod 4\\|\Delta| \leq 8X}}r(\Delta,X)H(|\Delta|)\right);
+\end{equation}
+\begin{equation} \label{eq:rhs}
+RHS = \sum_{n = 1}^X\left(2\left(\sum_{\substack{d\,|\,2n\\d \geq \sqrt{2n}}} d\right) - \chi(2n)\sqrt{2n} + \frac{1}{6}\chi(2n)\right).
+\end{equation}
+Here, $r(\Delta, X)$ counts the number of solutions to the equation
+$\Delta = t^2 - 8n$ for $1 \leq n \leq X$:
+\begin{equation} \label{eq:r}
+r(\Delta, X) = \begin{cases}
+0, & \textnormal{if $\Delta \equiv 5$ (mod 8);}\\
+\lfloor (Y+1)/2 \rfloor, & \textnormal{if $\Delta \equiv 1$ (mod 8);}\\
+\lfloor (Y+2)/4 \rfloor, & \textnormal{if $\Delta \equiv 4$ (mod 8);}\\
+\lfloor Y/4 \rfloor, & \textnormal{if $\Delta \equiv 0$ (mod 8)},\\
+\end{cases}
+\end{equation}
+where $Y = \lfloor \sqrt{8X + \Delta} \rfloor$.  We computed both
+$LHS$ and $RHS$ in parallel for $X = \lfloor N / 8 \rfloor$, where $N
+= 2^{40}$.  The expression $LHS$ is evaluated using the table of class
+numbers of fundamental discriminants computed using the BJT method;
+see \cite[Algorithm~4.1]{ramachandran} for pseudocode.  Though
+computationally more intensive, the calculation of the $RHS$ is more
+straightforward and easily parallelizable. In order to compute the
+divisors for each $n \leq X$, we use the formula (\ref{eq:rhs}) in
+conjunction with a segmented sieve.
+
+\section{Performance} \label{sec:performance}
+
+For the class number tabulation using out-of-core polynomial
+multiplication, we used the FLINT library for number theory,
+maintained by Hart \cite{flint}. In particular, we used the
+\texttt{nmod\_poly\_mullow} routine for polynomial multiplication in
+$\mathbb F_p[x]$. The FLINT library also contains subroutines
+for fast reduction modulo primes $p_0, \ldots, p_{n-1}$ and CRT
+reconstitution, respectively. We used OpenMP for parallelization.
+
+For the class group computation, we used Sayles's libraries
+\texttt{optarith} and \texttt{qform}, which contain fast
+implementations of binary quadratic form arithmetic
+\cite{sayles1,sayles2}, including implementations targeted to
+machine-size operands that avoid multi-precision integer arithmetic.
+We also use Message Passing Interface (MPI) for parallelization. The
+source code for our program can be found in \cite{mosunov2}.
+
+Our computations were performed on WestGrid's supercomputer Hungabee,
+located at the University of Alberta, Canada \cite{westgrid}. Hungabee
+is a 16 TB shared memory system with 2048 Intel Xeon cores, 2.67GHz
+each. Each user of Hungabee may request at most 8 GB of memory per
+core. Also, Hungabee provides a high performance 53 TB storage space,
+which allows to write to multiple disks in parallel. Note that the
+fast disk I/O requirement is essential for the high performance of our
+program.
+
+We first discuss our class number tabulation program. We performed
+three polynomial multiplications, described in formulas
+(\ref{eq:2mod4}), (\ref{eq:1mod4}) and (\ref{eq:3mod8}). After running
+several tests, we determined that Hungabee can comfortably multiply
+polynomials of $2^{25}$ coefficients without requiring additional
+memory. This observation allowed us to make the proper choice of a
+bundling parameter $B$. 
+
+Table \ref{tab:parameters} contains the list of parameters which we
+used for our computations, and the amount of disk space needed to
+store intermediate computations required for the polynomial
+multiplication.
+\begin{table}[htb]
+\centering
+\caption{Computational parameters}
+\label{tab:parameters}
+\begin{tabular}{| c | c || c | c | c | c | c | c |}
+\hline
+Formula & $\Delta$ & $N$ & $B$ & $C$ & $s$ & $n$ & Disk space\\
+\hline
+\hline
+$\nabla^2(q^2)\cdot \vartheta_3(q)$ & 8 (mod 16) & $2^{36}$ & $2^{11}$ & 11199314 & 24 & 1586 & 859 GB\\
+\hline
+$\vartheta_3^2(q) \cdot \nabla(q^2)$ & 12 (mod 16) & $2^{36}$ & $2^{11}$ & 11199314 & 25 & 1652 & 893.4 GB\\
+\hline
+$\nabla^2(q) \cdot \nabla(q)$ & 5 (mod 8) & $2^{37}$ & $2^{12}$ & 21381515 & 26 & 3435 & 1855 GB\\
+\hline
+\end{tabular}
+\end{table}
+Here, $C$ is the bound on $H(|\Delta|)$ defined in (\ref{eq:CN}), $s$
+is the bit size parameter (\ref{eq:s}), and $n$ is the number of
+63-bit primes required for correct CRT reconstitution
+(\ref{eq:n}). For each multiplication, we requested 64 processors and
+8 GB of memory per core. The number of files was chosen to be $m =
+4096$.  Table \ref{tab:clnum_timings} lists timings for each of the
+three class number tabulation algorithms.
+\begin{table}[htb]
+\centering
+\small
+\caption{Timings for the class number tabulation program}
+\label{tab:clnum_timings}
+\begin{tabular}{| c | c || c | c |}
+\hline
+$f(x)$ & $g(x)$ & CPU time & Real time\\
+\hline
+\hline
+$\nabla^2(q^2)$ & $\vartheta_3(q)$ & 23d 11h 10m 56s & 8h 47m 59s\\
+\hline
+$\vartheta_3^2(q)$ & $\nabla(q^2)$ & 29d 21h 2m 56s & 11h 12m 14s\\
+\hline
+$\nabla^2(q)$ & $\nabla(q)$ & 68d 5h 8m 16s & 25h 34m 49s\\
+\hline
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:timings_class_group} contains timings for computing the
+class group structures.
+As expected, for $\Delta \equiv 1 \pmod{8}$ our program takes
+significantly more time, since Ramachandran's approach requires the
+computation of the whole group. If we assume that all $\Delta$ were
+handled using solely Ramachandran's technique, then 64 processors
+would complete the (conditional) tabulation to $2^{40}$ in 80d 11h 9m
+48s, as opposed to 31d 22h 45m 8s (counting the class number
+tabulation and the verification). Note that 81.13\% of time in our
+computations was spent on the computation of $Cl_\Delta$ for $\Delta
+\equiv 1 \pmod{8}$ and the verification of the result.
+
+\begin{table}[!ht]
+\centering
+\caption{Timings for the class group tabulation program}
+\label{tab:timings_class_group}
+\begin{tabular}{| c || c | c | c |}
+\hline
+$\Delta$ & CPU time & Real time & \# processors\\
+\hline
+$\Delta \not \equiv 1$ (mod 8) & 267d 4h 31m 40s & 4d 3h 26m 44s & 64\\
+\hline
+$\Delta \equiv 1$ (mod 8) & 1657d 22h 12m 6s & 39h 28m 27s & 1008\\
+\hline
+\end{tabular}
+\end{table}
+
+We also observe that the structures of $Cl_\Delta$ for all congruence
+classes with $\Delta \not \equiv 1 \pmod{8}$ were computed over 6.25
+times faster than those with $\Delta \equiv 1 \pmod{8}.$ If we include
+the verification cost for the $1 \bmod 8$ case and the class number
+tabulation for the rest, then the entire computation for all $\Delta
+\not \equiv 1 \pmod{8}$ is roughly 4.72 times faster than that for $1
+\bmod 8.$ Such a significant speedup occurs due to the fact that in
+57.34\% of the cases $h(\Delta)$ had a square-free factor exceeding
+$\sqrt{h(\Delta)}$, which means that the size of the subgroup that we
+had to resolve was small relative to the size of the group
+itself. Moreover, in 1.67\% of the cases $h(\Delta)$ were square-free,
+which means that no resolution of class groups was needed at all.  In
+general, over 85.13\% of class numbers $h(\Delta)$ possessed a
+square-free part larger than 1. In Table~\ref{tab:count_h}, we present
+the counts of class numbers up to $2^{40}$ with various divisibility
+properties. In particular, column 3 counts class numbers with
+square-free part greater than 1, column 4 counts $h(\Delta)$ with
+square-free part exceeding $\sqrt{h(\Delta)}$, and column 5 counts
+class numbers that are square-free. Our data is separated into four
+congruence classes.
+\begin{table}[h]
+\centering
+\caption{Counts of $h(\Delta)$ with various divisibility properties}
+\begin{tabular}{| c || r | r | r | r |}
+\hline
+$\Delta$ & \multicolumn{1}{c|}{Total $\Delta$} & \multicolumn{1}{c|}{$p\,|\,h,\,p^2\,\nmid\,h$} & \multicolumn{1}{c|}{$h=g^2e,\,e > \sqrt{h}$} & \multicolumn{1}{c|}{square-free $h$}\\
+\hline
+\hline
+8 (mod 16) & 55701909754 & 47077629143 & 32012088117 & 941347842\\
+\hline
+12 (mod 16) & 55701909855 & 47091713960 & 31927265003 & 915383075\\ 
+\hline
+5 (mod 8) & 111403819688 & 95517292502 & 63828635213 & 8828052571\\
+\hline
+1 (mod 8) & 111403819373 & 94502061670 & 55851403024 & 7295483368\\
+\hline
+\end{tabular} \label{tab:count_h}
+\end{table}
+
+Note that the counts for $\Delta \equiv 1 \pmod{8}$ were not included
+in the percentages listed above.  The counts are similar to the other
+congruence classes, but divisibility properties of the class number
+played no role in the computation for the $1 \bmod 8$ case as the
+class numbers were not computed first.  It should be emphasized that
+the rapid computation of all class numbers using theta-series is what
+allowed us to take advantage of these properties when resolving the
+group structures.
+
+Finally, we compare the performance of our program to the
+implementation of Ramanchandran \cite{ramachandran}, and the
+\texttt{quadclassunit0} routine of the PARI/GP library
+\cite{pari}. For the class group resolution, the latter implementation
+uses Hafner and McCurley's subexponential index calculus algorithm
+\cite{mccurley,hafner}. For each implementation, we used a single
+Intel Xeon 2.27GHz processor to compute $Cl_\Delta$ for every
+fundamental $\Delta < 0$ such that $|\Delta|$ lies in the interval
+from $2^{39}$ to $2^{39} + 2^{20}$.  For this computation, we used the
+ERH-dependent version of the BJT algorithm for our implementation and
+that of Ramachandran (i.e., no prior class number tabulation nor
+verification in either case).  The resulting timings are listed in
+Table~\ref{tab:comparison}.
+\begin{table}[htb]
+\centering
+\caption{Timings for various class group tabulation implementations}
+\label{tab:comparison}
+\begin{tabular}{| c | c | c || c | c | c |}
+\hline
+$|\Delta_{min}|$ & $|\Delta_{max}|$ & Total $\Delta$ & Our program & \cite{ramachandran} & PARI/GP\\
+\hline
+\hline
+$2^{39}$ & $2^{39} + 2^{20}$ & 318729 & 438s & 736s & 1181s\\
+\hline
+\end{tabular}
+\end{table}
+
+All three implementations yield correct results under the assumption
+of the ERH. Though our program and Ramachandran's implementation
+implementation use the same algorithm, 
+it significantly outperforms the latter. We
+believe that the optimized binary quadratic form arithmetic in Sayles's
+libraries \texttt{optarith} and \texttt{qform} \cite{sayles1,sayles2}
+used in our program accounts for the improvement.  
+
+Note that asymptotically the Hafner-McCurley algorithm (with
+subexponential complexity in $\log |\Delta|$) is superior to the BJT
+algorithm (exponential complexity).  Thus, although it should be faster for a
+sufficiently large discriminant bound, our results show that the bound
+$2^{40}$ is still below the crossover point.
+
+\section{Numerical Results} \label{sec:results}
+
+\subsection{Bounds on $L(1,\chi_\Delta)$}
+In 1928, Littlewood \cite{littlewood} demonstrated that, assuming the
+ERH,
+\begin{equation} \label{eq:littlewood}
+(1 + o(1))(c_1\log\log|\Delta|)^{-1} < L(1,\chi_\Delta) < (1 + o(1)) c_2\log\log|\Delta|,
+\end{equation}
+where
+$$
+c_1 = \frac{12e^\gamma}{\pi^2}\,\,\,\textnormal{and}\,\,\,c_2=2e^\gamma\,\,\,\textnormal{when}\,\,\,2\,\nmid\,\Delta;
+$$
+$$
+c_1 = \frac{8e^\gamma}{\pi^2}\,\,\,\textnormal{and}\,\,\,c_2=e^\gamma\,\,\,\textnormal{when}\,\,\,2\,|\,\Delta,
+$$
+and $\gamma \approx 0.57722$ is the Euler-Mascheroni constant. Later,
+Shanks studied these bounds more carefully by defining two quantities,
+$$
+ULI = \frac{L(1,\chi_\Delta)}{c_2\log\log|\Delta|}\,\,\,\textnormal{and}\,\,\,LLI=L(1,\chi_\Delta)c_1\log\log|\Delta|,
+$$
+and ignoring $o(1)$ term in Littlewood's estimates
+\cite{shanks}. These quantities allow us to test whether Littlewood's
+bounds are violated, for if the ERH does not hold, then for large
+$|\Delta|$ we might find $ULI > 1$ or $LLI < 1$. Note that there
+\emph{are} small $\Delta$ such that $ULI > 1$ or $LLI < 1$, namely
+$\Delta = -3, -4, -163$. We assume that values of $ULI$ and $LLI$ for
+these discriminants are largely influenced by $o(1)$ terms. Aside from
+$\Delta = -3, -4, -163$, we did not find any occurrences of
+discriminants which violate Littlewood's bounds. Ignoring these
+$\Delta$, the largest $ULI \approx 0.85183$ corresponds to $\Delta =
+-8$, and the smallest $LLI \approx 1.00944$ corresponds to $\Delta =
+-232$.
+
+In addition to Littlewood's bounds, we also studied the growth of
+$L(1, \chi_\Delta).$ In Table~\ref{tab:L_max}, we list successive
+maximas of $L(1, \chi_\Delta)$ which did not occur in Table 5.3 of
+\cite{ramachandran}. The last discriminant found was $\Delta =
+-685122125399$, which corresponds to the largest $L(1, \chi_\Delta)
+\approx 8.47178$ with $|\Delta| < 2^{40}$. As for successive minimas
+of $L(1, \chi_\Delta)$, no new discoveries were made. The smallest
+$L(1, \chi_\Delta) \approx 0.17070$ corresponds to $\Delta =
+-107415709003$.
+\begin{table}[htb]
+\centering
+\caption{Successive $L(1,\chi_\Delta)$ maxima}
+\label{tab:L_max}
+\begin{tabular}{| c || c | c |}
+\hline
+$|\Delta|$	& $L(1,\chi_\Delta)$	& $ULI$\\%	& $L_\Delta(1)$	& $ULI_\Delta$\\
+\hline
+\hline
+210015218111	& 8.26604	& 0.71164\\%	& 4.13302	& 0.70051\\
+\hline
+332323080311	& 8.30989	& 0.71161\\%	& 4.15495	& 0.70072\\
+\hline
+503494619759	& 8.31253	& 0.70848\\%	& 4.15627	& 0.69785\\
+\hline
+603231310919	& 8.32466	& 0.70807\\%	& 4.16233	& 0.69754\\
+\hline
+685122125399	& 8.47178	& 0.71957\\%	& 4.23589	& 0.70892\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{The Cohen-Lenstra Heuristics}
+In 1984, Cohen and Lenstra presented several powerful heuristics on
+the structure of the odd part of the class group $Cl_\Delta$
+\cite{cohen2}. The odd part $Cl_\Delta^*$ is simply the largest
+subgroup of $Cl_\Delta$ with an \emph{odd} cardinality.
+\begin{conj}[{\cite[C1]{cohen2}}]
+Define
+$$
+\eta_k(l) = \prod\limits_{i = 1}^k\left(1 - \frac{1}{l^i}\right)\,\,\,\textnormal{and}\,\,\,C_\infty = \prod\limits_{i = 2}^\infty\zeta(i) \approx 2.294856589,
+$$
+where $\zeta(s)$ denotes the Riemann zeta function. For $\Delta < 0$,
+the probability that the odd part of the class group $Cl_\Delta$ is
+cyclic is
+\begin{equation} \label{eq:pr_cyclic}
+\textnormal{Pr($Cl_\Delta^*$ is cyclic)} = \frac{315\zeta(3)}{6\pi^4\eta_\infty(2)C_\infty} \approx 0.977575.
+\end{equation}
+\end{conj}
+
+\begin{conj}[{\cite[C2]{cohen2}}]  
+Let $l$ be an odd prime. For $\Delta < 0$, the probability that $l$ divides $h(\Delta)$ is
+\begin{equation} \label{eq:l_divides_h}
+\textnormal{Pr($l\,|\,h(\Delta)$)} =1 - \eta_\infty(l).
+\end{equation}
+\end{conj}
+
+\begin{conj}[{\cite[C5]{cohen2}}]
+Let $l$ be an odd prime. For $\Delta < 0$, the probability that the
+$l$-rank of $Cl_\Delta$ is equal to $r$ is
+\begin{equation} \label{eq:p-rank_is_r}
+\textnormal{Pr($l$-rank = $r$)} = \frac{\eta_\infty(l)}{l^{r^2}\eta_r(l)^2}.
+\end{equation}
+\end{conj}
+
+In order to study these conjectures, we follow the approach of
+Jacobson et al.\ and introduce three functions: $c(x)$, $p_l(x)$ and
+$p_{l,r}(x)$ \cite[Section 3.2]{jacobson}:
+$$
+c(x) = \frac{\textnormal{\# of $Cl_\Delta^*$ cyclic with $|\Delta| < x$}}{\textnormal{\# of $\Delta$ with $|\Delta| < x$}}\,\,\,/\,\,\,\textnormal{Pr($Cl_\Delta^*$ is cyclic)};
+$$
+$$
+p_l(x) = \frac{\textnormal{\# of $h(\Delta)$ divisible by $l$ with $|\Delta| < x$}}{\textnormal{\# of $\Delta$ with $|\Delta| < x$}}\,\,\,/\,\,\,\textnormal{Pr($l\,|\,h(\Delta)$)};
+$$
+$$
+p_{l,r}(x) = \frac{\textnormal{\# of $Cl_\Delta$ with $l$-rank = $r$ and $|\Delta| < x$}}{\textnormal{\# of $\Delta$ with $|\Delta| < x$}}\,\,\,/\,\,\,\textnormal{Pr($l$-rank = $r$)}.
+$$
+
+If the Cohen-Lenstra heuristics hold, we would expect each of those
+functions to approach 1 as $x$ grows. We observe this behavior in
+Figures \ref{fig:pl} and \ref{fig:plr}, which plot $p_l(x)$ and
+$p_{l,2}(x)$ for $l = 3, 5, 7$, respectively. The values of $c(x)$, as
+well as the counts of non-cyclic $Cl_\Delta^*$, are presented in
+Table~\ref{tab:CL_non_cyclic}. Note that our counts differ from the
+ones given in \cite[Table~3]{jacobson}. For example, the total number
+of non-cyclic $Cl_\Delta^*$ for $|\Delta| < 10^{11}$ given in
+\cite[Table~3]{jacobson} is $603101904$, whereas our count in
+Table~\ref{tab:CL_non_cyclic} suggests that this number is
+$636501087$. In general, our counts are over 1.044 times larger than
+the counts given in \cite[Table~3]{jacobson}; this ratio grows with
+$x$ and reaches $1.055$ for $x = 10^{11}$. We argue that values in
+Table~\ref{tab:CL_non_cyclic} are correct, because the output of
+algorithms for small $N < 10^{9}$ matches that of PARI/GP
+\cite{pari}. Finally, in Tables~\ref{tab:CL_pl1} and \ref{tab:CL_plr}
+we count the total number of $h(\Delta)$ divisible by a prime $l$, and
+class groups with a certain $l$-rank.
+
+\begin{figure}[htb]
+\centering
+\captionof{figure}{Values of $p_l(x)$}
+\label{fig:pl}
+\begin{tikzpicture}
+\begin{axis}[
+    xlabel={$x$},
+    ylabel={$p_l(x)$},
+    xmin=0, xmax=1099511627776,
+    ymin=0.975, ymax=1,
+    xtick={1e11, 2e11, 3e11, 4e11, 5e11, 6e11, 7e11, 8e11, 9e11, 1e12, 1099511627776},
+    ytick={0.975, 0.98, 0.985, 0.99, 0.995, 1},
+    legend pos=north west,
+    ymajorgrids=true,
+    grid style=dashed,
+    legend pos=south east,
+    y tick label style={
+        /pgf/number format/.cd,
+        fixed,
+        fixed zerofill,
+        precision=3,
+        /tikz/.cd
+    }
+]
+ 
+\addplot[
+    line width=1.3pt,
+    color=red,
+    mark=none,
+    ]
+    coordinates {
+    (2000000000,0.97624)(4000000000,0.97888)(6000000000,0.98029)(8000000000,0.98122)(10000000000,0.98191)(12000000000,0.98246)(14000000000,0.98291)(16000000000,0.98329)(18000000000,0.98362)(20000000000,0.98391)(22000000000,0.98416)(24000000000,0.98439)(26000000000,0.98460)(28000000000,0.98479)(30000000000,0.98496)(32000000000,0.98512)(34000000000,0.98528)(36000000000,0.98541)(38000000000,0.98554)(40000000000,0.98567)(42000000000,0.98578)(44000000000,0.98589)(46000000000,0.98600)(48000000000,0.98609)(50000000000,0.98619)(52000000000,0.98628)(54000000000,0.98637)(56000000000,0.98645)(58000000000,0.98653)(60000000000,0.98661)(62000000000,0.98668)(64000000000,0.98675)(66000000000,0.98682)(68000000000,0.98688)(70000000000,0.98695)(72000000000,0.98701)(74000000000,0.98707)(76000000000,0.98712)(78000000000,0.98718)(80000000000,0.98723)(82000000000,0.98728)(84000000000,0.98734)(86000000000,0.98739)(88000000000,0.98743)(90000000000,0.98748)(92000000000,0.98753)(94000000000,0.98757)(96000000000,0.98761)(98000000000,0.98766)(100000000000,0.98770)(102000000000,0.98774)(104000000000,0.98778)(106000000000,0.98782)(108000000000,0.98786)(110000000000,0.98789)(112000000000,0.98793)(114000000000,0.98797)(116000000000,0.98800)(118000000000,0.98803)(120000000000,0.98807)(122000000000,0.98810)(124000000000,0.98813)(126000000000,0.98816)(128000000000,0.98820)(130000000000,0.98823)(132000000000,0.98826)(134000000000,0.98828)(136000000000,0.98831)(138000000000,0.98834)(140000000000,0.98837)(142000000000,0.98840)(144000000000,0.98842)(146000000000,0.98845)(148000000000,0.98848)(150000000000,0.98850)(152000000000,0.98853)(154000000000,0.98855)(156000000000,0.98858)(158000000000,0.98860)(160000000000,0.98863)(162000000000,0.98865)(164000000000,0.98867)(166000000000,0.98870)(168000000000,0.98872)(170000000000,0.98874)(172000000000,0.98876)(174000000000,0.98878)(176000000000,0.98880)(178000000000,0.98883)(180000000000,0.98885)(182000000000,0.98887)(184000000000,0.98889)(186000000000,0.98891)(188000000000,0.98893)(190000000000,0.98895)(192000000000,0.98896)(194000000000,0.98898)(196000000000,0.98900)(198000000000,0.98902)(200000000000,0.98904)(202000000000,0.98906)(204000000000,0.98907)(206000000000,0.98909)(208000000000,0.98911)(210000000000,0.98913)(212000000000,0.98914)(214000000000,0.98916)(216000000000,0.98918)(218000000000,0.98919)(220000000000,0.98921)(222000000000,0.98923)(224000000000,0.98924)(226000000000,0.98926)(228000000000,0.98927)(230000000000,0.98929)(232000000000,0.98930)(234000000000,0.98932)(236000000000,0.98934)(238000000000,0.98935)(240000000000,0.98937)(242000000000,0.98938)(244000000000,0.98940)(246000000000,0.98941)(248000000000,0.98942)(250000000000,0.98944)(252000000000,0.98945)(254000000000,0.98947)(256000000000,0.98948)(258000000000,0.98949)(260000000000,0.98951)(262000000000,0.98952)(264000000000,0.98953)(266000000000,0.98955)(268000000000,0.98956)(270000000000,0.98957)(272000000000,0.98959)(274000000000,0.98960)(276000000000,0.98961)(278000000000,0.98962)(280000000000,0.98964)(282000000000,0.98965)(284000000000,0.98966)(286000000000,0.98967)(288000000000,0.98969)(290000000000,0.98970)(292000000000,0.98971)(294000000000,0.98972)(296000000000,0.98973)(298000000000,0.98974)(300000000000,0.98975)(302000000000,0.98977)(304000000000,0.98978)(306000000000,0.98979)(308000000000,0.98980)(310000000000,0.98981)(312000000000,0.98982)(314000000000,0.98983)(316000000000,0.98984)(318000000000,0.98985)(320000000000,0.98986)(322000000000,0.98988)(324000000000,0.98989)(326000000000,0.98990)(328000000000,0.98991)(330000000000,0.98992)(332000000000,0.98993)(334000000000,0.98994)(336000000000,0.98995)(338000000000,0.98996)(340000000000,0.98997)(342000000000,0.98998)(344000000000,0.98999)(346000000000,0.99000)(348000000000,0.99001)(350000000000,0.99002)(352000000000,0.99002)(354000000000,0.99003)(356000000000,0.99004)(358000000000,0.99005)(360000000000,0.99006)(362000000000,0.99007)(364000000000,0.99008)(366000000000,0.99009)(368000000000,0.99010)(370000000000,0.99011)(372000000000,0.99012)(374000000000,0.99012)(376000000000,0.99013)(378000000000,0.99014)(380000000000,0.99015)(382000000000,0.99016)(384000000000,0.99017)(386000000000,0.99018)(388000000000,0.99018)(390000000000,0.99019)(392000000000,0.99020)(394000000000,0.99021)(396000000000,0.99022)(398000000000,0.99023)(400000000000,0.99023)(402000000000,0.99024)(404000000000,0.99025)(406000000000,0.99026)(408000000000,0.99027)(410000000000,0.99027)(412000000000,0.99028)(414000000000,0.99029)(416000000000,0.99030)(418000000000,0.99030)(420000000000,0.99031)(422000000000,0.99032)(424000000000,0.99033)(426000000000,0.99034)(428000000000,0.99034)(430000000000,0.99035)(432000000000,0.99036)(434000000000,0.99037)(436000000000,0.99037)(438000000000,0.99038)(440000000000,0.99039)(442000000000,0.99039)(444000000000,0.99040)(446000000000,0.99041)(448000000000,0.99042)(450000000000,0.99042)(452000000000,0.99043)(454000000000,0.99044)(456000000000,0.99044)(458000000000,0.99045)(460000000000,0.99046)(462000000000,0.99047)(464000000000,0.99047)(466000000000,0.99048)(468000000000,0.99049)(470000000000,0.99049)(472000000000,0.99050)(474000000000,0.99051)(476000000000,0.99051)(478000000000,0.99052)(480000000000,0.99053)(482000000000,0.99053)(484000000000,0.99054)(486000000000,0.99055)(488000000000,0.99055)(490000000000,0.99056)(492000000000,0.99056)(494000000000,0.99057)(496000000000,0.99058)(498000000000,0.99058)(500000000000,0.99059)(502000000000,0.99060)(504000000000,0.99060)(506000000000,0.99061)(508000000000,0.99062)(510000000000,0.99062)(512000000000,0.99063)(514000000000,0.99063)(516000000000,0.99064)(518000000000,0.99065)(520000000000,0.99065)(522000000000,0.99066)(524000000000,0.99066)(526000000000,0.99067)(528000000000,0.99068)(530000000000,0.99068)(532000000000,0.99069)(534000000000,0.99069)(536000000000,0.99070)(538000000000,0.99070)(540000000000,0.99071)(542000000000,0.99072)(544000000000,0.99072)(546000000000,0.99073)(548000000000,0.99073)(550000000000,0.99074)(552000000000,0.99074)(554000000000,0.99075)(556000000000,0.99075)(558000000000,0.99076)(560000000000,0.99077)(562000000000,0.99077)(564000000000,0.99078)(566000000000,0.99078)(568000000000,0.99079)(570000000000,0.99079)(572000000000,0.99080)(574000000000,0.99080)(576000000000,0.99081)(578000000000,0.99081)(580000000000,0.99082)(582000000000,0.99082)(584000000000,0.99083)(586000000000,0.99083)(588000000000,0.99084)(590000000000,0.99085)(592000000000,0.99085)(594000000000,0.99086)(596000000000,0.99086)(598000000000,0.99087)(600000000000,0.99087)(602000000000,0.99088)(604000000000,0.99088)(606000000000,0.99089)(608000000000,0.99089)(610000000000,0.99090)(612000000000,0.99090)(614000000000,0.99091)(616000000000,0.99091)(618000000000,0.99092)(620000000000,0.99092)(622000000000,0.99093)(624000000000,0.99093)(626000000000,0.99093)(628000000000,0.99094)(630000000000,0.99094)(632000000000,0.99095)(634000000000,0.99095)(636000000000,0.99096)(638000000000,0.99096)(640000000000,0.99097)(642000000000,0.99097)(644000000000,0.99098)(646000000000,0.99098)(648000000000,0.99099)(650000000000,0.99099)(652000000000,0.99100)(654000000000,0.99100)(656000000000,0.99100)(658000000000,0.99101)(660000000000,0.99101)(662000000000,0.99102)(664000000000,0.99102)(666000000000,0.99103)(668000000000,0.99103)(670000000000,0.99104)(672000000000,0.99104)(674000000000,0.99104)(676000000000,0.99105)(678000000000,0.99105)(680000000000,0.99106)(682000000000,0.99106)(684000000000,0.99107)(686000000000,0.99107)(688000000000,0.99108)(690000000000,0.99108)(692000000000,0.99108)(694000000000,0.99109)(696000000000,0.99109)(698000000000,0.99110)(700000000000,0.99110)(702000000000,0.99110)(704000000000,0.99111)(706000000000,0.99111)(708000000000,0.99112)(710000000000,0.99112)(712000000000,0.99113)(714000000000,0.99113)(716000000000,0.99113)(718000000000,0.99114)(720000000000,0.99114)(722000000000,0.99115)(724000000000,0.99115)(726000000000,0.99115)(728000000000,0.99116)(730000000000,0.99116)(732000000000,0.99117)(734000000000,0.99117)(736000000000,0.99117)(738000000000,0.99118)(740000000000,0.99118)(742000000000,0.99119)(744000000000,0.99119)(746000000000,0.99119)(748000000000,0.99120)(750000000000,0.99120)(752000000000,0.99121)(754000000000,0.99121)(756000000000,0.99121)(758000000000,0.99122)(760000000000,0.99122)(762000000000,0.99123)(764000000000,0.99123)(766000000000,0.99123)(768000000000,0.99124)(770000000000,0.99124)(772000000000,0.99124)(774000000000,0.99125)(776000000000,0.99125)(778000000000,0.99126)(780000000000,0.99126)(782000000000,0.99126)(784000000000,0.99127)(786000000000,0.99127)(788000000000,0.99127)(790000000000,0.99128)(792000000000,0.99128)(794000000000,0.99129)(796000000000,0.99129)(798000000000,0.99129)(800000000000,0.99130)(802000000000,0.99130)(804000000000,0.99130)(806000000000,0.99131)(808000000000,0.99131)(810000000000,0.99131)(812000000000,0.99132)(814000000000,0.99132)(816000000000,0.99132)(818000000000,0.99133)(820000000000,0.99133)(822000000000,0.99133)(824000000000,0.99134)(826000000000,0.99134)(828000000000,0.99134)(830000000000,0.99135)(832000000000,0.99135)(834000000000,0.99136)(836000000000,0.99136)(838000000000,0.99136)(840000000000,0.99137)(842000000000,0.99137)(844000000000,0.99137)(846000000000,0.99138)(848000000000,0.99138)(850000000000,0.99138)(852000000000,0.99139)(854000000000,0.99139)(856000000000,0.99139)(858000000000,0.99140)(860000000000,0.99140)(862000000000,0.99140)(864000000000,0.99141)(866000000000,0.99141)(868000000000,0.99141)(870000000000,0.99142)(872000000000,0.99142)(874000000000,0.99142)(876000000000,0.99143)(878000000000,0.99143)(880000000000,0.99143)(882000000000,0.99144)(884000000000,0.99144)(886000000000,0.99144)(888000000000,0.99145)(890000000000,0.99145)(892000000000,0.99145)(894000000000,0.99146)(896000000000,0.99146)(898000000000,0.99146)(900000000000,0.99147)(902000000000,0.99147)(904000000000,0.99147)(906000000000,0.99147)(908000000000,0.99148)(910000000000,0.99148)(912000000000,0.99148)(914000000000,0.99149)(916000000000,0.99149)(918000000000,0.99149)(920000000000,0.99150)(922000000000,0.99150)(924000000000,0.99150)(926000000000,0.99151)(928000000000,0.99151)(930000000000,0.99151)(932000000000,0.99151)(934000000000,0.99152)(936000000000,0.99152)(938000000000,0.99152)(940000000000,0.99153)(942000000000,0.99153)(944000000000,0.99153)(946000000000,0.99154)(948000000000,0.99154)(950000000000,0.99154)(952000000000,0.99154)(954000000000,0.99155)(956000000000,0.99155)(958000000000,0.99155)(960000000000,0.99156)(962000000000,0.99156)(964000000000,0.99156)(966000000000,0.99157)(968000000000,0.99157)(970000000000,0.99157)(972000000000,0.99157)(974000000000,0.99158)(976000000000,0.99158)(978000000000,0.99158)(980000000000,0.99159)(982000000000,0.99159)(984000000000,0.99159)(986000000000,0.99159)(988000000000,0.99160)(990000000000,0.99160)(992000000000,0.99160)(994000000000,0.99161)(996000000000,0.99161)(998000000000,0.99161)(1000000000000,0.99161)(1002000000000,0.99162)(1004000000000,0.99162)(1006000000000,0.99162)(1008000000000,0.99162)(1010000000000,0.99163)(1012000000000,0.99163)(1014000000000,0.99163)(1016000000000,0.99164)(1018000000000,0.99164)(1020000000000,0.99164)(1022000000000,0.99164)(1024000000000,0.99165)(1026000000000,0.99165)(1028000000000,0.99165)(1030000000000,0.99165)(1032000000000,0.99166)(1034000000000,0.99166)(1036000000000,0.99166)(1038000000000,0.99167)(1040000000000,0.99167)(1042000000000,0.99167)(1044000000000,0.99167)(1046000000000,0.99168)(1048000000000,0.99168)(1050000000000,0.99168)(1052000000000,0.99168)(1054000000000,0.99169)(1056000000000,0.99169)(1058000000000,0.99169)(1060000000000,0.99169)(1062000000000,0.99170)(1064000000000,0.99170)(1066000000000,0.99170)(1068000000000,0.99170)(1070000000000,0.99171)(1072000000000,0.99171)(1074000000000,0.99171)(1076000000000,0.99172)(1078000000000,0.99172)(1080000000000,0.99172)(1082000000000,0.99172)(1084000000000,0.99173)(1086000000000,0.99173)(1088000000000,0.99173)(1090000000000,0.99173)(1092000000000,0.99174)(1094000000000,0.99174)(1096000000000,0.99174)(1098000000000,0.99174)
+    };
+
+\addplot[
+    line width=1.3pt,
+    color=green,
+    mark=none,
+    ]
+    coordinates {  
+    (2000000000,0.99453)(4000000000,0.99558)(6000000000,0.99610)(8000000000,0.99635)(10000000000,0.99653)(12000000000,0.99670)(14000000000,0.99685)(16000000000,0.99694)(18000000000,0.99706)(20000000000,0.99712)(22000000000,0.99719)(24000000000,0.99727)(26000000000,0.99733)(28000000000,0.99738)(30000000000,0.99744)(32000000000,0.99748)(34000000000,0.99752)(36000000000,0.99755)(38000000000,0.99758)(40000000000,0.99761)(42000000000,0.99764)(44000000000,0.99768)(46000000000,0.99771)(48000000000,0.99774)(50000000000,0.99776)(52000000000,0.99779)(54000000000,0.99780)(56000000000,0.99782)(58000000000,0.99784)(60000000000,0.99786)(62000000000,0.99788)(64000000000,0.99789)(66000000000,0.99791)(68000000000,0.99793)(70000000000,0.99796)(72000000000,0.99798)(74000000000,0.99800)(76000000000,0.99801)(78000000000,0.99802)(80000000000,0.99804)(82000000000,0.99805)(84000000000,0.99806)(86000000000,0.99807)(88000000000,0.99809)(90000000000,0.99810)(92000000000,0.99811)(94000000000,0.99812)(96000000000,0.99813)(98000000000,0.99814)(100000000000,0.99815)(102000000000,0.99817)(104000000000,0.99818)(106000000000,0.99819)(108000000000,0.99820)(110000000000,0.99821)(112000000000,0.99822)(114000000000,0.99823)(116000000000,0.99823)(118000000000,0.99824)(120000000000,0.99825)(122000000000,0.99826)(124000000000,0.99826)(126000000000,0.99827)(128000000000,0.99828)(130000000000,0.99829)(132000000000,0.99830)(134000000000,0.99830)(136000000000,0.99831)(138000000000,0.99832)(140000000000,0.99832)(142000000000,0.99833)(144000000000,0.99834)(146000000000,0.99834)(148000000000,0.99835)(150000000000,0.99835)(152000000000,0.99836)(154000000000,0.99837)(156000000000,0.99837)(158000000000,0.99838)(160000000000,0.99839)(162000000000,0.99840)(164000000000,0.99840)(166000000000,0.99840)(168000000000,0.99841)(170000000000,0.99841)(172000000000,0.99842)(174000000000,0.99842)(176000000000,0.99843)(178000000000,0.99843)(180000000000,0.99844)(182000000000,0.99844)(184000000000,0.99845)(186000000000,0.99845)(188000000000,0.99846)(190000000000,0.99846)(192000000000,0.99847)(194000000000,0.99847)(196000000000,0.99848)(198000000000,0.99848)(200000000000,0.99848)(202000000000,0.99849)(204000000000,0.99849)(206000000000,0.99849)(208000000000,0.99850)(210000000000,0.99850)(212000000000,0.99851)(214000000000,0.99851)(216000000000,0.99852)(218000000000,0.99852)(220000000000,0.99852)(222000000000,0.99853)(224000000000,0.99853)(226000000000,0.99853)(228000000000,0.99854)(230000000000,0.99854)(232000000000,0.99854)(234000000000,0.99855)(236000000000,0.99855)(238000000000,0.99855)(240000000000,0.99856)(242000000000,0.99856)(244000000000,0.99857)(246000000000,0.99857)(248000000000,0.99857)(250000000000,0.99857)(252000000000,0.99858)(254000000000,0.99858)(256000000000,0.99858)(258000000000,0.99858)(260000000000,0.99859)(262000000000,0.99859)(264000000000,0.99859)(266000000000,0.99860)(268000000000,0.99860)(270000000000,0.99860)(272000000000,0.99861)(274000000000,0.99861)(276000000000,0.99861)(278000000000,0.99862)(280000000000,0.99862)(282000000000,0.99863)(284000000000,0.99863)(286000000000,0.99863)(288000000000,0.99863)(290000000000,0.99864)(292000000000,0.99864)(294000000000,0.99864)(296000000000,0.99865)(298000000000,0.99865)(300000000000,0.99865)(302000000000,0.99865)(304000000000,0.99866)(306000000000,0.99866)(308000000000,0.99866)(310000000000,0.99866)(312000000000,0.99866)(314000000000,0.99867)(316000000000,0.99867)(318000000000,0.99867)(320000000000,0.99868)(322000000000,0.99868)(324000000000,0.99868)(326000000000,0.99868)(328000000000,0.99868)(330000000000,0.99869)(332000000000,0.99869)(334000000000,0.99869)(336000000000,0.99869)(338000000000,0.99870)(340000000000,0.99870)(342000000000,0.99870)(344000000000,0.99870)(346000000000,0.99871)(348000000000,0.99871)(350000000000,0.99871)(352000000000,0.99871)(354000000000,0.99872)(356000000000,0.99872)(358000000000,0.99872)(360000000000,0.99872)(362000000000,0.99872)(364000000000,0.99872)(366000000000,0.99873)(368000000000,0.99873)(370000000000,0.99873)(372000000000,0.99873)(374000000000,0.99873)(376000000000,0.99873)(378000000000,0.99873)(380000000000,0.99874)(382000000000,0.99874)(384000000000,0.99874)(386000000000,0.99874)(388000000000,0.99874)(390000000000,0.99874)(392000000000,0.99875)(394000000000,0.99875)(396000000000,0.99875)(398000000000,0.99875)(400000000000,0.99875)(402000000000,0.99875)(404000000000,0.99876)(406000000000,0.99876)(408000000000,0.99876)(410000000000,0.99876)(412000000000,0.99876)(414000000000,0.99876)(416000000000,0.99877)(418000000000,0.99877)(420000000000,0.99877)(422000000000,0.99877)(424000000000,0.99877)(426000000000,0.99877)(428000000000,0.99877)(430000000000,0.99878)(432000000000,0.99878)(434000000000,0.99878)(436000000000,0.99878)(438000000000,0.99878)(440000000000,0.99878)(442000000000,0.99879)(444000000000,0.99879)(446000000000,0.99879)(448000000000,0.99879)(450000000000,0.99879)(452000000000,0.99879)(454000000000,0.99880)(456000000000,0.99880)(458000000000,0.99880)(460000000000,0.99880)(462000000000,0.99880)(464000000000,0.99880)(466000000000,0.99880)(468000000000,0.99881)(470000000000,0.99881)(472000000000,0.99881)(474000000000,0.99881)(476000000000,0.99881)(478000000000,0.99881)(480000000000,0.99881)(482000000000,0.99881)(484000000000,0.99881)(486000000000,0.99882)(488000000000,0.99882)(490000000000,0.99882)(492000000000,0.99882)(494000000000,0.99882)(496000000000,0.99882)(498000000000,0.99882)(500000000000,0.99882)(502000000000,0.99882)(504000000000,0.99883)(506000000000,0.99883)(508000000000,0.99883)(510000000000,0.99883)(512000000000,0.99883)(514000000000,0.99883)(516000000000,0.99883)(518000000000,0.99884)(520000000000,0.99884)(522000000000,0.99884)(524000000000,0.99884)(526000000000,0.99884)(528000000000,0.99884)(530000000000,0.99884)(532000000000,0.99884)(534000000000,0.99884)(536000000000,0.99885)(538000000000,0.99885)(540000000000,0.99885)(542000000000,0.99885)(544000000000,0.99885)(546000000000,0.99885)(548000000000,0.99885)(550000000000,0.99886)(552000000000,0.99886)(554000000000,0.99886)(556000000000,0.99886)(558000000000,0.99886)(560000000000,0.99886)(562000000000,0.99886)(564000000000,0.99886)(566000000000,0.99886)(568000000000,0.99886)(570000000000,0.99886)(572000000000,0.99887)(574000000000,0.99887)(576000000000,0.99887)(578000000000,0.99887)(580000000000,0.99887)(582000000000,0.99887)(584000000000,0.99887)(586000000000,0.99887)(588000000000,0.99888)(590000000000,0.99888)(592000000000,0.99888)(594000000000,0.99888)(596000000000,0.99888)(598000000000,0.99888)(600000000000,0.99888)(602000000000,0.99888)(604000000000,0.99888)(606000000000,0.99888)(608000000000,0.99889)(610000000000,0.99889)(612000000000,0.99889)(614000000000,0.99889)(616000000000,0.99889)(618000000000,0.99889)(620000000000,0.99889)(622000000000,0.99889)(624000000000,0.99889)(626000000000,0.99889)(628000000000,0.99890)(630000000000,0.99890)(632000000000,0.99890)(634000000000,0.99890)(636000000000,0.99890)(638000000000,0.99890)(640000000000,0.99890)(642000000000,0.99890)(644000000000,0.99890)(646000000000,0.99890)(648000000000,0.99891)(650000000000,0.99891)(652000000000,0.99891)(654000000000,0.99891)(656000000000,0.99891)(658000000000,0.99891)(660000000000,0.99891)(662000000000,0.99891)(664000000000,0.99891)(666000000000,0.99891)(668000000000,0.99891)(670000000000,0.99891)(672000000000,0.99892)(674000000000,0.99892)(676000000000,0.99892)(678000000000,0.99892)(680000000000,0.99892)(682000000000,0.99892)(684000000000,0.99892)(686000000000,0.99892)(688000000000,0.99892)(690000000000,0.99892)(692000000000,0.99892)(694000000000,0.99892)(696000000000,0.99892)(698000000000,0.99892)(700000000000,0.99893)(702000000000,0.99893)(704000000000,0.99893)(706000000000,0.99893)(708000000000,0.99893)(710000000000,0.99893)(712000000000,0.99893)(714000000000,0.99893)(716000000000,0.99893)(718000000000,0.99894)(720000000000,0.99894)(722000000000,0.99894)(724000000000,0.99894)(726000000000,0.99894)(728000000000,0.99894)(730000000000,0.99894)(732000000000,0.99894)(734000000000,0.99894)(736000000000,0.99894)(738000000000,0.99895)(740000000000,0.99895)(742000000000,0.99895)(744000000000,0.99895)(746000000000,0.99895)(748000000000,0.99895)(750000000000,0.99895)(752000000000,0.99895)(754000000000,0.99895)(756000000000,0.99895)(758000000000,0.99895)(760000000000,0.99895)(762000000000,0.99895)(764000000000,0.99895)(766000000000,0.99896)(768000000000,0.99896)(770000000000,0.99896)(772000000000,0.99896)(774000000000,0.99896)(776000000000,0.99896)(778000000000,0.99896)(780000000000,0.99896)(782000000000,0.99896)(784000000000,0.99896)(786000000000,0.99896)(788000000000,0.99896)(790000000000,0.99896)(792000000000,0.99896)(794000000000,0.99897)(796000000000,0.99897)(798000000000,0.99897)(800000000000,0.99897)(802000000000,0.99897)(804000000000,0.99897)(806000000000,0.99897)(808000000000,0.99897)(810000000000,0.99897)(812000000000,0.99897)(814000000000,0.99897)(816000000000,0.99897)(818000000000,0.99897)(820000000000,0.99897)(822000000000,0.99898)(824000000000,0.99898)(826000000000,0.99898)(828000000000,0.99898)(830000000000,0.99898)(832000000000,0.99898)(834000000000,0.99898)(836000000000,0.99898)(838000000000,0.99898)(840000000000,0.99898)(842000000000,0.99898)(844000000000,0.99898)(846000000000,0.99898)(848000000000,0.99898)(850000000000,0.99899)(852000000000,0.99899)(854000000000,0.99899)(856000000000,0.99899)(858000000000,0.99899)(860000000000,0.99899)(862000000000,0.99899)(864000000000,0.99899)(866000000000,0.99899)(868000000000,0.99899)(870000000000,0.99899)(872000000000,0.99899)(874000000000,0.99899)(876000000000,0.99899)(878000000000,0.99900)(880000000000,0.99900)(882000000000,0.99900)(884000000000,0.99900)(886000000000,0.99900)(888000000000,0.99900)(890000000000,0.99900)(892000000000,0.99900)(894000000000,0.99900)(896000000000,0.99900)(898000000000,0.99900)(900000000000,0.99900)(902000000000,0.99900)(904000000000,0.99900)(906000000000,0.99900)(908000000000,0.99901)(910000000000,0.99901)(912000000000,0.99901)(914000000000,0.99901)(916000000000,0.99901)(918000000000,0.99901)(920000000000,0.99901)(922000000000,0.99901)(924000000000,0.99901)(926000000000,0.99901)(928000000000,0.99901)(930000000000,0.99901)(932000000000,0.99901)(934000000000,0.99901)(936000000000,0.99901)(938000000000,0.99901)(940000000000,0.99902)(942000000000,0.99902)(944000000000,0.99902)(946000000000,0.99902)(948000000000,0.99902)(950000000000,0.99902)(952000000000,0.99902)(954000000000,0.99902)(956000000000,0.99902)(958000000000,0.99902)(960000000000,0.99902)(962000000000,0.99902)(964000000000,0.99902)(966000000000,0.99902)(968000000000,0.99902)(970000000000,0.99902)(972000000000,0.99902)(974000000000,0.99903)(976000000000,0.99903)(978000000000,0.99903)(980000000000,0.99903)(982000000000,0.99903)(984000000000,0.99903)(986000000000,0.99903)(988000000000,0.99903)(990000000000,0.99903)(992000000000,0.99903)(994000000000,0.99903)(996000000000,0.99903)(998000000000,0.99903)(1000000000000,0.99903)(1002000000000,0.99903)(1004000000000,0.99903)(1006000000000,0.99903)(1008000000000,0.99903)(1010000000000,0.99903)(1012000000000,0.99903)(1014000000000,0.99903)(1016000000000,0.99904)(1018000000000,0.99904)(1020000000000,0.99904)(1022000000000,0.99904)(1024000000000,0.99904)(1026000000000,0.99904)(1028000000000,0.99904)(1030000000000,0.99904)(1032000000000,0.99904)(1034000000000,0.99904)(1036000000000,0.99904)(1038000000000,0.99904)(1040000000000,0.99904)(1042000000000,0.99904)(1044000000000,0.99904)(1046000000000,0.99904)(1048000000000,0.99904)(1050000000000,0.99904)(1052000000000,0.99904)(1054000000000,0.99905)(1056000000000,0.99905)(1058000000000,0.99905)(1060000000000,0.99905)(1062000000000,0.99905)(1064000000000,0.99905)(1066000000000,0.99905)(1068000000000,0.99905)(1070000000000,0.99905)(1072000000000,0.99905)(1074000000000,0.99905)(1076000000000,0.99905)(1078000000000,0.99905)(1080000000000,0.99905)(1082000000000,0.99905)(1084000000000,0.99905)(1086000000000,0.99905)(1088000000000,0.99905)(1090000000000,0.99905)(1092000000000,0.99905)(1094000000000,0.99905)(1096000000000,0.99906)(1098000000000,0.99906)
+    };
+ 
+
+\addplot[
+    line width=1.3pt,
+    color=cyan,
+    mark=none,
+    ]
+    coordinates {  
+(2000000000,0.99687)(4000000000,0.99760)(6000000000,0.99786)(8000000000,0.99800)(10000000000,0.99818)(12000000000,0.99830)(14000000000,0.99840)(16000000000,0.99846)(18000000000,0.99853)(20000000000,0.99861)(22000000000,0.99864)(24000000000,0.99868)(26000000000,0.99870)(28000000000,0.99873)(30000000000,0.99876)(32000000000,0.99878)(34000000000,0.99879)(36000000000,0.99882)(38000000000,0.99884)(40000000000,0.99887)(42000000000,0.99890)(44000000000,0.99891)(46000000000,0.99892)(48000000000,0.99894)(50000000000,0.99896)(52000000000,0.99897)(54000000000,0.99898)(56000000000,0.99899)(58000000000,0.99900)(60000000000,0.99901)(62000000000,0.99901)(64000000000,0.99902)(66000000000,0.99903)(68000000000,0.99904)(70000000000,0.99905)(72000000000,0.99906)(74000000000,0.99907)(76000000000,0.99908)(78000000000,0.99908)(80000000000,0.99909)(82000000000,0.99910)(84000000000,0.99911)(86000000000,0.99912)(88000000000,0.99912)(90000000000,0.99913)(92000000000,0.99913)(94000000000,0.99914)(96000000000,0.99915)(98000000000,0.99915)(100000000000,0.99915)(102000000000,0.99916)(104000000000,0.99916)(106000000000,0.99917)(108000000000,0.99918)(110000000000,0.99919)(112000000000,0.99919)(114000000000,0.99920)(116000000000,0.99920)(118000000000,0.99920)(120000000000,0.99921)(122000000000,0.99921)(124000000000,0.99922)(126000000000,0.99922)(128000000000,0.99923)(130000000000,0.99923)(132000000000,0.99923)(134000000000,0.99923)(136000000000,0.99924)(138000000000,0.99925)(140000000000,0.99925)(142000000000,0.99926)(144000000000,0.99926)(146000000000,0.99926)(148000000000,0.99926)(150000000000,0.99926)(152000000000,0.99927)(154000000000,0.99927)(156000000000,0.99927)(158000000000,0.99927)(160000000000,0.99928)(162000000000,0.99928)(164000000000,0.99928)(166000000000,0.99929)(168000000000,0.99929)(170000000000,0.99929)(172000000000,0.99930)(174000000000,0.99930)(176000000000,0.99930)(178000000000,0.99930)(180000000000,0.99930)(182000000000,0.99930)(184000000000,0.99930)(186000000000,0.99931)(188000000000,0.99931)(190000000000,0.99931)(192000000000,0.99932)(194000000000,0.99932)(196000000000,0.99932)(198000000000,0.99932)(200000000000,0.99932)(202000000000,0.99933)(204000000000,0.99933)(206000000000,0.99933)(208000000000,0.99933)(210000000000,0.99933)(212000000000,0.99933)(214000000000,0.99934)(216000000000,0.99934)(218000000000,0.99934)(220000000000,0.99934)(222000000000,0.99934)(224000000000,0.99934)(226000000000,0.99935)(228000000000,0.99935)(230000000000,0.99935)(232000000000,0.99935)(234000000000,0.99935)(236000000000,0.99935)(238000000000,0.99935)(240000000000,0.99935)(242000000000,0.99936)(244000000000,0.99936)(246000000000,0.99936)(248000000000,0.99936)(250000000000,0.99936)(252000000000,0.99937)(254000000000,0.99937)(256000000000,0.99937)(258000000000,0.99937)(260000000000,0.99937)(262000000000,0.99937)(264000000000,0.99938)(266000000000,0.99938)(268000000000,0.99938)(270000000000,0.99938)(272000000000,0.99938)(274000000000,0.99939)(276000000000,0.99939)(278000000000,0.99939)(280000000000,0.99939)(282000000000,0.99939)(284000000000,0.99940)(286000000000,0.99940)(288000000000,0.99940)(290000000000,0.99940)(292000000000,0.99940)(294000000000,0.99941)(296000000000,0.99941)(298000000000,0.99941)(300000000000,0.99941)(302000000000,0.99941)(304000000000,0.99942)(306000000000,0.99942)(308000000000,0.99942)(310000000000,0.99942)(312000000000,0.99942)(314000000000,0.99942)(316000000000,0.99942)(318000000000,0.99942)(320000000000,0.99943)(322000000000,0.99943)(324000000000,0.99943)(326000000000,0.99943)(328000000000,0.99943)(330000000000,0.99943)(332000000000,0.99943)(334000000000,0.99943)(336000000000,0.99944)(338000000000,0.99944)(340000000000,0.99944)(342000000000,0.99944)(344000000000,0.99944)(346000000000,0.99944)(348000000000,0.99944)(350000000000,0.99944)(352000000000,0.99944)(354000000000,0.99945)(356000000000,0.99945)(358000000000,0.99945)(360000000000,0.99945)(362000000000,0.99945)(364000000000,0.99945)(366000000000,0.99945)(368000000000,0.99945)(370000000000,0.99945)(372000000000,0.99945)(374000000000,0.99946)(376000000000,0.99946)(378000000000,0.99946)(380000000000,0.99946)(382000000000,0.99946)(384000000000,0.99946)(386000000000,0.99946)(388000000000,0.99946)(390000000000,0.99946)(392000000000,0.99946)(394000000000,0.99946)(396000000000,0.99946)(398000000000,0.99946)(400000000000,0.99946)(402000000000,0.99947)(404000000000,0.99947)(406000000000,0.99947)(408000000000,0.99947)(410000000000,0.99947)(412000000000,0.99947)(414000000000,0.99947)(416000000000,0.99947)(418000000000,0.99947)(420000000000,0.99947)(422000000000,0.99947)(424000000000,0.99947)(426000000000,0.99947)(428000000000,0.99947)(430000000000,0.99947)(432000000000,0.99947)(434000000000,0.99947)(436000000000,0.99947)(438000000000,0.99948)(440000000000,0.99948)(442000000000,0.99948)(444000000000,0.99948)(446000000000,0.99948)(448000000000,0.99948)(450000000000,0.99948)(452000000000,0.99948)(454000000000,0.99948)(456000000000,0.99948)(458000000000,0.99948)(460000000000,0.99948)(462000000000,0.99949)(464000000000,0.99949)(466000000000,0.99949)(468000000000,0.99949)(470000000000,0.99949)(472000000000,0.99949)(474000000000,0.99949)(476000000000,0.99949)(478000000000,0.99949)(480000000000,0.99949)(482000000000,0.99949)(484000000000,0.99949)(486000000000,0.99949)(488000000000,0.99949)(490000000000,0.99949)(492000000000,0.99949)(494000000000,0.99949)(496000000000,0.99950)(498000000000,0.99950)(500000000000,0.99950)(502000000000,0.99950)(504000000000,0.99950)(506000000000,0.99950)(508000000000,0.99950)(510000000000,0.99950)(512000000000,0.99950)(514000000000,0.99950)(516000000000,0.99950)(518000000000,0.99950)(520000000000,0.99950)(522000000000,0.99950)(524000000000,0.99950)(526000000000,0.99951)(528000000000,0.99951)(530000000000,0.99951)(532000000000,0.99951)(534000000000,0.99951)(536000000000,0.99951)(538000000000,0.99951)(540000000000,0.99951)(542000000000,0.99951)(544000000000,0.99951)(546000000000,0.99951)(548000000000,0.99951)(550000000000,0.99951)(552000000000,0.99951)(554000000000,0.99951)(556000000000,0.99952)(558000000000,0.99952)(560000000000,0.99952)(562000000000,0.99952)(564000000000,0.99952)(566000000000,0.99952)(568000000000,0.99952)(570000000000,0.99952)(572000000000,0.99952)(574000000000,0.99952)(576000000000,0.99952)(578000000000,0.99952)(580000000000,0.99952)(582000000000,0.99952)(584000000000,0.99952)(586000000000,0.99952)(588000000000,0.99952)(590000000000,0.99953)(592000000000,0.99953)(594000000000,0.99953)(596000000000,0.99953)(598000000000,0.99953)(600000000000,0.99953)(602000000000,0.99953)(604000000000,0.99953)(606000000000,0.99953)(608000000000,0.99953)(610000000000,0.99953)(612000000000,0.99953)(614000000000,0.99953)(616000000000,0.99953)(618000000000,0.99953)(620000000000,0.99953)(622000000000,0.99953)(624000000000,0.99953)(626000000000,0.99954)(628000000000,0.99954)(630000000000,0.99954)(632000000000,0.99954)(634000000000,0.99954)(636000000000,0.99954)(638000000000,0.99954)(640000000000,0.99954)(642000000000,0.99954)(644000000000,0.99954)(646000000000,0.99954)(648000000000,0.99954)(650000000000,0.99954)(652000000000,0.99954)(654000000000,0.99954)(656000000000,0.99954)(658000000000,0.99954)(660000000000,0.99954)(662000000000,0.99954)(664000000000,0.99955)(666000000000,0.99955)(668000000000,0.99955)(670000000000,0.99955)(672000000000,0.99955)(674000000000,0.99955)(676000000000,0.99955)(678000000000,0.99955)(680000000000,0.99955)(682000000000,0.99955)(684000000000,0.99955)(686000000000,0.99955)(688000000000,0.99955)(690000000000,0.99955)(692000000000,0.99955)(694000000000,0.99955)(696000000000,0.99955)(698000000000,0.99955)(700000000000,0.99955)(702000000000,0.99955)(704000000000,0.99955)(706000000000,0.99956)(708000000000,0.99956)(710000000000,0.99956)(712000000000,0.99956)(714000000000,0.99956)(716000000000,0.99956)(718000000000,0.99956)(720000000000,0.99956)(722000000000,0.99956)(724000000000,0.99956)(726000000000,0.99956)(728000000000,0.99956)(730000000000,0.99956)(732000000000,0.99956)(734000000000,0.99956)(736000000000,0.99956)(738000000000,0.99956)(740000000000,0.99956)(742000000000,0.99956)(744000000000,0.99957)(746000000000,0.99957)(748000000000,0.99957)(750000000000,0.99957)(752000000000,0.99957)(754000000000,0.99957)(756000000000,0.99957)(758000000000,0.99957)(760000000000,0.99957)(762000000000,0.99957)(764000000000,0.99957)(766000000000,0.99957)(768000000000,0.99957)(770000000000,0.99957)(772000000000,0.99957)(774000000000,0.99957)(776000000000,0.99957)(778000000000,0.99958)(780000000000,0.99958)(782000000000,0.99958)(784000000000,0.99958)(786000000000,0.99958)(788000000000,0.99958)(790000000000,0.99958)(792000000000,0.99958)(794000000000,0.99958)(796000000000,0.99958)(798000000000,0.99958)(800000000000,0.99958)(802000000000,0.99958)(804000000000,0.99958)(806000000000,0.99958)(808000000000,0.99958)(810000000000,0.99958)(812000000000,0.99958)(814000000000,0.99958)(816000000000,0.99958)(818000000000,0.99958)(820000000000,0.99958)(822000000000,0.99958)(824000000000,0.99958)(826000000000,0.99958)(828000000000,0.99958)(830000000000,0.99958)(832000000000,0.99958)(834000000000,0.99958)(836000000000,0.99958)(838000000000,0.99958)(840000000000,0.99958)(842000000000,0.99958)(844000000000,0.99958)(846000000000,0.99958)(848000000000,0.99958)(850000000000,0.99958)(852000000000,0.99958)(854000000000,0.99958)(856000000000,0.99958)(858000000000,0.99958)(860000000000,0.99959)(862000000000,0.99959)(864000000000,0.99959)(866000000000,0.99959)(868000000000,0.99959)(870000000000,0.99959)(872000000000,0.99959)(874000000000,0.99959)(876000000000,0.99959)(878000000000,0.99959)(880000000000,0.99959)(882000000000,0.99959)(884000000000,0.99959)(886000000000,0.99959)(888000000000,0.99959)(890000000000,0.99959)(892000000000,0.99959)(894000000000,0.99959)(896000000000,0.99959)(898000000000,0.99959)(900000000000,0.99959)(902000000000,0.99959)(904000000000,0.99959)(906000000000,0.99959)(908000000000,0.99959)(910000000000,0.99959)(912000000000,0.99959)(914000000000,0.99959)(916000000000,0.99959)(918000000000,0.99960)(920000000000,0.99960)(922000000000,0.99960)(924000000000,0.99960)(926000000000,0.99960)(928000000000,0.99960)(930000000000,0.99960)(932000000000,0.99960)(934000000000,0.99960)(936000000000,0.99960)(938000000000,0.99960)(940000000000,0.99960)(942000000000,0.99960)(944000000000,0.99960)(946000000000,0.99960)(948000000000,0.99960)(950000000000,0.99960)(952000000000,0.99960)(954000000000,0.99960)(956000000000,0.99960)(958000000000,0.99960)(960000000000,0.99960)(962000000000,0.99960)(964000000000,0.99960)(966000000000,0.99960)(968000000000,0.99960)(970000000000,0.99960)(972000000000,0.99960)(974000000000,0.99960)(976000000000,0.99960)(978000000000,0.99960)(980000000000,0.99961)(982000000000,0.99961)(984000000000,0.99961)(986000000000,0.99961)(988000000000,0.99961)(990000000000,0.99961)(992000000000,0.99961)(994000000000,0.99961)(996000000000,0.99961)(998000000000,0.99961)(1000000000000,0.99961)(1002000000000,0.99961)(1004000000000,0.99961)(1006000000000,0.99961)(1008000000000,0.99961)(1010000000000,0.99961)(1012000000000,0.99961)(1014000000000,0.99961)(1016000000000,0.99961)(1018000000000,0.99961)(1020000000000,0.99961)(1022000000000,0.99961)(1024000000000,0.99961)(1026000000000,0.99961)(1028000000000,0.99961)(1030000000000,0.99961)(1032000000000,0.99961)(1034000000000,0.99961)(1036000000000,0.99961)(1038000000000,0.99961)(1040000000000,0.99961)(1042000000000,0.99961)(1044000000000,0.99961)(1046000000000,0.99961)(1048000000000,0.99961)(1050000000000,0.99961)(1052000000000,0.99961)(1054000000000,0.99961)(1056000000000,0.99961)(1058000000000,0.99961)(1060000000000,0.99961)(1062000000000,0.99961)(1064000000000,0.99961)(1066000000000,0.99961)(1068000000000,0.99961)(1070000000000,0.99962)(1072000000000,0.99962)(1074000000000,0.99962)(1076000000000,0.99962)(1078000000000,0.99962)(1080000000000,0.99962)(1082000000000,0.99962)(1084000000000,0.99962)(1086000000000,0.99962)(1088000000000,0.99962)(1090000000000,0.99962)(1092000000000,0.99962)(1094000000000,0.99962)(1096000000000,0.99962)(1098000000000,0.99962)
+};
+    \legend{$p_3(x)$\\$p_5(x)$\\$p_7(x)$\\}
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+
+\begin{figure}[htb]
+\centering
+\captionof{figure}{Values of $p_{l,2}(x)$}
+\label{fig:plr}
+\begin{tikzpicture}
+\begin{axis}[
+    xlabel={$x$},
+    ylabel={$p_{l,2}(x)$},
+    xmin=0, xmax=1099511627776,
+    ymin=0.85, ymax=1,
+    xtick={1e11, 2e11, 3e11, 4e11, 5e11, 6e11, 7e11, 8e11, 9e11, 1e12, 1099511627776},
+    ytick={0.85, 0.90, 0.95, 1.00},
+    legend pos=north west,
+    ymajorgrids=true,
+    grid style=dashed,
+    legend pos=south east,
+    y tick label style={
+        /pgf/number format/.cd,
+        fixed,
+        fixed zerofill,
+        precision=2,
+        /tikz/.cd
+    }
+]
+ 
+\addplot[
+    line width=1.3pt,
+    color=red,
+    mark=none,
+    ]
+    coordinates {
+    (2000000000,0.86065)(4000000000,0.87560)(6000000000,0.88365)(8000000000,0.88904)(10000000000,0.89309)(12000000000,0.89626)(14000000000,0.89892)(16000000000,0.90112)(18000000000,0.90303)(20000000000,0.90470)(22000000000,0.90621)(24000000000,0.90758)(26000000000,0.90879)(28000000000,0.90992)(30000000000,0.91096)(32000000000,0.91192)(34000000000,0.91280)(36000000000,0.91362)(38000000000,0.91444)(40000000000,0.91516)(42000000000,0.91586)(44000000000,0.91650)(46000000000,0.91712)(48000000000,0.91771)(50000000000,0.91828)(52000000000,0.91882)(54000000000,0.91932)(56000000000,0.91980)(58000000000,0.92026)(60000000000,0.92072)(62000000000,0.92115)(64000000000,0.92155)(66000000000,0.92196)(68000000000,0.92235)(70000000000,0.92272)(72000000000,0.92309)(74000000000,0.92344)(76000000000,0.92378)(78000000000,0.92412)(80000000000,0.92444)(82000000000,0.92476)(84000000000,0.92506)(86000000000,0.92535)(88000000000,0.92563)(90000000000,0.92591)(92000000000,0.92618)(94000000000,0.92645)(96000000000,0.92671)(98000000000,0.92696)(100000000000,0.92721)(102000000000,0.92745)(104000000000,0.92768)(106000000000,0.92791)(108000000000,0.92814)(110000000000,0.92835)(112000000000,0.92858)(114000000000,0.92878)(116000000000,0.92899)(118000000000,0.92920)(120000000000,0.92940)(122000000000,0.92959)(124000000000,0.92978)(126000000000,0.92997)(128000000000,0.93016)(130000000000,0.93033)(132000000000,0.93051)(134000000000,0.93069)(136000000000,0.93086)(138000000000,0.93102)(140000000000,0.93119)(142000000000,0.93135)(144000000000,0.93152)(146000000000,0.93168)(148000000000,0.93184)(150000000000,0.93199)(152000000000,0.93213)(154000000000,0.93228)(156000000000,0.93243)(158000000000,0.93257)(160000000000,0.93271)(162000000000,0.93285)(164000000000,0.93299)(166000000000,0.93312)(168000000000,0.93325)(170000000000,0.93339)(172000000000,0.93352)(174000000000,0.93365)(176000000000,0.93378)(178000000000,0.93390)(180000000000,0.93402)(182000000000,0.93415)(184000000000,0.93427)(186000000000,0.93439)(188000000000,0.93451)(190000000000,0.93463)(192000000000,0.93474)(194000000000,0.93486)(196000000000,0.93497)(198000000000,0.93509)(200000000000,0.93520)(202000000000,0.93530)(204000000000,0.93541)(206000000000,0.93552)(208000000000,0.93562)(210000000000,0.93573)(212000000000,0.93583)(214000000000,0.93593)(216000000000,0.93603)(218000000000,0.93613)(220000000000,0.93623)(222000000000,0.93632)(224000000000,0.93642)(226000000000,0.93651)(228000000000,0.93661)(230000000000,0.93670)(232000000000,0.93679)(234000000000,0.93688)(236000000000,0.93697)(238000000000,0.93706)(240000000000,0.93715)(242000000000,0.93723)(244000000000,0.93732)(246000000000,0.93740)(248000000000,0.93749)(250000000000,0.93757)(252000000000,0.93765)(254000000000,0.93773)(256000000000,0.93781)(258000000000,0.93789)(260000000000,0.93797)(262000000000,0.93805)(264000000000,0.93813)(266000000000,0.93821)(268000000000,0.93829)(270000000000,0.93836)(272000000000,0.93844)(274000000000,0.93851)(276000000000,0.93859)(278000000000,0.93866)(280000000000,0.93873)(282000000000,0.93881)(284000000000,0.93888)(286000000000,0.93895)(288000000000,0.93902)(290000000000,0.93909)(292000000000,0.93916)(294000000000,0.93923)(296000000000,0.93930)(298000000000,0.93937)(300000000000,0.93944)(302000000000,0.93950)(304000000000,0.93957)(306000000000,0.93964)(308000000000,0.93970)(310000000000,0.93977)(312000000000,0.93983)(314000000000,0.93990)(316000000000,0.93996)(318000000000,0.94003)(320000000000,0.94009)(322000000000,0.94015)(324000000000,0.94021)(326000000000,0.94028)(328000000000,0.94034)(330000000000,0.94040)(332000000000,0.94046)(334000000000,0.94052)(336000000000,0.94058)(338000000000,0.94063)(340000000000,0.94069)(342000000000,0.94075)(344000000000,0.94080)(346000000000,0.94086)(348000000000,0.94092)(350000000000,0.94098)(352000000000,0.94103)(354000000000,0.94109)(356000000000,0.94114)(358000000000,0.94120)(360000000000,0.94125)(362000000000,0.94131)(364000000000,0.94137)(366000000000,0.94142)(368000000000,0.94147)(370000000000,0.94152)(372000000000,0.94158)(374000000000,0.94163)(376000000000,0.94168)(378000000000,0.94173)(380000000000,0.94178)(382000000000,0.94184)(384000000000,0.94189)(386000000000,0.94194)(388000000000,0.94199)(390000000000,0.94204)(392000000000,0.94209)(394000000000,0.94214)(396000000000,0.94219)(398000000000,0.94224)(400000000000,0.94228)(402000000000,0.94233)(404000000000,0.94238)(406000000000,0.94243)(408000000000,0.94248)(410000000000,0.94252)(412000000000,0.94257)(414000000000,0.94262)(416000000000,0.94266)(418000000000,0.94271)(420000000000,0.94275)(422000000000,0.94280)(424000000000,0.94284)(426000000000,0.94289)(428000000000,0.94293)(430000000000,0.94298)(432000000000,0.94302)(434000000000,0.94307)(436000000000,0.94311)(438000000000,0.94316)(440000000000,0.94320)(442000000000,0.94324)(444000000000,0.94329)(446000000000,0.94333)(448000000000,0.94337)(450000000000,0.94341)(452000000000,0.94345)(454000000000,0.94349)(456000000000,0.94354)(458000000000,0.94358)(460000000000,0.94362)(462000000000,0.94366)(464000000000,0.94370)(466000000000,0.94374)(468000000000,0.94379)(470000000000,0.94383)(472000000000,0.94387)(474000000000,0.94390)(476000000000,0.94394)(478000000000,0.94398)(480000000000,0.94402)(482000000000,0.94406)(484000000000,0.94410)(486000000000,0.94414)(488000000000,0.94418)(490000000000,0.94422)(492000000000,0.94425)(494000000000,0.94429)(496000000000,0.94433)(498000000000,0.94436)(500000000000,0.94440)(502000000000,0.94444)(504000000000,0.94447)(506000000000,0.94451)(508000000000,0.94455)(510000000000,0.94458)(512000000000,0.94462)(514000000000,0.94465)(516000000000,0.94469)(518000000000,0.94473)(520000000000,0.94476)(522000000000,0.94480)(524000000000,0.94483)(526000000000,0.94487)(528000000000,0.94490)(530000000000,0.94494)(532000000000,0.94497)(534000000000,0.94501)(536000000000,0.94504)(538000000000,0.94507)(540000000000,0.94511)(542000000000,0.94514)(544000000000,0.94517)(546000000000,0.94521)(548000000000,0.94524)(550000000000,0.94528)(552000000000,0.94531)(554000000000,0.94535)(556000000000,0.94538)(558000000000,0.94541)(560000000000,0.94545)(562000000000,0.94548)(564000000000,0.94551)(566000000000,0.94554)(568000000000,0.94558)(570000000000,0.94561)(572000000000,0.94564)(574000000000,0.94567)(576000000000,0.94570)(578000000000,0.94574)(580000000000,0.94577)(582000000000,0.94580)(584000000000,0.94583)(586000000000,0.94586)(588000000000,0.94589)(590000000000,0.94592)(592000000000,0.94595)(594000000000,0.94598)(596000000000,0.94601)(598000000000,0.94604)(600000000000,0.94608)(602000000000,0.94611)(604000000000,0.94614)(606000000000,0.94617)(608000000000,0.94620)(610000000000,0.94623)(612000000000,0.94626)(614000000000,0.94629)(616000000000,0.94632)(618000000000,0.94634)(620000000000,0.94637)(622000000000,0.94640)(624000000000,0.94643)(626000000000,0.94646)(628000000000,0.94649)(630000000000,0.94652)(632000000000,0.94655)(634000000000,0.94658)(636000000000,0.94660)(638000000000,0.94663)(640000000000,0.94666)(642000000000,0.94669)(644000000000,0.94672)(646000000000,0.94674)(648000000000,0.94677)(650000000000,0.94680)(652000000000,0.94683)(654000000000,0.94686)(656000000000,0.94688)(658000000000,0.94691)(660000000000,0.94694)(662000000000,0.94696)(664000000000,0.94699)(666000000000,0.94702)(668000000000,0.94704)(670000000000,0.94707)(672000000000,0.94709)(674000000000,0.94712)(676000000000,0.94715)(678000000000,0.94717)(680000000000,0.94720)(682000000000,0.94723)(684000000000,0.94725)(686000000000,0.94728)(688000000000,0.94730)(690000000000,0.94733)(692000000000,0.94735)(694000000000,0.94738)(696000000000,0.94740)(698000000000,0.94743)(700000000000,0.94746)(702000000000,0.94748)(704000000000,0.94751)(706000000000,0.94753)(708000000000,0.94755)(710000000000,0.94758)(712000000000,0.94760)(714000000000,0.94763)(716000000000,0.94765)(718000000000,0.94768)(720000000000,0.94770)(722000000000,0.94773)(724000000000,0.94775)(726000000000,0.94778)(728000000000,0.94780)(730000000000,0.94783)(732000000000,0.94785)(734000000000,0.94787)(736000000000,0.94790)(738000000000,0.94792)(740000000000,0.94794)(742000000000,0.94797)(744000000000,0.94799)(746000000000,0.94801)(748000000000,0.94804)(750000000000,0.94806)(752000000000,0.94808)(754000000000,0.94811)(756000000000,0.94813)(758000000000,0.94815)(760000000000,0.94817)(762000000000,0.94820)(764000000000,0.94822)(766000000000,0.94824)(768000000000,0.94827)(770000000000,0.94829)(772000000000,0.94831)(774000000000,0.94833)(776000000000,0.94836)(778000000000,0.94838)(780000000000,0.94840)(782000000000,0.94842)(784000000000,0.94844)(786000000000,0.94847)(788000000000,0.94849)(790000000000,0.94851)(792000000000,0.94853)(794000000000,0.94855)(796000000000,0.94857)(798000000000,0.94860)(800000000000,0.94862)(802000000000,0.94864)(804000000000,0.94866)(806000000000,0.94868)(808000000000,0.94870)(810000000000,0.94873)(812000000000,0.94875)(814000000000,0.94877)(816000000000,0.94879)(818000000000,0.94881)(820000000000,0.94883)(822000000000,0.94885)(824000000000,0.94888)(826000000000,0.94890)(828000000000,0.94892)(830000000000,0.94894)(832000000000,0.94896)(834000000000,0.94898)(836000000000,0.94900)(838000000000,0.94902)(840000000000,0.94904)(842000000000,0.94906)(844000000000,0.94908)(846000000000,0.94910)(848000000000,0.94912)(850000000000,0.94914)(852000000000,0.94916)(854000000000,0.94918)(856000000000,0.94920)(858000000000,0.94922)(860000000000,0.94924)(862000000000,0.94926)(864000000000,0.94928)(866000000000,0.94930)(868000000000,0.94932)(870000000000,0.94934)(872000000000,0.94936)(874000000000,0.94938)(876000000000,0.94939)(878000000000,0.94941)(880000000000,0.94943)(882000000000,0.94945)(884000000000,0.94947)(886000000000,0.94949)(888000000000,0.94951)(890000000000,0.94953)(892000000000,0.94955)(894000000000,0.94956)(896000000000,0.94958)(898000000000,0.94960)(900000000000,0.94962)(902000000000,0.94964)(904000000000,0.94966)(906000000000,0.94968)(908000000000,0.94970)(910000000000,0.94971)(912000000000,0.94973)(914000000000,0.94975)(916000000000,0.94977)(918000000000,0.94979)(920000000000,0.94981)(922000000000,0.94982)(924000000000,0.94984)(926000000000,0.94986)(928000000000,0.94988)(930000000000,0.94990)(932000000000,0.94991)(934000000000,0.94993)(936000000000,0.94995)(938000000000,0.94997)(940000000000,0.94998)(942000000000,0.95000)(944000000000,0.95002)(946000000000,0.95004)(948000000000,0.95005)(950000000000,0.95007)(952000000000,0.95009)(954000000000,0.95011)(956000000000,0.95013)(958000000000,0.95014)(960000000000,0.95016)(962000000000,0.95018)(964000000000,0.95019)(966000000000,0.95021)(968000000000,0.95023)(970000000000,0.95025)(972000000000,0.95026)(974000000000,0.95028)(976000000000,0.95030)(978000000000,0.95032)(980000000000,0.95033)(982000000000,0.95035)(984000000000,0.95036)(986000000000,0.95038)(988000000000,0.95040)(990000000000,0.95042)(992000000000,0.95043)(994000000000,0.95045)(996000000000,0.95047)(998000000000,0.95048)(1000000000000,0.95050)(1002000000000,0.95051)(1004000000000,0.95053)(1006000000000,0.95055)(1008000000000,0.95056)(1010000000000,0.95058)(1012000000000,0.95060)(1014000000000,0.95061)(1016000000000,0.95063)(1018000000000,0.95065)(1020000000000,0.95066)(1022000000000,0.95068)(1024000000000,0.95069)(1026000000000,0.95071)(1028000000000,0.95073)(1030000000000,0.95074)(1032000000000,0.95076)(1034000000000,0.95077)(1036000000000,0.95079)(1038000000000,0.95081)(1040000000000,0.95082)(1042000000000,0.95084)(1044000000000,0.95085)(1046000000000,0.95087)(1048000000000,0.95089)(1050000000000,0.95090)(1052000000000,0.95092)(1054000000000,0.95093)(1056000000000,0.95095)(1058000000000,0.95096)(1060000000000,0.95098)(1062000000000,0.95099)(1064000000000,0.95101)(1066000000000,0.95103)(1068000000000,0.95104)(1070000000000,0.95106)(1072000000000,0.95107)(1074000000000,0.95109)(1076000000000,0.95110)(1078000000000,0.95112)(1080000000000,0.95113)(1082000000000,0.95115)(1084000000000,0.95116)(1086000000000,0.95118)(1088000000000,0.95119)(1090000000000,0.95121)(1092000000000,0.95122)(1094000000000,0.95124)(1096000000000,0.95125)(1098000000000,0.95127)
+    };
+
+\addplot[
+    line width=1.3pt,
+    color=green,
+    mark=none,
+    ]
+    coordinates {  
+    (2000000000,0.96351)(4000000000,0.96977)(6000000000,0.97289)(8000000000,0.97467)(10000000000,0.97642)(12000000000,0.97775)(14000000000,0.97876)(16000000000,0.97934)(18000000000,0.98012)(20000000000,0.98042)(22000000000,0.98099)(24000000000,0.98133)(26000000000,0.98182)(28000000000,0.98226)(30000000000,0.98264)(32000000000,0.98286)(34000000000,0.98304)(36000000000,0.98335)(38000000000,0.98353)(40000000000,0.98384)(42000000000,0.98401)(44000000000,0.98425)(46000000000,0.98446)(48000000000,0.98463)(50000000000,0.98481)(52000000000,0.98495)(54000000000,0.98509)(56000000000,0.98527)(58000000000,0.98531)(60000000000,0.98541)(62000000000,0.98561)(64000000000,0.98562)(66000000000,0.98576)(68000000000,0.98587)(70000000000,0.98605)(72000000000,0.98614)(74000000000,0.98629)(76000000000,0.98632)(78000000000,0.98640)(80000000000,0.98653)(82000000000,0.98665)(84000000000,0.98676)(86000000000,0.98684)(88000000000,0.98695)(90000000000,0.98704)(92000000000,0.98714)(94000000000,0.98725)(96000000000,0.98731)(98000000000,0.98738)(100000000000,0.98743)(102000000000,0.98751)(104000000000,0.98755)(106000000000,0.98760)(108000000000,0.98767)(110000000000,0.98773)(112000000000,0.98778)(114000000000,0.98782)(116000000000,0.98790)(118000000000,0.98796)(120000000000,0.98802)(122000000000,0.98810)(124000000000,0.98818)(126000000000,0.98823)(128000000000,0.98829)(130000000000,0.98833)(132000000000,0.98840)(134000000000,0.98844)(136000000000,0.98848)(138000000000,0.98856)(140000000000,0.98859)(142000000000,0.98862)(144000000000,0.98867)(146000000000,0.98872)(148000000000,0.98875)(150000000000,0.98879)(152000000000,0.98881)(154000000000,0.98887)(156000000000,0.98893)(158000000000,0.98898)(160000000000,0.98904)(162000000000,0.98909)(164000000000,0.98913)(166000000000,0.98916)(168000000000,0.98917)(170000000000,0.98919)(172000000000,0.98922)(174000000000,0.98924)(176000000000,0.98927)(178000000000,0.98929)(180000000000,0.98933)(182000000000,0.98937)(184000000000,0.98940)(186000000000,0.98945)(188000000000,0.98947)(190000000000,0.98949)(192000000000,0.98952)(194000000000,0.98956)(196000000000,0.98958)(198000000000,0.98959)(200000000000,0.98963)(202000000000,0.98967)(204000000000,0.98970)(206000000000,0.98972)(208000000000,0.98974)(210000000000,0.98976)(212000000000,0.98979)(214000000000,0.98983)(216000000000,0.98985)(218000000000,0.98987)(220000000000,0.98988)(222000000000,0.98992)(224000000000,0.98995)(226000000000,0.98997)(228000000000,0.99000)(230000000000,0.99002)(232000000000,0.99004)(234000000000,0.99006)(236000000000,0.99009)(238000000000,0.99010)(240000000000,0.99013)(242000000000,0.99014)(244000000000,0.99016)(246000000000,0.99017)(248000000000,0.99019)(250000000000,0.99021)(252000000000,0.99023)(254000000000,0.99025)(256000000000,0.99026)(258000000000,0.99027)(260000000000,0.99030)(262000000000,0.99032)(264000000000,0.99035)(266000000000,0.99037)(268000000000,0.99040)(270000000000,0.99041)(272000000000,0.99045)(274000000000,0.99047)(276000000000,0.99051)(278000000000,0.99054)(280000000000,0.99057)(282000000000,0.99060)(284000000000,0.99061)(286000000000,0.99063)(288000000000,0.99066)(290000000000,0.99068)(292000000000,0.99069)(294000000000,0.99072)(296000000000,0.99073)(298000000000,0.99075)(300000000000,0.99078)(302000000000,0.99079)(304000000000,0.99080)(306000000000,0.99081)(308000000000,0.99083)(310000000000,0.99083)(312000000000,0.99085)(314000000000,0.99087)(316000000000,0.99087)(318000000000,0.99089)(320000000000,0.99092)(322000000000,0.99095)(324000000000,0.99097)(326000000000,0.99099)(328000000000,0.99101)(330000000000,0.99102)(332000000000,0.99103)(334000000000,0.99105)(336000000000,0.99106)(338000000000,0.99107)(340000000000,0.99110)(342000000000,0.99112)(344000000000,0.99113)(346000000000,0.99115)(348000000000,0.99116)(350000000000,0.99118)(352000000000,0.99120)(354000000000,0.99121)(356000000000,0.99123)(358000000000,0.99125)(360000000000,0.99127)(362000000000,0.99129)(364000000000,0.99130)(366000000000,0.99131)(368000000000,0.99132)(370000000000,0.99134)(372000000000,0.99134)(374000000000,0.99135)(376000000000,0.99135)(378000000000,0.99136)(380000000000,0.99138)(382000000000,0.99139)(384000000000,0.99140)(386000000000,0.99141)(388000000000,0.99141)(390000000000,0.99141)(392000000000,0.99142)(394000000000,0.99144)(396000000000,0.99145)(398000000000,0.99147)(400000000000,0.99148)(402000000000,0.99149)(404000000000,0.99151)(406000000000,0.99153)(408000000000,0.99154)(410000000000,0.99156)(412000000000,0.99157)(414000000000,0.99158)(416000000000,0.99159)(418000000000,0.99162)(420000000000,0.99163)(422000000000,0.99164)(424000000000,0.99164)(426000000000,0.99164)(428000000000,0.99165)(430000000000,0.99167)(432000000000,0.99168)(434000000000,0.99170)(436000000000,0.99172)(438000000000,0.99173)(440000000000,0.99174)(442000000000,0.99174)(444000000000,0.99175)(446000000000,0.99177)(448000000000,0.99177)(450000000000,0.99178)(452000000000,0.99179)(454000000000,0.99181)(456000000000,0.99182)(458000000000,0.99184)(460000000000,0.99185)(462000000000,0.99185)(464000000000,0.99186)(466000000000,0.99187)(468000000000,0.99188)(470000000000,0.99189)(472000000000,0.99190)(474000000000,0.99191)(476000000000,0.99191)(478000000000,0.99193)(480000000000,0.99193)(482000000000,0.99193)(484000000000,0.99194)(486000000000,0.99195)(488000000000,0.99196)(490000000000,0.99197)(492000000000,0.99198)(494000000000,0.99199)(496000000000,0.99200)(498000000000,0.99200)(500000000000,0.99201)(502000000000,0.99202)(504000000000,0.99203)(506000000000,0.99203)(508000000000,0.99204)(510000000000,0.99205)(512000000000,0.99206)(514000000000,0.99207)(516000000000,0.99208)(518000000000,0.99209)(520000000000,0.99210)(522000000000,0.99211)(524000000000,0.99212)(526000000000,0.99212)(528000000000,0.99213)(530000000000,0.99213)(532000000000,0.99214)(534000000000,0.99214)(536000000000,0.99216)(538000000000,0.99217)(540000000000,0.99217)(542000000000,0.99217)(544000000000,0.99218)(546000000000,0.99219)(548000000000,0.99219)(550000000000,0.99221)(552000000000,0.99222)(554000000000,0.99223)(556000000000,0.99223)(558000000000,0.99223)(560000000000,0.99224)(562000000000,0.99225)(564000000000,0.99226)(566000000000,0.99227)(568000000000,0.99228)(570000000000,0.99229)(572000000000,0.99230)(574000000000,0.99231)(576000000000,0.99232)(578000000000,0.99233)(580000000000,0.99233)(582000000000,0.99235)(584000000000,0.99236)(586000000000,0.99236)(588000000000,0.99237)(590000000000,0.99237)(592000000000,0.99238)(594000000000,0.99239)(596000000000,0.99239)(598000000000,0.99240)(600000000000,0.99240)(602000000000,0.99241)(604000000000,0.99242)(606000000000,0.99243)(608000000000,0.99244)(610000000000,0.99244)(612000000000,0.99245)(614000000000,0.99245)(616000000000,0.99246)(618000000000,0.99247)(620000000000,0.99248)(622000000000,0.99249)(624000000000,0.99249)(626000000000,0.99250)(628000000000,0.99250)(630000000000,0.99251)(632000000000,0.99252)(634000000000,0.99252)(636000000000,0.99252)(638000000000,0.99253)(640000000000,0.99253)(642000000000,0.99254)(644000000000,0.99254)(646000000000,0.99255)(648000000000,0.99255)(650000000000,0.99256)(652000000000,0.99257)(654000000000,0.99257)(656000000000,0.99257)(658000000000,0.99258)(660000000000,0.99259)(662000000000,0.99259)(664000000000,0.99259)(666000000000,0.99259)(668000000000,0.99260)(670000000000,0.99260)(672000000000,0.99260)(674000000000,0.99261)(676000000000,0.99261)(678000000000,0.99262)(680000000000,0.99262)(682000000000,0.99262)(684000000000,0.99263)(686000000000,0.99264)(688000000000,0.99264)(690000000000,0.99265)(692000000000,0.99265)(694000000000,0.99266)(696000000000,0.99266)(698000000000,0.99266)(700000000000,0.99267)(702000000000,0.99268)(704000000000,0.99269)(706000000000,0.99269)(708000000000,0.99270)(710000000000,0.99270)(712000000000,0.99271)(714000000000,0.99271)(716000000000,0.99272)(718000000000,0.99273)(720000000000,0.99273)(722000000000,0.99274)(724000000000,0.99274)(726000000000,0.99275)(728000000000,0.99276)(730000000000,0.99276)(732000000000,0.99277)(734000000000,0.99278)(736000000000,0.99279)(738000000000,0.99279)(740000000000,0.99280)(742000000000,0.99280)(744000000000,0.99280)(746000000000,0.99281)(748000000000,0.99281)(750000000000,0.99281)(752000000000,0.99282)(754000000000,0.99282)(756000000000,0.99283)(758000000000,0.99283)(760000000000,0.99283)(762000000000,0.99284)(764000000000,0.99284)(766000000000,0.99285)(768000000000,0.99286)(770000000000,0.99286)(772000000000,0.99287)(774000000000,0.99288)(776000000000,0.99289)(778000000000,0.99289)(780000000000,0.99290)(782000000000,0.99290)(784000000000,0.99291)(786000000000,0.99291)(788000000000,0.99292)(790000000000,0.99292)(792000000000,0.99292)(794000000000,0.99293)(796000000000,0.99294)(798000000000,0.99294)(800000000000,0.99295)(802000000000,0.99295)(804000000000,0.99296)(806000000000,0.99297)(808000000000,0.99297)(810000000000,0.99297)(812000000000,0.99298)(814000000000,0.99298)(816000000000,0.99299)(818000000000,0.99299)(820000000000,0.99299)(822000000000,0.99299)(824000000000,0.99300)(826000000000,0.99301)(828000000000,0.99301)(830000000000,0.99301)(832000000000,0.99302)(834000000000,0.99302)(836000000000,0.99302)(838000000000,0.99303)(840000000000,0.99304)(842000000000,0.99305)(844000000000,0.99305)(846000000000,0.99306)(848000000000,0.99306)(850000000000,0.99307)(852000000000,0.99307)(854000000000,0.99308)(856000000000,0.99309)(858000000000,0.99309)(860000000000,0.99310)(862000000000,0.99310)(864000000000,0.99311)(866000000000,0.99311)(868000000000,0.99312)(870000000000,0.99312)(872000000000,0.99312)(874000000000,0.99313)(876000000000,0.99313)(878000000000,0.99313)(880000000000,0.99313)(882000000000,0.99314)(884000000000,0.99315)(886000000000,0.99315)(888000000000,0.99316)(890000000000,0.99316)(892000000000,0.99317)(894000000000,0.99318)(896000000000,0.99318)(898000000000,0.99319)(900000000000,0.99319)(902000000000,0.99320)(904000000000,0.99320)(906000000000,0.99321)(908000000000,0.99322)(910000000000,0.99322)(912000000000,0.99322)(914000000000,0.99323)(916000000000,0.99323)(918000000000,0.99323)(920000000000,0.99324)(922000000000,0.99324)(924000000000,0.99325)(926000000000,0.99326)(928000000000,0.99326)(930000000000,0.99326)(932000000000,0.99327)(934000000000,0.99327)(936000000000,0.99327)(938000000000,0.99328)(940000000000,0.99328)(942000000000,0.99329)(944000000000,0.99329)(946000000000,0.99330)(948000000000,0.99330)(950000000000,0.99330)(952000000000,0.99331)(954000000000,0.99331)(956000000000,0.99332)(958000000000,0.99332)(960000000000,0.99333)(962000000000,0.99333)(964000000000,0.99334)(966000000000,0.99334)(968000000000,0.99335)(970000000000,0.99335)(972000000000,0.99336)(974000000000,0.99336)(976000000000,0.99336)(978000000000,0.99337)(980000000000,0.99337)(982000000000,0.99338)(984000000000,0.99338)(986000000000,0.99339)(988000000000,0.99339)(990000000000,0.99339)(992000000000,0.99340)(994000000000,0.99340)(996000000000,0.99341)(998000000000,0.99341)(1000000000000,0.99341)(1002000000000,0.99341)(1004000000000,0.99342)(1006000000000,0.99343)(1008000000000,0.99343)(1010000000000,0.99343)(1012000000000,0.99344)(1014000000000,0.99344)(1016000000000,0.99345)(1018000000000,0.99345)(1020000000000,0.99345)(1022000000000,0.99346)(1024000000000,0.99347)(1026000000000,0.99347)(1028000000000,0.99347)(1030000000000,0.99348)(1032000000000,0.99348)(1034000000000,0.99348)(1036000000000,0.99348)(1038000000000,0.99349)(1040000000000,0.99349)(1042000000000,0.99349)(1044000000000,0.99350)(1046000000000,0.99350)(1048000000000,0.99350)(1050000000000,0.99350)(1052000000000,0.99351)(1054000000000,0.99351)(1056000000000,0.99351)(1058000000000,0.99352)(1060000000000,0.99352)(1062000000000,0.99352)(1064000000000,0.99352)(1066000000000,0.99353)(1068000000000,0.99354)(1070000000000,0.99354)(1072000000000,0.99354)(1074000000000,0.99355)(1076000000000,0.99355)(1078000000000,0.99356)(1080000000000,0.99356)(1082000000000,0.99356)(1084000000000,0.99356)(1086000000000,0.99356)(1088000000000,0.99357)(1090000000000,0.99357)(1092000000000,0.99358)(1094000000000,0.99358)(1096000000000,0.99359)(1098000000000,0.99359)
+    };
+ 
+
+\addplot[
+    line width=1.3pt,
+    color=cyan,
+    mark=none,
+    ]
+    coordinates {  
+(2000000000,0.96570)(4000000000,0.97550)(6000000000,0.97885)(8000000000,0.98048)(10000000000,0.98224)(12000000000,0.98420)(14000000000,0.98525)(16000000000,0.98613)(18000000000,0.98677)(20000000000,0.98737)(22000000000,0.98779)(24000000000,0.98804)(26000000000,0.98830)(28000000000,0.98841)(30000000000,0.98868)(32000000000,0.98866)(34000000000,0.98898)(36000000000,0.98897)(38000000000,0.98903)(40000000000,0.98918)(42000000000,0.98951)(44000000000,0.98972)(46000000000,0.98973)(48000000000,0.98979)(50000000000,0.98996)(52000000000,0.99012)(54000000000,0.99014)(56000000000,0.99033)(58000000000,0.99052)(60000000000,0.99060)(62000000000,0.99059)(64000000000,0.99068)(66000000000,0.99077)(68000000000,0.99089)(70000000000,0.99119)(72000000000,0.99132)(74000000000,0.99144)(76000000000,0.99160)(78000000000,0.99166)(80000000000,0.99168)(82000000000,0.99176)(84000000000,0.99188)(86000000000,0.99192)(88000000000,0.99197)(90000000000,0.99198)(92000000000,0.99203)(94000000000,0.99209)(96000000000,0.99213)(98000000000,0.99222)(100000000000,0.99223)(102000000000,0.99227)(104000000000,0.99232)(106000000000,0.99238)(108000000000,0.99243)(110000000000,0.99250)(112000000000,0.99257)(114000000000,0.99262)(116000000000,0.99262)(118000000000,0.99262)(120000000000,0.99266)(122000000000,0.99272)(124000000000,0.99277)(126000000000,0.99279)(128000000000,0.99279)(130000000000,0.99287)(132000000000,0.99285)(134000000000,0.99286)(136000000000,0.99291)(138000000000,0.99297)(140000000000,0.99299)(142000000000,0.99305)(144000000000,0.99308)(146000000000,0.99311)(148000000000,0.99311)(150000000000,0.99311)(152000000000,0.99314)(154000000000,0.99319)(156000000000,0.99320)(158000000000,0.99328)(160000000000,0.99331)(162000000000,0.99333)(164000000000,0.99341)(166000000000,0.99339)(168000000000,0.99341)(170000000000,0.99345)(172000000000,0.99347)(174000000000,0.99350)(176000000000,0.99350)(178000000000,0.99350)(180000000000,0.99350)(182000000000,0.99352)(184000000000,0.99353)(186000000000,0.99358)(188000000000,0.99359)(190000000000,0.99362)(192000000000,0.99365)(194000000000,0.99371)(196000000000,0.99371)(198000000000,0.99372)(200000000000,0.99374)(202000000000,0.99378)(204000000000,0.99380)(206000000000,0.99380)(208000000000,0.99380)(210000000000,0.99381)(212000000000,0.99383)(214000000000,0.99385)(216000000000,0.99385)(218000000000,0.99388)(220000000000,0.99390)(222000000000,0.99390)(224000000000,0.99393)(226000000000,0.99394)(228000000000,0.99394)(230000000000,0.99396)(232000000000,0.99397)(234000000000,0.99398)(236000000000,0.99400)(238000000000,0.99402)(240000000000,0.99402)(242000000000,0.99404)(244000000000,0.99405)(246000000000,0.99408)(248000000000,0.99411)(250000000000,0.99414)(252000000000,0.99416)(254000000000,0.99421)(256000000000,0.99423)(258000000000,0.99424)(260000000000,0.99424)(262000000000,0.99425)(264000000000,0.99428)(266000000000,0.99430)(268000000000,0.99433)(270000000000,0.99433)(272000000000,0.99435)(274000000000,0.99438)(276000000000,0.99437)(278000000000,0.99438)(280000000000,0.99439)(282000000000,0.99440)(284000000000,0.99444)(286000000000,0.99444)(288000000000,0.99443)(290000000000,0.99445)(292000000000,0.99450)(294000000000,0.99454)(296000000000,0.99458)(298000000000,0.99460)(300000000000,0.99465)(302000000000,0.99469)(304000000000,0.99470)(306000000000,0.99472)(308000000000,0.99473)(310000000000,0.99472)(312000000000,0.99473)(314000000000,0.99475)(316000000000,0.99476)(318000000000,0.99476)(320000000000,0.99474)(322000000000,0.99476)(324000000000,0.99477)(326000000000,0.99478)(328000000000,0.99480)(330000000000,0.99481)(332000000000,0.99482)(334000000000,0.99485)(336000000000,0.99486)(338000000000,0.99488)(340000000000,0.99490)(342000000000,0.99491)(344000000000,0.99491)(346000000000,0.99491)(348000000000,0.99492)(350000000000,0.99495)(352000000000,0.99495)(354000000000,0.99495)(356000000000,0.99496)(358000000000,0.99496)(360000000000,0.99496)(362000000000,0.99497)(364000000000,0.99497)(366000000000,0.99499)(368000000000,0.99498)(370000000000,0.99500)(372000000000,0.99501)(374000000000,0.99502)(376000000000,0.99504)(378000000000,0.99505)(380000000000,0.99506)(382000000000,0.99509)(384000000000,0.99509)(386000000000,0.99508)(388000000000,0.99509)(390000000000,0.99510)(392000000000,0.99511)(394000000000,0.99512)(396000000000,0.99513)(398000000000,0.99513)(400000000000,0.99515)(402000000000,0.99515)(404000000000,0.99515)(406000000000,0.99516)(408000000000,0.99516)(410000000000,0.99516)(412000000000,0.99517)(414000000000,0.99519)(416000000000,0.99521)(418000000000,0.99522)(420000000000,0.99522)(422000000000,0.99522)(424000000000,0.99523)(426000000000,0.99524)(428000000000,0.99523)(430000000000,0.99523)(432000000000,0.99524)(434000000000,0.99524)(436000000000,0.99526)(438000000000,0.99526)(440000000000,0.99527)(442000000000,0.99529)(444000000000,0.99530)(446000000000,0.99531)(448000000000,0.99531)(450000000000,0.99532)(452000000000,0.99533)(454000000000,0.99535)(456000000000,0.99536)(458000000000,0.99537)(460000000000,0.99537)(462000000000,0.99538)(464000000000,0.99538)(466000000000,0.99538)(468000000000,0.99540)(470000000000,0.99541)(472000000000,0.99542)(474000000000,0.99542)(476000000000,0.99543)(478000000000,0.99544)(480000000000,0.99544)(482000000000,0.99544)(484000000000,0.99544)(486000000000,0.99545)(488000000000,0.99544)(490000000000,0.99546)(492000000000,0.99547)(494000000000,0.99546)(496000000000,0.99546)(498000000000,0.99547)(500000000000,0.99548)(502000000000,0.99549)(504000000000,0.99549)(506000000000,0.99550)(508000000000,0.99550)(510000000000,0.99551)(512000000000,0.99551)(514000000000,0.99552)(516000000000,0.99553)(518000000000,0.99553)(520000000000,0.99554)(522000000000,0.99555)(524000000000,0.99556)(526000000000,0.99556)(528000000000,0.99556)(530000000000,0.99555)(532000000000,0.99555)(534000000000,0.99553)(536000000000,0.99553)(538000000000,0.99553)(540000000000,0.99555)(542000000000,0.99555)(544000000000,0.99556)(546000000000,0.99556)(548000000000,0.99556)(550000000000,0.99556)(552000000000,0.99556)(554000000000,0.99557)(556000000000,0.99558)(558000000000,0.99559)(560000000000,0.99559)(562000000000,0.99559)(564000000000,0.99560)(566000000000,0.99561)(568000000000,0.99563)(570000000000,0.99563)(572000000000,0.99564)(574000000000,0.99565)(576000000000,0.99565)(578000000000,0.99568)(580000000000,0.99568)(582000000000,0.99567)(584000000000,0.99568)(586000000000,0.99568)(588000000000,0.99569)(590000000000,0.99570)(592000000000,0.99571)(594000000000,0.99572)(596000000000,0.99573)(598000000000,0.99573)(600000000000,0.99573)(602000000000,0.99574)(604000000000,0.99574)(606000000000,0.99576)(608000000000,0.99575)(610000000000,0.99576)(612000000000,0.99576)(614000000000,0.99576)(616000000000,0.99578)(618000000000,0.99578)(620000000000,0.99579)(622000000000,0.99580)(624000000000,0.99580)(626000000000,0.99579)(628000000000,0.99580)(630000000000,0.99580)(632000000000,0.99581)(634000000000,0.99581)(636000000000,0.99583)(638000000000,0.99584)(640000000000,0.99584)(642000000000,0.99584)(644000000000,0.99583)(646000000000,0.99584)(648000000000,0.99585)(650000000000,0.99586)(652000000000,0.99587)(654000000000,0.99588)(656000000000,0.99589)(658000000000,0.99589)(660000000000,0.99590)(662000000000,0.99591)(664000000000,0.99590)(666000000000,0.99590)(668000000000,0.99591)(670000000000,0.99592)(672000000000,0.99593)(674000000000,0.99594)(676000000000,0.99595)(678000000000,0.99596)(680000000000,0.99596)(682000000000,0.99597)(684000000000,0.99597)(686000000000,0.99598)(688000000000,0.99598)(690000000000,0.99598)(692000000000,0.99599)(694000000000,0.99600)(696000000000,0.99599)(698000000000,0.99600)(700000000000,0.99599)(702000000000,0.99599)(704000000000,0.99601)(706000000000,0.99601)(708000000000,0.99601)(710000000000,0.99602)(712000000000,0.99602)(714000000000,0.99602)(716000000000,0.99603)(718000000000,0.99603)(720000000000,0.99603)(722000000000,0.99604)(724000000000,0.99604)(726000000000,0.99604)(728000000000,0.99604)(730000000000,0.99605)(732000000000,0.99605)(734000000000,0.99606)(736000000000,0.99607)(738000000000,0.99607)(740000000000,0.99607)(742000000000,0.99607)(744000000000,0.99608)(746000000000,0.99608)(748000000000,0.99609)(750000000000,0.99610)(752000000000,0.99611)(754000000000,0.99611)(756000000000,0.99611)(758000000000,0.99612)(760000000000,0.99612)(762000000000,0.99613)(764000000000,0.99613)(766000000000,0.99614)(768000000000,0.99614)(770000000000,0.99615)(772000000000,0.99615)(774000000000,0.99616)(776000000000,0.99617)(778000000000,0.99617)(780000000000,0.99618)(782000000000,0.99618)(784000000000,0.99617)(786000000000,0.99617)(788000000000,0.99617)(790000000000,0.99617)(792000000000,0.99618)(794000000000,0.99619)(796000000000,0.99619)(798000000000,0.99620)(800000000000,0.99621)(802000000000,0.99621)(804000000000,0.99621)(806000000000,0.99621)(808000000000,0.99622)(810000000000,0.99622)(812000000000,0.99622)(814000000000,0.99623)(816000000000,0.99623)(818000000000,0.99622)(820000000000,0.99622)(822000000000,0.99622)(824000000000,0.99622)(826000000000,0.99622)(828000000000,0.99621)(830000000000,0.99622)(832000000000,0.99622)(834000000000,0.99622)(836000000000,0.99623)(838000000000,0.99623)(840000000000,0.99623)(842000000000,0.99623)(844000000000,0.99624)(846000000000,0.99624)(848000000000,0.99623)(850000000000,0.99624)(852000000000,0.99624)(854000000000,0.99625)(856000000000,0.99624)(858000000000,0.99625)(860000000000,0.99625)(862000000000,0.99625)(864000000000,0.99625)(866000000000,0.99625)(868000000000,0.99625)(870000000000,0.99625)(872000000000,0.99625)(874000000000,0.99625)(876000000000,0.99624)(878000000000,0.99625)(880000000000,0.99626)(882000000000,0.99626)(884000000000,0.99627)(886000000000,0.99627)(888000000000,0.99627)(890000000000,0.99627)(892000000000,0.99628)(894000000000,0.99628)(896000000000,0.99628)(898000000000,0.99628)(900000000000,0.99629)(902000000000,0.99630)(904000000000,0.99630)(906000000000,0.99630)(908000000000,0.99632)(910000000000,0.99632)(912000000000,0.99631)(914000000000,0.99631)(916000000000,0.99632)(918000000000,0.99633)(920000000000,0.99633)(922000000000,0.99634)(924000000000,0.99633)(926000000000,0.99633)(928000000000,0.99633)(930000000000,0.99634)(932000000000,0.99634)(934000000000,0.99635)(936000000000,0.99635)(938000000000,0.99636)(940000000000,0.99635)(942000000000,0.99635)(944000000000,0.99635)(946000000000,0.99635)(948000000000,0.99635)(950000000000,0.99636)(952000000000,0.99636)(954000000000,0.99636)(956000000000,0.99636)(958000000000,0.99637)(960000000000,0.99637)(962000000000,0.99637)(964000000000,0.99638)(966000000000,0.99638)(968000000000,0.99639)(970000000000,0.99639)(972000000000,0.99639)(974000000000,0.99640)(976000000000,0.99641)(978000000000,0.99642)(980000000000,0.99642)(982000000000,0.99642)(984000000000,0.99642)(986000000000,0.99643)(988000000000,0.99643)(990000000000,0.99643)(992000000000,0.99643)(994000000000,0.99643)(996000000000,0.99643)(998000000000,0.99643)(1000000000000,0.99644)(1002000000000,0.99644)(1004000000000,0.99644)(1006000000000,0.99644)(1008000000000,0.99645)(1010000000000,0.99645)(1012000000000,0.99646)(1014000000000,0.99646)(1016000000000,0.99646)(1018000000000,0.99647)(1020000000000,0.99647)(1022000000000,0.99647)(1024000000000,0.99647)(1026000000000,0.99647)(1028000000000,0.99648)(1030000000000,0.99648)(1032000000000,0.99647)(1034000000000,0.99647)(1036000000000,0.99647)(1038000000000,0.99648)(1040000000000,0.99648)(1042000000000,0.99648)(1044000000000,0.99648)(1046000000000,0.99649)(1048000000000,0.99649)(1050000000000,0.99649)(1052000000000,0.99649)(1054000000000,0.99649)(1056000000000,0.99650)(1058000000000,0.99650)(1060000000000,0.99651)(1062000000000,0.99651)(1064000000000,0.99652)(1066000000000,0.99652)(1068000000000,0.99651)(1070000000000,0.99652)(1072000000000,0.99652)(1074000000000,0.99653)(1076000000000,0.99653)(1078000000000,0.99653)(1080000000000,0.99653)(1082000000000,0.99653)(1084000000000,0.99653)(1086000000000,0.99653)(1088000000000,0.99654)(1090000000000,0.99654)(1092000000000,0.99655)(1094000000000,0.99655)(1096000000000,0.99655)(1098000000000,0.99656)
+};
+    \legend{$p_{3,2}(x)$\\$p_{5,2}(x)$\\$p_{7,2}(x)$\\}
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+
+\begin{table}[htb]
+\centering
+\caption{Number of noncyclic odd parts of class groups}
+\label{tab:CL_non_cyclic}
+\begin{tabular}{| r || r | r | c | c |}
+\hline
+\multicolumn{1}{|c||}{$x$}	& \multicolumn{1}{c|}{Total}	& \multicolumn{1}{c|}{Non-cyclic}	& Percent	& $c(x)$\\
+\hline
+\hline
+$10^{11}$	& 30396355052	& 636501087	& 2.09400	& 1.00152\\
+\hline
+$2\cdot 10^{11}$	& 60792710179	& 1283029629	& 2.11050	& 1.00135\\
+\hline
+$3\cdot 10^{11}$	& 91189065248	& 1932535723	& 2.11926	& 1.00126\\
+\hline
+$4\cdot 10^{11}$	& 121585420327	& 2583844783	& 2.12513	& 1.00120\\
+\hline
+$5\cdot 10^{11}$	& 151981775550	& 3236429002	& 2.12948	& 1.00116\\
+\hline
+$6\cdot 10^{11}$	& 182378130683	& 3889995513	& 2.13293	& 1.00112\\
+\hline
+$7\cdot 10^{11}$	& 212774486110	& 4544337515	& 2.13575	& 1.00109\\
+\hline
+$8\cdot 10^{11}$	& 243170840635	& 5199342505	& 2.13814	& 1.00107\\
+\hline
+$9\cdot 10^{11}$	& 273567195607	& 5854902775	& 2.14021	& 1.00105\\
+\hline
+$10^{12}$	& 303963550712	& 6510933430	& 2.14201	& 1.00103\\
+\hline
+$2^{40}$	& 334211458670	& 7164219493	& 2.14362	& 1.00101\\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[htb]
+\centering
+\caption{Counts of class numbers divisible by $l$}
+\label{tab:CL_pl1}
+\begin{tabular}{| r || r | r | r | r | r |}
+\hline
+\multicolumn{1}{|c||}{$x$}	& \multicolumn{1}{c|}{$3\,|\,h$}	& \multicolumn{1}{c|}{$5\,|\,h$}	& \multicolumn{1}{c|}{$7\,|\,h$}	& \multicolumn{1}{c|}{$11\,|\,h$}	& \multicolumn{1}{c|}{$13\,|\,h$}\\
+\hline
+\hline
+$10^{11}$	& 13206088529	& 7271547905	& 4956628127	& 3011896994	& 2516050182\\
+\hline
+$2\cdot 10^{11}$	& 26447989308	& 14547903930	& 9914941601	& 6025009729	& 5032948550\\
+\hline
+$3\cdot 10^{11}$	& 39700741936	& 21825546084	& 14873726078	& 9038458883	& 7550137579\\
+\hline
+$4\cdot 10^{11}$	& 52959934649	& 29103662856	& 19832681021	& 12052003780	& 10067454468\\
+\hline
+$5\cdot 10^{11}$	& 66223739128	& 36382211005	& 24791661364	& 15065606774	& 12584840703\\
+\hline
+$6\cdot 10^{11}$	& 79491008890	& 43661126382	& 29750874514	& 18079320114	& 15102137499\\
+\hline
+$7\cdot 10^{11}$	& 92761033879	& 50940277442	& 34710302571	& 21092999797	& 17619561852\\
+\hline
+$8\cdot 10^{11}$	& 106033521908	& 58219944093	& 39669843978	& 24106720004	& 20137035912\\
+\hline
+$9\cdot 10^{11}$	& 119308020675	& 65499671827	& 44629193028	& 27120432707	& 22654498276\\
+\hline
+$10^{12}$	& 132584350621	& 72779583545	& 49588756987	& 30134192653	& 25171929972\\
+\hline
+$2^{40}$	& 145797270882	& 80023955398	& 54524158518	& 33133247297	& 27677104824\\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[htb]
+\centering
+\caption{Counts of class groups with $l$-rank = $r$}
+\label{tab:CL_plr}
+\begin{tabular}{| r || r | r | r || H H r | r | r |}
+\hline
+ & 
+\multicolumn{3}{c||}{$r=2$} & 
+\multicolumn{5}{c|}{$r=3$} \\
+
+\multicolumn{1}{|c||}{$x$} & 
+\multicolumn{1}{c|}{$l=3$} &
+\multicolumn{1}{c|}{$l=5$} &
+\multicolumn{1}{c||}{$l=7$} &
+\multicolumn{3}{c|}{$l=3$} &
+\multicolumn{1}{c|}{$l=5$} & 
+\multicolumn{1}{c|}{$l=7$} \\
+\hline
+\hline
+$10^{11}$	& 554992183	& 61905528	& 14909598	& 2278429	& 1146493	& 1891327	& 19701	& 824\\
+\hline
+$2\cdot 10^{11}$	& 1119549000	& 124086783	& 29864434	& 4566277	& 2298416	& 3941440	& 39455	& 1699\\
+\hline
+$3\cdot 10^{11}$	& 1686937952	& 186346310	& 44837690	& 6858856	& 3452213	& 6041677	& 59455	& 2555\\
+\hline
+$4\cdot 10^{11}$	& 2256067209	& 248638170	& 59813385	& 9153290	& 4609915	& 8170672	& 79056	& 3392\\
+\hline
+$5\cdot 10^{11}$	& 2826419025	& 310963856	& 74791724	& 11448254	& 5763011	& 10319592	& 99020	& 4302\\
+\hline
+$6\cdot 10^{11}$	& 3397716149	& 373303706	& 89772515	& 13746350	& 6918844	& 12486498	& 119058	& 5158\\
+\hline
+$7\cdot 10^{11}$	& 3969781768	& 435637308	& 104762170	& 16040965	& 8073267	& 14667860	& 138969	& 6050\\
+\hline
+$8\cdot 10^{11}$	& 4542454057	& 498010970	& 119754407	& 18334765	& 9229892	& 16861780	& 158992	& 6949\\
+\hline
+$9\cdot 10^{11}$	& 5115675246	& 560398913	& 134735076	& 20629307	& 10383578	& 19064061	& 179000	& 7804\\
+\hline
+$10^{12}$	& 5689326792	& 622806579	& 149727575	& 22924492	& 11538014	& 21274374	& 199005	& 8677\\
+\hline
+$2^{40}$	& 6260628955	& 684906543	& 164647966	& 25208614	& 12687370	& 23481723	& 218977	& 9586\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{First Occurrences of Non-cyclic $p$-Sylow Subgroups}
+During our computations, we also looked at the problem of finding
+$Cl_\Delta$ with the smallest $|\Delta|$ which corresponds to a
+certain $p$-group structure. This question was explored by Buell in
+\cite{buell}, where he tabulated the first occurrences of what he
+called ``exotic'' groups. He gave a list of first even and odd
+$\Delta$, as well as the total number of them up to $2.2\cdot
+10^9$. This list was extended by Ramachandran to $2\cdot 10^{11}$
+\cite{ramachandran}. In Tables \ref{tab:NC_2_p}, \ref{tab:NC_3_p} and
+\ref{tab:NC_4_p} we further extend Ramachandran's results by listing
+first occurrences of class groups that are not present in Tables~5.13,
+5.15 and 5.17 of \cite{ramachandran}.  Previously unknown minimal
+discriminants whose class groups have a variety of exotic structures
+were discovered, including $\Delta = -824746962451$ which is the
+smallest discriminant in absolute value with $17$-rank equal to three.
+
+We also looked at the first occurrences of doubly and trebly
+non-cyclic class groups. One of the most interesting discoveries is
+$\Delta = -658234953151$ with $Cl_\Delta^* \cong C(5\cdot 7\cdot 17)
+\times C(5 \cdot 7 \cdot 17)$, where $C(x)$ denotes the cyclic group
+of order $x$. In Tables \ref{tab:NC_mult_2} and \ref{tab:NC_mult_3},
+we list first occurrences of doubly and trebly non-cyclic $p$-groups
+that are not present in Tables 5.18 and 5.19 of \cite{ramachandran}.
+
+The complete tables with all frequency counts for discriminants
+satisfying \mbox{$|\Delta| < 2^{40}$} can be found in \cite{mosunov1}.
+The data is soon to appear online on The $L$-functions and Modular
+Forms Database \cite{lmfdb}.
+
+\begin{longtable}[b]{| c | c | c || r | r | r | r |}
+\caption{Non-cyclic rank 2 $p$-Sylow subgroups\label{tab:NC_2_p}}\\
+
+\hline
+$p$ & $e_1$	& $e_2$	& \multicolumn{1}{c|}{First even $|\Delta|$}		& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endfirsthead
+
+\multicolumn{7}{c}{\normalsize{{\tablename~\thetable{}} -- continued from previous page}} \\
+\hline
+$p$ & $e_1$	& $e_2$	& \multicolumn{1}{c|}{First even $|\Delta|$}		& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+3	& 7	& 5	& *	& *	& 253237383431	& 2\\
+\hline
+3	& 8	& 4	& *	& *	& 225796561799	& 10\\
+\hline
+3	& 10	& 2	& 1018482429656	& 2	& 65798421911	& 908\\
+\hline
+3	& 10	& 3	& *	& *	& 766483839959	& 2\\
+\hline
+3	& 11	& 1	& 786365476244	& 16	& 52623967679	& 7879\\
+\hline
+3	& 11	& 2	& *	& *	& 677250946319	& 24\\
+\hline
+3	& 12	& 1	& *	& *	& 512068796879	& 177\\
+\hline
+5	& 5	& 3	& *	& *	& 213265691687	& 15\\
+\hline
+5	& 6	& 2	& 775319038196	& 5	& 75913193999	& 175\\
+\hline
+5	& 7	& 1	& 573881434136	& 107	& 48662190359	& 4626\\
+\hline
+5	& 8	& 1	& *	& *	& 941197327199	& 3\\
+\hline
+7	& 3	& 3	& 798957687128	& 2	& 40111506371	& 10\\
+\hline
+7	& 5	& 2	& *	& *	& 336699684383	& 5\\
+\hline
+11	& 3	& 2	& 344379903284	& 5	& 91355041631	& 29\\
+\hline
+11	& 5	& 1	& *	& *	& 935094698711	& 2\\
+\hline
+13	& 3	& 2	& *	& *	& 366445322799	& 2\\
+\hline
+13	& 4	& 1	& 604812537944	& 15	& 55385334839	& 522\\
+\hline
+17	& 2	& 2	& 522715590248	& 3	& 94733724779	& 12\\
+\hline
+17	& 4	& 1	& *	& *	& 607531396391	& 7\\
+\hline
+23	& 3	& 1	& 428918887976	& 12	& 74447537447	& 296\\
+\hline
+29	& 3	& 1	& *	& *	& 323459074199	& 19\\
+\hline
+31	& 3	& 1	& *	& *	& 503905534439	& 14\\
+\hline
+53	& 2	& 1	& 313806056276	& 24	& 34862413351	& 200\\
+\hline
+59	& 2	& 1	& 278155567784	& 6	& 65887828631	& 81\\
+\hline
+61	& 2	& 1	& 388888967156	& 6	& 148712371111	& 62\\
+\hline
+67	& 2	& 1	& 323124297044	& 3	& 131240605511	& 28\\
+\hline
+73	& 2	& 1	& *	& *	& 350771311831	& 17\\
+\hline
+83	& 2	& 1	& *	& *	& 589364144599	& 3\\
+\hline
+89	& 2	& 1	& *	& *	& 619130566127	& 2\\
+\hline
+97	& 2	& 1	& *	& *	& 438994809599	& 2\\
+\hline
+101	& 2	& 1	& *	& *	& 981198752759	& 1\\
+\hline
+223	& 1	& 1	& 229260698804	& 17	& 36799898071	& 49\\
+\hline
+227	& 1	& 1	& 248738329160	& 17	& 129251563279	& 43\\
+\hline
+241	& 1	& 1	& 275897077784	& 13	& 74882513855	& 33\\
+\hline
+251	& 1	& 1	& 274131019432	& 7	& 78181110431	& 24\\
+\hline
+263	& 1	& 1	& 482147329592	& 7	& 37893813311	& 31\\
+\hline
+269	& 1	& 1	& 241103392196	& 4	& 11129396567	& 22\\
+\hline
+271	& 1	& 1	& 291445797352	& 5	& 171753801031	& 18\\
+\hline
+277	& 1	& 1	& 266610558308	& 6	& 128621435167	& 18\\
+\hline
+281	& 1	& 1	& 644634989492	& 2	& 266379885935	& 13\\
+\hline
+293	& 1	& 1	& 874615243688	& 3	& 158602460567	& 17\\
+\hline
+307	& 1	& 1	& 749662659128	& 3	& 149654057447	& 13\\
+\hline
+311	& 1	& 1	& 666221368184	& 4	& 111301462879	& 8\\
+\hline
+313	& 1	& 1	& 416363928728	& 3	& 303265490831	& 14\\
+\hline
+331	& 1	& 1	& 158739065384	& 3	& 388995885319	& 7\\
+\hline
+337	& 1	& 1	& 506841655124	& 2	& 283026340679	& 6\\
+\hline
+349	& 1	& 1	& 804641768168	& 1	& 32819826815	& 5\\
+\hline
+353	& 1	& 1	& 839537284648	& 2	& 305328598259	& 9\\
+\hline
+359	& 1	& 1	& *	& *	& 627072510479	& 4\\
+\hline
+373	& 1	& 1	& *	& *	& 215425181891	& 5\\
+\hline
+379	& 1	& 1	& *	& *	& 356510006687	& 4\\
+\hline
+383	& 1	& 1	& 878382375224	& 1	& 137740312007	& 6\\
+\hline
+397	& 1	& 1	& *	& *	& 434530437127	& 2\\
+\hline
+409	& 1	& 1	& *	& *	& 594857692087	& 1\\
+\hline
+421	& 1	& 1	& *	& *	& 422660888879	& 4\\
+\hline
+431	& 1	& 1	& *	& *	& 567134500223	& 3\\
+\hline
+433	& 1	& 1	& *	& *	& 791181108079	& 2\\
+\hline
+439	& 1	& 1	& *	& *	& 782761871063	& 2\\
+\hline
+443	& 1	& 1	& 462953812184	& 2	& 146805555551	& 2\\
+\hline
+449	& 1	& 1	& *	& *	& 347760731679	& 3\\
+\hline
+457	& 1	& 1	& 212262246356	& 1	& 413877350951	& 2\\
+\hline
+461	& 1	& 1	& *	& *	& 353455619411	& 4\\
+\hline
+463	& 1	& 1	& 1047876328724	& 1	& 679010903567	& 1\\
+\hline
+467	& 1	& 1	& 683325795752	& 1	& 817093587359	& 1\\
+\hline
+503	& 1	& 1	& *	& *	& 544027580079	& 1\\
+\hline
+521	& 1	& 1	& 969683875304	& 1	& 363850136623	& 1\\
+\hline
+577	& 1	& 1	& *	& *	& 733117084823	& 1\\
+\hline
+719	& 1	& 1	& *	& *	& 737463696271	& 1\\
+\end{longtable}
+
+\begin{longtable}[c]{| c | c | c | c || r | r | r | r |}
+\caption{Non-cyclic rank 3 $p$-Sylow subgroups\label{tab:NC_3_p}}\\
+
+\hline
+$p$ & $e_1$	& $e_2$	& $e_3$	& \multicolumn{1}{c|}{First even $|\Delta|$}	& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endfirsthead
+
+\multicolumn{8}{c}{\normalsize{{\tablename~\thetable{}} -- continued from previous page}} \\
+\hline
+$p$ & $e_1$	& $e_2$	& $e_3$	& \multicolumn{1}{c|}{First even $|\Delta|$}	& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+3	& 3	& 3	& 2	& 341946799364	& 2	& 20687610651	& 11\\
+\hline
+3	& 4	& 3	& 2	& 295863285976	& 3	& 744853350587	& 1\\
+\hline
+3	& 5	& 2	& 2	& 412703787940	& 9	& 45248632247	& 24\\
+\hline
+3	& 5	& 4	& 1	& 186447381556	& 3	& 376544421947	& 5\\
+\hline
+3	& 6	& 2	& 2	& 582608055992	& 1	& 9483757583	& 9\\
+\hline
+3	& 6	& 4	& 1	& 900453600692	& 1	& 276331426207	& 2\\
+\hline
+3	& 7	& 2	& 2	& *	& *	& 484468933679	& 1\\
+\hline
+3	& 7	& 3	& 1	& 1076743681124	& 1	& 338926563823	& 10\\
+\hline
+3	& 8	& 2	& 1	& 276573602516	& 12	& 59714529551	& 139\\
+\hline
+3	& 9	& 1	& 1	& 182514096404	& 127	& 12792023879	& 978\\
+\hline
+3	& 9	& 2	& 1	& *	& *	& 581116399159	& 14\\
+\hline
+3	& 10	& 1	& 1	& 989021051864	& 1	& 146114436719	& 104\\
+\hline
+3	& 11	& 1	& 1	& *	& *	& 797107037711	& 1\\
+\hline
+5	& 4	& 2	& 1	& 204195796664	& 3	& 116279191211	& 7\\
+\hline
+5	& 6	& 1	& 1	& *	& *	& 349008665407	& 5\\
+\hline
+7	& 2	& 2	& 1	& 439240920004	& 1	& 868770849819	& 3\\
+\hline
+7	& 4	& 1	& 1	& 356820088964	& 1	& 451900165735	& 4\\
+\hline
+11	& 2	& 1	& 1	& 889484965924	& 2	& 145931588651	& 9\\
+\hline
+13	& 1	& 1	& 1	& 218639119912	& 11	& 38630907167	& 20\\
+\hline
+17	& 1	& 1	& 1	& *	& *	& 824746962451	& 2\\
+\end{longtable}
+
+\begin{longtable}[c]{| c | c | c | c | c || r | r | r | r |}
+\caption{Non-cyclic rank 4 $p$-Sylow subgroups\label{tab:NC_4_p}}\\
+
+\hline
+$p$ & $e_1$	& $e_2$	& $e_3$	& $e_4$	& \multicolumn{1}{c|}{First even $|\Delta|$}		& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endfirsthead
+
+\multicolumn{9}{c}{\normalsize{{\tablename~\thetable{}} -- continued from previous page}} \\
+\hline
+$p$ & $e_1$	& $e_2$	& $e_3$	& $e_4$	& \multicolumn{1}{c|}{First even $|\Delta|$}		& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+3	& 3	& 3	& 1	& 1	& *	& *	& 1074734433547	& 1\\
+\hline
+3	& 4	& 2	& 1	& 1	& 426126877012	& 3	& 128589208863	& 8\\
+\hline
+3	& 5	& 2	& 1	& 1	& *	& *	& 473827747963	& 2\\
+\hline
+3	& 6	& 1	& 1	& 1	& 460093393912	& 8	& 76951070303	& 15\\
+\hline
+3	& 7	& 1	& 1	& 1	& 1047320556596	& 1	& 513092626699	& 2\\
+\hline
+3	& 8	& 1	& 1	& 1	& *	& *	& 226138531999	& 2\\
+\end{longtable}
+
+\begin{longtable}[c]{| c | c || r | r | r | r |}
+\caption{Doubly non-cyclic class groups\label{tab:NC_mult_2}}\\
+
+\hline
+$p_1$	& $p_2$	& \multicolumn{1}{c|}{First even $|\Delta|$}	& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endfirsthead
+
+\multicolumn{6}{c}{\normalsize{{\tablename~\thetable{}} -- continued from previous page}} \\
+\hline
+$p_1$	& $p_2$	& \multicolumn{1}{c|}{First even $|\Delta|$}	& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+3	& 83	& {411040250696}	& 8	& 50476998239	& 69\\
+\hline
+3	& 89	& {271776528392}	& 14	& 146604777199	& 29\\
+\hline
+3	& 97	& {373716927704}	& 5	& 43344787079	& 22\\
+\hline
+3	& 101	& {204919229864}	& 3	& {270845549231}	& 12\\
+\hline
+3	& 103	& {374301791476}	& 8	& 93069031703	& 14\\
+\hline
+3	& 107	& {747657517988}	& 2	& 193384461719	& 15\\
+\hline
+3	& 109	& {379370724596}	& 5	& 35029686023	& 17\\
+\hline
+3	& 127	& {761263140536}	& 1	& 127466536019	& 10\\
+\hline
+3	& 131	& *	& *	& {248486020319}	& 2\\
+\hline
+3	& 137	& *	& *	& {373309196719}	& 4\\
+\hline
+3	& 139	& *	& *	& {261265037799}	& 3\\
+\hline
+3	& 149	& *	& *	& {555574557467}	& 4\\
+\hline
+3	& 157	& *	& *	& {258504106919}	& 2\\
+\hline
+3	& 163	& *	& *	& {288700332223}	& 5\\
+\hline
+3	& 191	& *	& *	& {778133573263}	& 1\\
+\hline
+3	& 193	& *	& *	& 4 {15837893871}	& 1\\
+\hline
+3	& 197	& *	& *	&  {675588676571}	& 1\\
+\hline
+3	& 223	& *	& *	&  {1044678632711}	& 1\\
+\hline
+5	& 47	&  {337410526616}	& 16	& 8182208159	& 78\\
+\hline
+5	& 53	&  {375201391636}	& 8	& 22759605719	& 28\\
+\hline
+5	& 59	&  {842452697976}	& 2	& 166413410411	& 20\\
+\hline
+5	& 61	&  {621148062232}	& 2	& 198540663599	& 14\\
+\hline
+5	& 67	&  {952877473160}	& 1	& { 202658297511}	& 13\\
+\hline
+5	& 79	& *	& *	&  {695299489415}	& 4\\
+\hline
+5	& 83	& *	& *	&  {255558978287}	& 5\\
+\hline
+5	& 97	& *	& *	&  {957408127639}	& 1\\
+\hline
+5	& 107	& *	& *	&  {895542638663}	& 1\\
+\hline
+7	& 37	&  {220308406520}	& 5	& 49918973471	& 36\\
+\hline
+7	& 43	&  {395768104936}	& 1	& 57006644887	& 18\\
+\hline
+7	& 47	&  {611628524996}	& 2	& 98533572251	& 12\\
+\hline
+7	& 53	&  {819974042456}	& 1	&  {532593252151}	& 6\\
+\hline
+7	& 59	& *	& *	&  {746029216663}	& 3\\
+\hline
+7	& 61	& *	& *	&  {530458082031}	& 2\\
+\hline
+7	& 79	& *	& *	&  {1010896284767}	& 1\\
+\hline
+7	& 101	& *	& *	&  {613532171711}	& 1\\
+\hline
+11	& 19	&  {293745669956}	& 33	& 19439678123	& 86\\
+\hline
+11	& 23	&  {440245788692}	& 7	& 94266055451	& 45\\
+\hline
+11	& 29	&  {258828614756}	& 2	&  {246806029679}	& 13\\
+\hline
+11	& 31	&  {752299766228}	& 1	& 167546860535	& 6\\
+\hline
+11	& 37	& *	& *	&  {507297592171}	& 1\\
+\hline
+13	& 23	&  {886308340568}	& 1	&  {303087341987}	& 15\\
+\hline
+13	& 31	&  {1042065325544}	& 1	&  {309693265351}	& 5\\
+\hline
+13	& 37	& *	& *	&  {583833769207}	& 1\\
+\hline
+13	& 41	&  {969016080404}	& 1	&  {407911409771}	& 2\\
+\hline
+17	& 19	& 150334566104	& 2	&  {473841789911}	& 9\\
+\hline
+17	& 23	&  {432363302164}	& 2	& 54134972891	& 3\\
+\hline
+17	& 29	& *	& *	&  {892052200651}	& 2\\
+\hline
+17	& 31	& *	& *	&  {1035367542059}	& 1\\
+\hline
+19	& 23	& *	& *	&  {659380117199}	& 1\\
+\hline
+19	& 29	& *	& *	&  {915336787039}	& 1\\
+\end{longtable}
+
+\begin{longtable}[c]{| c | c | c || r | r | r | r |}
+\caption{Trebly non-cyclic class groups\label{tab:NC_mult_3}}\\
+
+\hline
+$p_1$	& $p_2$	& $p_3$	& \multicolumn{1}{c|}{First even $|\Delta|$}	& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endfirsthead
+
+\multicolumn{7}{c}{\normalsize{{\tablename~\thetable{}} -- continued from previous page}} \\
+\hline
+$p_1$	& $p_2$	& $p_3$	& \multicolumn{1}{c|}{First even $|\Delta|$}	& \multicolumn{1}{c|}{\# even $\Delta$}	& \multicolumn{1}{c|}{First odd $|\Delta|$}	& \multicolumn{1}{c|}{\# odd $\Delta$}\\
+\hline
+\hline
+\endhead
+
+\hline
+\endfoot
+
+\hline
+\endlastfoot
+
+3	& 5	& 17	& {278849168408}	& 19	& 60235736039	& 63\\
+\hline
+3	& 5	& 23	& {703386940456}	& 3	& 148439200263	& 14\\
+\hline
+3	& 5	& 29	& *	& *	& {300193517399}	& 5\\
+\hline
+3	& 5	& 31	& *	& *	& {323714678543}	& 5\\
+\hline
+3	& 5	& 37	& *	& *	& {999098015071}	& 1\\
+\hline
+3	& 7	& 23	& *	& *	& {805192394183}	& 1\\
+\hline
+5	& 7	& 11	& *	& *	& {656450533751}	& 6\\
+\hline
+5	& 7	& 13	& {786460186856}	& 1	& 110671542299	& 3\\
+\hline
+5	& 7	& 17	& *	& *	& {658234953151}	& 1\\
+\end{longtable}
+
+\subsection{Euler's Conjecture on Idoneal Numbers}
+Consider a discriminant $\Delta$ such that $Cl_\Delta$ is isomorphic
+to $(\mathbb Z/2\mathbb Z)^l$ for some $l > 0$. All such $\Delta$ are
+related to so-called \emph{idoneal} numbers, which were studied by
+Euler and Gau\ss\,(see the extensive survey on idoneal numbers by Kani
+\cite{kani}). A positive number $D$ is idoneal if every integer $n$,
+which is uniquely representable in the form $n = x^2 \pm Dy^2$ with
+$\gcd(x^2,Dy^2) = 1$, is either a prime, or a prime power, or twice
+one of these.  Both Euler and Gau\ss\, tabulated idoneal numbers, and
+conjectured that the largest of them does not exceed 1848
+\cite[\textsection 303]{gauss}. From the class group perspective, it
+means that $\Delta = -5460$ is the largest fundamental discriminant
+such that $Cl_\Delta \cong (\mathbb Z/2\mathbb Z)^l$. In 1918, the
+hypothesis of Euler and Gau\ss\, was confirmed by Hecke and Landau
+under the assumption of the ERH \cite{landau}. However,
+unconditionally this problem still remains open, though Weinberger was
+able to prove that there exists \emph{at most} one idoneal number
+exceeding 1848 \cite{weinberger}. In our computations, we confirm that
+up to $2^{40}$ the largest in its absolute value fundamental
+discriminant $\Delta$ with $Cl_\Delta \cong (\mathbb Z/2\mathbb Z)^l$
+is $\Delta = -5460$. This result agrees with findings of Euler and
+Gau\ss. Note that there exists one non-fundamental discriminant, namely
+$\Delta = -7392$, which is larger than $-5460$ in its absolute value and
+has the group structure as above.
+
+\section{Further Work} \label{sec:furtherwork}
+
+Our novel approach to class group tabulation has enabled us to extend
+the feasibility limit.  Pushing our methods further would probably
+require a class number tabulation mechanism for $\Delta \equiv 1
+\pmod{8}$. Presently, no efficient class number tabulation formulas
+are known for this congruence class. One formula that might be of
+interest for future exploration is due to Humbert \cite[Section
+  6]{watson}, who discovered that
+\begin{equation} \label{eq:humbert}
+\sum_{n = 0}^\infty F(8n+7)q^n = S^{-1}(q)\sum_{n=1}^\infty(-1)^{n+1}n^2\frac{q^{\frac{n(n+1)}{2}}-1}{1+q^n},
+\end{equation} 
+where
+$$
+S(q) = \sum_{n = 0}^\infty(-1)^n(2n+1)q^{\frac{n(n+1)}{2}} = 1 - 3q + 5q^3 - 7q^6 + 9q^{10} - \ldots\,\,\,.
+$$
+Despite its look, the large series on the right hand side of
+(\ref{eq:humbert}) does not take long to initialize, as it is simple
+to derive the formula for its $n$-th coefficient. The main problem
+lies in the computation of $S^{-1}(q)$, which can take a significant
+amount of time, especially if $S(q)$ is of a high degree. Also, the
+coefficients of $S(q)$ grow very fast. For example, its 16-th
+coefficient has bit size 10, 64-th --- bit size 59, and 65536-th fits
+into 1135 bits. These coefficients have to be somehow truncated, for
+example, by reducing them modulo some prime $p$, such that $F(8n+7) <
+p$ for any $n < (N-7)/8$. However, this approach also brings certain
+difficulties, as it significantly increases the bit size parameter
+$s$. Despite all the obstacles, the usage of the formula
+(\ref{eq:humbert}) might still be faster than the conditional
+computation of $\Delta \equiv 1 \pmod{8}$ followed by the verification
+procedure. We tried to use this approach, and in fact
+our implementation includes a subroutine \texttt{invert} for
+out-of-core polynomial inversion \cite{mosunov2}. This subroutine
+utilizes a Newton iteration algorithm \cite[Algorithm 9.3]{gathen},
+which performs the inversion of an arbitrary polynomial to degree $2^n
+- 1$ by sequentially computing its inverse to degrees $3, 7, \ldots,
+2^k - 1, \ldots, 2^n - 1$ for $2 \leq k \leq n$. Each iteration in
+this algorithm requires one squaring of a polynomial and one
+polynomial multiplication. Unfortunately, we were unable to produce
+class numbers using this method due to the number of difficulties
+previously mentioned.
+
+We also believe that the class group computation can get accelerated
+by using Sutherland's $p$-group discrete logarithm algorithms
+\cite{sutherland}. The idea is simple: when the class number
+$h(\Delta)$ is known, instead of computing all of the potentially
+non-cyclic subgroups of $Cl_\Delta$ we compute the structure of each
+potentially non-cyclic $p$-group separately. Sutherland's algorithms
+may be especially useful when resolving the structure of a 2-group, as
+we can precompute its rank by factoring $\Delta$. In some cases, the
+2-rank allows us to terminate the 2-group resolution earlier by
+ignoring some of its generators of order 2.
+
+Finally, we note that the question of unconditional tabulation of
+class groups with positive $\Delta$ is still left open, and is
+currently work in progress.
+
+\bibliographystyle{amsplain}
+
+\providecommand{\bysame}{\leavevmode\hbox to3em{\hrulefill}\thinspace}
+\providecommand{\MR}{\relax\ifhmode\unskip\space\fi MR }
+\providecommand{\MRhref}[2]{  \href{http://www.ams.org/mathscinet-getitem?mr=#1}{#2}
+}
+\providecommand{\href}[2]{#2}
+\begin{thebibliography}{10}
+
+\bibitem[Bac90]{bach1}
+E. Bach,
+\emph{Explicit bounds for primality testing and related problems},
+Mathematics of Computation 55, 1990, pp. 355 -- 380.
+
+\bibitem[Bac95]{bach2}
+E. Bach,
+\emph{Improved approximations for {E}uler products},
+Number Theory: CMS Proceedings 15, American Mathematical Society Providence, RI, 1995, pp. 13 -- 28.
+
+\bibitem[Bel24]{bell}
+E.~T. Bell,
+\emph{The class number relations implicit in the {D}isquisitiones arithmeticae},
+Bulletin of the American Mathematical Society 30 (5-6), 1924, pp. 236 -- 238.
+
+\bibitem[BJT97]{buchmann}
+J. Buchmann, M.~J. Jacobson, Jr., E. Teske,
+\emph{On some computational problems in finite abelian groups},
+Mathematics of Computation 66 (220), 1997, pp. 1663 -- 1687.
+
+\bibitem[BM74]{borodin}
+A. Borodin, R.~T. Moenck,
+\emph{Fast modular transforms},
+Journal of Computer and System Sciences 8, 1974, pp. 366 -- 386.
+
+\bibitem[Bue99]{buell}
+D.~A. Buell,
+\emph{The last exhaustive computation of class groups of complex quadratic number fields},
+Number theory, CRM Proceedings and Lecture Notes 19, American Mathematical Society, Providence, RI, 1999, pp. 35 -- 53.
+
+\bibitem[GG03]{gathen}
+J. von zur Gathen, J. Gerhard,
+\emph{Modern Computer Algebra},
+Cambridge University Press, 2nd edition, 2003.
+
+\bibitem[CL84]{cohen2}
+H. Cohen, H.~W. Lenstra, Jr.,
+\emph{Heuristics on class groups},
+Number Theory, Noordwijkerhout, Lecture Notes in Mathematics 1052, Springer-Verlag, New York, 1984, pp. 26 -- 36.
+
+\bibitem[Coh93]{cohen3}
+H. Cohen,
+\emph{A course in computational algebraic number theory},
+Springer-Verlag, Berlin, 1993.
+
+\bibitem[Gau86]{gauss}
+C. F. Gau\ss,
+\emph{Disquisitiones arithmeticae},
+1798. Translated into English by A.~A. Clarke and reprinted, Springer-Verlag, 1986.
+
+\bibitem[Gro85]{grosswald}
+E. Grosswald,
+\emph{Representation of Integers as Sums of Squares},
+Springer-Verlag, New York, 1985.
+
+\bibitem[Har14]{flint}
+W.~B. Hart,
+\emph{FLINT: Fast Library for Number Theory}, version 2.4.1, \url{http://www.flintlib.org}, 2014.
+
+\bibitem[HMcC89]{hafner}
+J. Hafner, K. McCurley,
+\emph{A rigorous subexponential algorithm for computation of class groups},
+Journal of American Mathematical Society 2, 1989, pp. 837 -- 850.
+
+\bibitem[HTW10]{hart}
+W.~B. Hart, G. Tornar\'ia, M. Watkins,
+\emph{Congruent number theta coefficients to $10^{12}$},
+Algorithmic Number Theory - ANTS-IX (Nancy, France), Lecture Notes in Computer Science 6197, Springer-Verlag, Berlin, 2010, pp. 186 -- 200.
+
+\bibitem[JRW06]{jacobson}
+M.~J. Jacobson, Jr., S. Ramachandran, H. C. Williams,
+\emph{Numerical results on class groups of imaginary quadratic fields},
+Algorithmic Number Theory - ANTS-VII (Berlin, Germany), Lecture Notes in Computer Science 4076, Springer-Verlag, Berlin, 2006, pp. 87 -- 101.
+
+\bibitem[Kan11]{kani}
+E. Kani,
+\emph{Idoneal numbers and some generalizations},
+Annales des Sciences Math\'ematiques du Qu\'ebec 35, 2011, pp. 197 -- 227.
+
+\bibitem[Kro60]{kronecker}
+L. Kronecker,
+\emph{\"Uber die Anzahl der verschiedenen classen quadratischer Formen von negativer Determinante},
+Journal f\"ur die reine und angewandte Mathematik 57 (4), 1860, pp. 248 -- 255.
+
+\bibitem[Lan18]{landau}
+E. Landau,
+\emph{\"Uber die Klassenzahl imagin\"ar-quadratischer Zahlk\"orper},
+Ges. Wiss. G\"ottingen, Math.-Phys., 1918, pp. 285 -- 295.
+
+\bibitem[Lit28]{littlewood}
+J.~E. Littlewood,
+\emph{On the class number of the corpus $P(\sqrt{-k})$},
+Proceedings of the London Mathematical Society 27, 1928, pp. 358 -- 372.
+
+\bibitem[LMFDB]{lmfdb}
+The LMFDB Collaboration,
+The $L$-functions and Modular Forms Database,
+\url{http://www.lmfdb.org}, 2015.
+
+\bibitem[McC89]{mccurley}
+K. McCurley,
+\emph{Cryptographic key distribution and computation in class groups},
+Proceedings of NATO ASI Number Theory and Applications, Kluwer Academic Publishers, 1989, pp. 459 -- 479.
+
+\bibitem[Mey12]{meyer}
+D. Meyer,
+\emph{The second $p$-class group of a number field},
+International Journal of Number Theory 2 (8), 2012, pp. 471 -- 505.
+
+\bibitem[Mos14a]{mosunov1}
+A.~S. Mosunov,
+\emph{Unconditional Class Group Tabulation to $2^{40}$},
+Master's thesis, University of Calgary, Calgary, Alberta, 2014.
+
+\bibitem[Mos14b]{mosunov2}
+A.~S. Mosunov,
+\emph{Class group tabulation program},
+\url{https://github.com/amosunov}, 2014.
+
+\bibitem[Par14]{pari}
+The PARI~Group,
+\emph{PARI/GP version \texttt{2.7.1}},
+\url{http://pari.math.u-bordeaux.fr}, Bordeaux, 2014.
+
+\bibitem[Ram01]{ramare}
+O. Ramar\'e,
+\emph{Approximate formulae for $L(1,\chi)$},
+Acta Arithmetica 100, 2001, pp. 245 -- 266.
+
+\bibitem[Ram06]{ramachandran}
+S. Ramachandran,
+\emph{Class groups of quadratic fields},
+Master's thesis, University of Calgary, Calgary, Alberta, 2006.
+
+\bibitem[Say13a]{sayles1}
+M. Sayles,
+\emph{Improved arithmetic in the ideal class group of imaginary quadratic fields with an application to integer factoring},
+Master's thesis, University of Calgary, Calgary, Alberta, 2013.
+
+\bibitem[Say13b]{sayles2}
+M. Sayles,
+C libraries \texttt{optarith} and \texttt{qform} for fast binary quadratic form arithmetic,
+\url{https://github.com/maxwellsayles}, 2013.
+
+\bibitem[Sha73]{shanks}
+\emph{Systematic examination of Littlewood's bounds on $L(1,\chi)$},
+Proceedings of Symposia in Pure Mathematics, AMS, Providence, R.I., 1973, pp. 267 -- 283.
+
+\bibitem[Sut11]{sutherland}
+A.~V. Sutherland,
+\emph{Structure computation and discrete logarithms in finite abelian $p$-groups},
+Mathematics of Computation 80 (273), 2011, pp. 477 -- 500.
+
+\bibitem[SvdV91]{schoof}
+R. Schoof, M. van der Vlugt,
+\emph{Hecke operators and the weight distributions of certain codes},
+Journal of Combinatorial Theory 57, 1991, pp. 163 -- 186.
+
+\bibitem[Wat35]{watson}
+G.~N. Watson,
+\emph{Generating functions of class numbers},
+Compositio Mathematica, tome 1, 1935, pp. 39 -- 68.
+
+\bibitem[Wei73]{weinberger}
+P. Weinberger,
+\emph{Exponents of the class groups of complex quadratic fields},
+Acta Arithmetica 22, 1973, pp. 117 -- 124.
+
+\bibitem[Wes14]{westgrid}
+Hungabee specification,
+\url{https://www.westgrid.ca/support/systems/Hungabee}, 2014.
+\end{thebibliography}
+
+\end{document}
+

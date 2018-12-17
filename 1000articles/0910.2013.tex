@@ -1,0 +1,2118 @@
+\documentclass[12pt,reqno]{amsart}
+\usepackage{graphicx, epsfig}
+\usepackage{amsfonts,amsmath,amssymb,cite}
+\usepackage{multirow}
+\usepackage{color}
+\usepackage{theorem}
+
+ \topmargin 0.1in
+ \advance \topmargin by -\headheight
+ \advance \topmargin by -\headsep
+ \textheight 8.9in
+ \oddsidemargin 0pt
+ \evensidemargin \oddsidemargin
+ \marginparwidth 0.5in
+ \textwidth 6.5in
+
+\newcounter{theorem}
+
+\newenvironment{theorem}[1][!]{{\refstepcounter{theorem}\bigskip
+
+{\noindent\bf{Theorem}~\thetheorem\if{#1}!{. }\else{ ({#1}).}\fi}
+\it}}{}
+\newenvironment{lemma}[1][!]{{\refstepcounter{theorem}\bigskip
+
+{\noindent\bf{Lemma}~\thetheorem\if{#1}!{. }\else{ ({#1}).}\fi}
+\it}}{}
+\newenvironment{corollary}[1][!]{{\refstepcounter{theorem}\bigskip
+
+{\noindent\bf{Corollary}~\thetheorem\if{#1}!{. }\else{ ({#1}).}\fi}
+\it}}{}
+\newenvironment{proposition}[1][!]{{\refstepcounter{theorem}\bigskip
+
+{\noindent\bf{Proposition}~\thetheorem\if{#1}!{. }\else{ ({#1}).}\fi}
+\it}}{}
+\newenvironment{conjecture}[1][!]{{\refstepcounter{theorem}\bigskip
+
+{\noindent\bf{Conjecture}~\thetheorem\if{#1}!{. }\else{ ({#1}).}\fi}
+\it}}{}
+
+\newcounter{remark}
+
+\newenvironment{remark}[1][!]{{\refstepcounter{remark}\bigskip
+{\noindent \it \bfseries{Remark}~\theremark\if{#1}!{. }\else{ ({#1}). }\fi}}}{\qed}
+
+\def\alphaoptqcl2{\alpha^{\rm qcl,2,{\infty}}_{\rm opt}}
+\def\alphamaxqcl2{\alpha^{\rm qcl,2,{\infty}}_{\rm max}}
+
+\begin{document}
+
+\title[Iterative Methods for the Force-based QC
+Approximation]{Iterative Methods for the Force-based Quasicontinuum Approximation: Analysis of a 1D Model Problem}
+
+\author{M. Dobson}
+
+\author{M. Luskin}
+
+\author{C. Ortner}
+
+\date{\today}
+
+\keywords{atomistic-to-continuum coupling, quasicontinuum method,
+  iterative methods, stability}
+\thanks{M. Dobson: CERMICS - ENPC,
+6 et 8 avenue Blaise Pascal,
+Cit\'e Descartes - Champs sur Marne,
+77455 Marne la Vall\'ee Cedex 2, France, dobsonm@cermics.enpc.fr}
+\thanks{M. Luskin (Corresponding Author):
+School of Mathematics, 206 Church St. SE,
+  University of Minnesota, Minneapolis, MN 55455, USA,
+luskin@umn.edu}
+\thanks{Christoph Ortner:
+Mathematical Institute, St. Giles' 24--29, Oxford OX1 3LB, UK, ortner@maths.ox.ac.uk}
+
+\thanks{ This work was supported in part by DMS-0757355, DMS-0811039,
+  the Department of Energy under Award Numbers DE-FG02-05ER25706
+and DE-SC0002085, the University of
+  Minnesota Supercomputing Institute, the University of Minnesota
+  Doctoral Dissertation Fellowship, the NSF Mathematical Sciences
+  Postdoctoral Research Fellowship, and the EPSRC critical mass
+  programme ``New Frontier in the Mathematics of Solids.''  }
+
+\subjclass[2000]{65Z05,70C20}
+
+\begin{abstract}
+  Force-based atomistic-continuum hybrid methods are the only known
+  pointwise consistent methods for coupling a general atomistic model
+  to a finite element continuum model. For this reason, and due to
+  their algorithmic simplicity, force-based coupling methods have
+  become a popular class of atomistic-continuum hybrid models as well
+  as other types of multiphysics models. However, the recently
+  discovered unusual stability properties of the linearized
+  force-based quasicontinuum (QCF) approximation, especially its
+  indefiniteness, present a challenge to the development of efficient
+  and reliable iterative methods.
+
+  We present analytic and computational results for the generalized
+  minimal residual (GMRES) solution of the linearized QCF equilibrium
+  equations.  We show that the GMRES method accurately reproduces the
+  stability of the force-based approximation and conclude that an
+  appropriately preconditioned GMRES method results in a reliable and
+  efficient solution method.
+  \end{abstract}
+
+\maketitle
+
+\vspace{6mm}
+
+\section{Introduction}
+{{{The motivation for coupled atomistic/continuum models of solids
+  is that the accuracy of an atomistic model is often only needed in
+  localized regions of the computational domain, but a coarse-grained
+  continuum model is necessary for the simulation of large enough
+  systems}}} to include long-range effects ~\cite{LinP:2006a,
+  Gunzburger:2008a, arlequin1, blan05, gaviniorbital, Ortner:2008a,
+  ted03, Ortiz:1996a,kohlhoff,cadd}.  The force-based approach has
+become very popular because {{{it provides a particularly simple
+  and accurate \cite{dobs-qcf2} method}}} for coupling two physics
+models without the development of an accurate hybrid coupling energy.
+It operates by creating disjoint subdomains in which the equilibrium
+equations at each degree of freedom are obtained by assigning forces
+directly from one of the physics models.  In addition to coupling
+atomistic and continuum models, such an approach has also been found
+to be attractive, for example, in the coupling of regions modeled by
+quantum mechanics to regions modeled by molecular mechanics, since
+accurate hybrid coupling energies require an interfacial region that
+is too computationally demanding for the quantum mechanics
+model~\cite{hybrid_review}.
+
+The force-based quasicontinuum (QCF) approximation is attractive
+because of its simple and efficient implementation and because it is
+the only known pointwise consistent quasicontinuum (QC) approximation
+for coupling a general atomistic model with a Cauchy-Born continuum
+model~\cite{dobs-qcf2}. {{{By {\em consistent} we mean that the
+  absence of ghost forces under homogeneous deformations.}}} Its main
+drawback is that it results in a non-conservative force
+field~\cite{Dobson:2008a}, that is, the QCF forces are not compatible
+with any energy functional.  Several creative attempts have been made
+to develop hybrid coupling energies that satisfy the patch test (there
+are no resultant forces under uniform strain)
+~\cite{Shimokawa:2004,E:2006}, which is a weaker compatibility
+condition than pointwise consistency and leads to reduced accuracy.
+
+In this paper, we consider the force-based quasicontinuum
+approximation (QCF),
+\begin{equation}
+  \label{fullqcfc2}
+  -{{\mathcal{F}}^{{\rm qcf}}}({y^{{\rm qcf}}})=f,
+\end{equation}
+but, for simplicity, we will focus mainly on its linearization about a
+reference state,
+\begin{displaymath}
+  
+  {L^{{\rm qcf}}_F} {u^{{\rm qcf}}} = f;
+\end{displaymath}
+see Section \ref{sec:model} for the precise definitions.  Recent
+analyses of the linearized QCF
+operator~\cite{dobs-qcf2,sharpstabilityqcf} have identified both
+further advantages as well as disadvantages of the force-based
+coupling approach.  In addition to being non-symmetric, which is
+related to the fact that ${{\mathcal{F}}^{{\rm qcf}}}$ is non-conservative, the linearized
+QCF operator also suffers from a lack of
+positive-definiteness~\cite{dobs-qcf2}.  In the present paper, we show
+that this somewhat unusual stability property of the operator ${L^{{\rm qcf}}_F}$
+presents a challenge for the development of efficient and stable
+iterative solution methods that is overcome by the GMRES methods we
+propose.
+
+\subsection{Framework for iterative solution methods}
+We consider three related approaches to the development of iterative
+methods for the QCF equilibrium
+equations~\eqref{fullqcfc2}.
+A popular approach \cite{Miller:2008} to solve the force-based
+equations~\eqref{fullqcfc2}
+modifies a nonlinear conjugate gradient algorithm by replacing the
+univariate optimization of an energy, used for step size
+selection~\cite{NocedalWright99}, with the computation of a step size
+such that the residual is (approximately) orthogonal to the current
+search direction.  We will show in Section~\ref{sec:modifiedcg} that,
+due to the indefiniteness of ${L^{{\rm qcf}}_F}$, this method is not numerically
+stable for our QCF model problem.
+
+The second approach we consider is the nonlinear splitting
+\begin{displaymath}
+  -{{\mathcal{F}}^{{\rm qcf}}}(y)=-\left[{{\mathcal{F}}^{{\rm qcf}}}(y)+\nabla {\mathcal{E}} (y)\right] + \nabla {\mathcal{E}} (y)
+\end{displaymath}
+to construct the nonlinear iteration equation
+\begin{equation}\label{split}
+ \nabla {\mathcal{E}} (y^{(n+1)})=f+ \left[{{\mathcal{F}}^{{\rm qcf}}}(y^{(n)})+\nabla {\mathcal{E}} (y^{(n)})\right] .
+\end{equation}
+The iterative solution of the nonlinear splitting method~\eqref{split} can then
+be obtained from the minimization of the sum of ${\mathcal{E}}(y)$ and the
+potential energy of the dead load $f+g^{(n)}$ where
+\[
+g^{(n)}:={{\mathcal{F}}^{{\rm qcf}}}\left(y^{(n)}\right)+\nabla {\mathcal{E}} \left(y^{(n)}\right),
+\]
+that is,
+\begin{equation*}
+y^{(n+1)} \in {{\rm argmin}} \, \big\{ y \mapsto {\mathcal{E}}(y) - {\langle} f, y
+{\rangle}- {\langle} g^{(n)}, y {\rangle} \big\}.
+\end{equation*}
+For this approach to be accurate under conditions near the formation
+or motion of defects, care must be taken to ensure that the energy
+${\mathcal{E}}(y)$ accurately reproduces the stability of the approximated
+atomistic system.  We will see in Section~\ref{sec:gfc_method} that
+using the original quasicontinuum energy ${{\mathcal{E}}^{{\rm qce}}}(y)$ {{{defined in
+  \eqref{qce.equation}}}}, which results in the ghost force correction
+(GFC) scheme, does not reliably reproduce the stability of the
+atomistic system~\cite{doblusort:qce.stab} and can give a reduced
+critical strain for a lattice instability.
+
+To develop the final approach,
+we recall the Newton method
+\begin{equation}\label{newt}
+-\nabla {{\mathcal{F}}^{{\rm qcf}}}(y^{(n)})[y^{(n+1)}-y^{(n)}]=r^{(n)},
+\end{equation}
+where $r^{(n)}$ is the residual
+\begin{displaymath}
+  r^{(n)}:=f+{{\mathcal{F}}^{{\rm qcf}}}(y^{(n)}).
+\end{displaymath}
+The GMRES methods proposed and analyzed in this paper apply to
+the solution of the linear Newton equations \eqref{newt} or their
+approximations.  Since the QCF equilibrium equations are generally
+solved along a quasi-static process~\cite{dobsonluskin08}, a good
+initial guess is usually available and a small number of iterations of
+the outer iteration \eqref{newt} is sufficient to maintain stability
+and accuracy.
+
+\subsection{Outline}
+We begin in Sections \ref{sec:model} and \ref{sec:qcf} by introducing
+the most important quasicontinuum approximations and outlining their
+stability properties, which are mostly straightforward generalizations
+of results from
+\cite{dobs-qcf2,sharpstabilityqcf,doblusort:qce.stab}. We also present
+careful numerical studies of the spectral properties of ${L^{{\rm qcf}}_F}$ which
+are particularly useful for the analysis of Krylov subspace methods in
+Section \ref{sec:gmres}.
+
+In Section~\ref{sec:nonlinear}, we revisit the {\em ghost force
+  correction (GFC) scheme}~\cite{Shenoy:1999a} which, as was pointed
+out in~\cite{Dobson:2008a}, can be understood as a linear stationary
+iterative method~\eqref{split} for solving the QCF equilibrium
+equations.  We show that, even though the QCF method itself is stable
+up to a critical strain $F_*$, the GFC scheme becomes unstable at a
+significantly reduced strain for our model problem. This leads us to
+conclude (though the simple examples we analyze here can only be first
+indicators) that the GFC method is not universally reliable near
+instabilities.  We note, however, that the GFC method can be expected
+on the basis of both theoretical~\cite{doblusort:qce.stab} and
+computational results~\cite{doblusort:qce.stab,Miller:2008} to be more
+accurate near instabilities than the use of the uncorrected QCE energy
+${{\mathcal{E}}^{{\rm qce}}}(y),$ as explained in Section~\ref{sec:gfc_method}.  Numerical
+results have also shown that the GFC method can give an accurate
+approximation of critical loads if the atomistic-to-continuum
+interface is sufficiently far from the defect~\cite[Figure
+16]{Miller:2008}, at a cost of a larger atomistic region than likely
+required by the accuracy of the QCF approximation.
+
+The quasi-nonlocal energy ${{\mathcal{E}}^{{\rm qnl}}}(y)$ of~\cite{Shimokawa:2004} given
+by~\eqref{qnlenergy} is a more reliable and accurate
+energy to use in the splitting iteration~\eqref{split}.  It has been shown
+to reproduce the atomistic stability of one-dimensional atomistic systems
+with next-nearest neighbor interactions~\cite{doblusort:qce.stab}, and the error for
+multi-dimensional atomistic systems is likely to be acceptable
+if the longer-range interactions decay sufficiently fast.
+The splitting iteration~\eqref{split} can then be used as part of
+a continuation algorithm for a quasi-static process~\cite{dobsonluskin08}
+that provides the reliable
+detection of the stability of the atomistic
+system~\cite{doblusort:qce.stab} as well as the improved accuracy for
+the deformation given by the force-based
+approximation~\cite{dobs-qcf2}.
+
+We conclude
+Section~\ref{sec:nonlinear} by proving the numerical instability
+of the modified conjugate algorithm~\cite{Miller:2008}
+for our QCF model problem.
+We present these two examples to demonstrate the subtleties in
+designing an iterative algorithm for the solution of the QCF system
+and to underscore the need for thorough
+numerical analysis in the development of stable and efficient
+iterative methods for the QCF system.
+
+We conclude by considering in Section \ref{sec:gmres} the
+generalized minimal residual method
+(GMRES) for the solution of the indefinite and
+non-symmetric QCF system.  We provide an analysis of basic as
+well as preconditioned GMRES methods. We find in this section that
+a non-standard preconditioned GMRES method, based on the discrete
+$W^{1,2}$-inner product, appears to have excellent
+stability properties up to the critical strain $F_*$
+and a more reliable termination criterion.
+
+\section{Quasicontinuum Approximations and Their Stability}
+\label{sec:model}
+In this section, we give a condensed description of the prototype QC
+approximations and their stability properties.  We refer the reader to
+\cite{sharpstabilityqcf,doblusort:qce.stab} for more details. Many
+details of this section can be skipped on a first reading and only
+referred back to when required.
+
+\subsection{Notation}
+\label{sec:notation}
+Before we introduce the atomistic model and its QC approximations, we
+define the notation that will be used throughout the paper.
+
+We consider a one-dimensional atomistic chain whose $2N+1$ atoms have
+the reference positions $x_j = j {\varepsilon} $ for ${\varepsilon} = 1/N.$ We will
+constrain the displacement of boundary atoms which gives rise to the
+{\em displacement space}
+\begin{displaymath}
+  {\mathcal{U}} = \big\{ u \in {\mathbb{R}}^{2N+1} : u_{-N} = u_N = 0 \big\}.
+\end{displaymath}
+We will equip the space ${\mathcal{U}}$ with various norms which are discrete
+variants of the usual Sobolev norms that arise naturally in the
+analysis of elliptic PDEs. For displacements $v \in {\mathcal{U}}$ and $1 \leq p
+\leq \infty,$ we define the $\ell^p_{\varepsilon}$ norms,
+\begin{displaymath}
+  {\left\|{v}\right\|_{\ell^{{p}}_{\varepsilon}}} := \begin{cases}
+    \Big( {\varepsilon}\sum_{\ell=-N+1}^N |v_\ell|^p \Big)^{1/p},
+    &1 \leq p < \infty, \\
+    \max_{\ell = -N+1,\dots,N} |v_\ell|,
+    &p = \infty,
+  \end{cases}
+\end{displaymath}
+and we let ${\mathcal{U}}^{0,p}$ denote the space ${\mathcal{U}}$ equipped with the
+$\ell^p_{\varepsilon}$ norm. The inner product associated with the
+$\ell^2_{\varepsilon}$ norm is
+\begin{equation*}
+  \<v,w{\rangle} := {\varepsilon} \sum_{\ell=-N+1}^N v_\ell w_\ell \qquad
+  \text{ for } v, w \in {\mathcal{U}}.
+\end{equation*}
+In fact, we use $\|f\|_{\ell^p_{\varepsilon}}$ and $\<f, g{\rangle}$ to denote the
+$\ell^p_{\varepsilon}$-norm and $\ell^2_{\varepsilon}$-inner product for arbitrary
+vectors $f, g$ which need not belong to ${\mathcal{U}}$. In particular, we
+further define the ${\mathcal{U}}^{1,p}$ norm
+\begin{equation}\label{equivdef}
+  \|v\|_{{\mathcal{U}}^{1,p}} := \|v'\|_{\ell^p_{\varepsilon}},
+\end{equation}
+where $(v')_\ell = v_\ell'={\varepsilon}^{-1}(v_{\ell}-v_{\ell-1})$, $\ell =
+-N+1, \dots, N$, and we let ${\mathcal{U}}^{1,p}$ denote the space ${\mathcal{U}}$
+equipped with the ${\mathcal{U}}^{1,p}$ norm.  Similarly, we define the space
+${\mathcal{U}}^{2,p}$ and its associated ${\mathcal{U}}^{2,p}$ norm, based on the centered
+second difference $v_\ell'' = {\varepsilon}^{-2}(v_{\ell+1} - 2 v_\ell +
+v_{\ell-1})$ for $\ell=-N+1,\dots,N-1.$ (We remark that, for $v \in
+{\mathcal{U}}$, we have that $v' \in {\mathbb{R}}^{2N}$ and $v'' \in {\mathbb{R}}^{2N-1}$.)
+
+For a linear mapping $A: {\mathcal{U}}_1 \to {\mathcal{U}}_2$ where ${\mathcal{U}}_i$ are vector
+spaces equipped with the norms $\|\cdot \|_{{\mathcal{U}}_i},$ we denote the
+operator norm of $A$
+\[
+\|A\|_{L({\mathcal{U}}_1,\ {\mathcal{U}}_2)}:=\sup_{v\in{\mathcal{U}},\,v\ne 0}\frac {\|Av\|_{{\mathcal{U}}_2}}{\|v\|_{{\mathcal{U}}_1}}.
+\]
+If ${\mathcal{U}}_1={\mathcal{U}}_2$, then we use the more concise notation
+\[
+\|A\|_{{\mathcal{U}}_1} :=\|A\|_{L({\mathcal{U}}_1,\ {\mathcal{U}}_1)}.
+\]
+
+If $A: {\mathcal{U}}^{0,2} \to {\mathcal{U}}^{0,2}$ is invertible, then we can define the
+{\em condition number} by
+\[
+\operatorname{cond}(A)=\|A\|_{{\mathcal{U}}^{0,2}}\cdot \|A^{-1}\|_{{\mathcal{U}}^{0,2}}.
+\]
+When $A$ is symmetric and positive definite, we have that
+\[
+\operatorname{cond}(A)=\lambda_{2N-1}^A/\lambda_1^A
+\]
+where the eigenvalues of $A$ are
+\[
+0<\lambda^A_1\le \dots \le \lambda_{2N-1}^A.
+\]
+If a linear mapping $A: {\mathcal{U}} \to {\mathcal{U}}$ is symmetric and positive
+definite, then we can define the $A$-inner product and $A$-norm by
+\[
+\<v,w{\rangle}_A:=\<Av,w{\rangle},\qquad \|v\|_A^2=\<Av,v{\rangle}.
+\]
+
+We define the discrete Laplacian ${{L}}:{\mathcal{U}}\to{\mathcal{U}}$ by 
+\begin{equation}\label{lap}
+({{L}} {v})_j:=-v_j''=
+	\left[\frac{-v_{j+1} + 2 v_{j} - v_{j-1}}{{\varepsilon}^2} \right], \quad j=-N+1,\dots, N-1.
+\end{equation}
+A definition of the ${\mathcal{U}}^{1,2}$ inner product and norm that is
+equivalent to \eqref{equivdef} can now be given by
+\begin{equation}\label{pos}
+\<v,w{\rangle}_{{\mathcal{U}}^{1,2}}:={\langle}{{L}} v,w{\rangle},\qquad \|v\|_{{\mathcal{U}}^{1,2}}^2={\langle}{{L}} v,v{\rangle}
+=\|{{L}}^{1/2}v\|_{\ell^2_{\varepsilon}}^2=\|v'\|_{\ell^2_{\varepsilon}}^2.
+\end{equation}
+Since ${{L}}^{-1}:{\mathcal{U}}\to{\mathcal{U}}$ is symmetric and positive definite, we can also define the
+${\mathcal{U}}^{-1,2}$ inner product and ``negative'' norm by
+\begin{equation}\label{neg}
+\<v,w{\rangle}_{{\mathcal{U}}^{-1,2}}:={\langle}{{L}}^{-1}v,w{\rangle},\qquad \|v\|_{{\mathcal{U}}^{-1,2}}^2={\langle}{{L}}^{-1}v,v{\rangle}=\|{{L}}^{-1/2}v\|_{\ell^2_{\varepsilon}}^2.
+\end{equation}
+
+\subsection{The atomistic model}
+\label{sec:model_at}
+We consider a one-dimensional atomistic chain whose $2N+3$ atoms have
+the reference positions $x_j = j{\varepsilon} $ for ${\varepsilon} = 1/N,$ and interact
+only with their nearest and next-nearest neighbors. (For an
+explanation why we require $2N+3$ instead of $2N+1$ atoms as
+previously stated, we note that the atoms with indices $\pm(N+1)$ will
+later be removed from the model, and refer to Remark \ref{rem:abcs}
+for further details.) We denote the deformed positions by $y_j$,
+$j=-N-1,\dots,N+1;$ and we constrain the boundary atoms and their
+next-nearest neighbors to match the uniformly deformed state, $y_j^F =
+Fj{\varepsilon} ,$ where $F>0$ is a macroscopic strain,
+that is,
+\begin{equation}\label{bc}
+\begin{aligned}
+  y_{-N-1}&=-F(N+1){\varepsilon},\qquad &y_{-N}&=-F N {\varepsilon},\\
+y_{N}&=FN{\varepsilon},\qquad &y_{N+1}&=F(N+1){\varepsilon}.
+\end{aligned}
+\end{equation}
+The total energy
+of a deformation ${y} \in \mathbb{R}^{2N+3}$ is given by
+\begin{equation*}
+  {{\mathcal{E}}^{{\rm a}}}({y}) -\sum_{j=-N}^{N}{\varepsilon} f_j y_j,
+\end{equation*}
+where
+\begin{equation}\label{atomaa}
+\begin{split}
+{{\mathcal{E}}^{{\rm a}}}({y})&:=
+\sum_{j=-N}^{N+1} {\varepsilon} \phi\Big(\frac{y_{j} - y_{j-1}}{\varepsilon} \Big)
++ \sum_{j = -N+1}^{N+1} {\varepsilon} \phi\Big(\frac{y_{j} - y_{j-2}}{\varepsilon}\Big)\\
+&=\sum_{j=-N}^{N+1} {\varepsilon} \phi(y_j')
++ \sum_{j = -N+1}^{N+1} {\varepsilon} \phi(y_j'+y_{j-1}').
+\end{split}
+\end{equation}
+Here, $\phi$ is a scaled two-body interatomic potential (for example,
+the normalized Lennard-Jones potential, $\phi(r) = r^{-12}-2 r^{-6}$),
+and $f_j$, $j = -N, \dots, N,$ are external forces. We do not apply a
+force at the atoms $\pm(N+1)$, which will later be removed from the
+model. The equilibrium equations are given by the force balance
+conditions at the unconstrained atoms,
+\begin{equation}
+\label{full}
+\begin{aligned}
+-{{\mathcal{F}}^{{\rm a}}}_j({y^{{\rm a}}}) &= f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+{y^{{\rm a}}}_{j}&=Fj{\varepsilon}&\quad&\text{for} \quad j = -N-1,\,-N,\,N,\,N+1,
+\end{aligned}
+\end{equation}
+where the atomistic force (per lattice spacing ${\varepsilon}$) is given by
+\begin{equation} \label{atomforce}
+\begin{split}
+{{\mathcal{F}}^{{\rm a}}}_j(y)
+&:=-\frac{1}{\varepsilon}\frac{\partial {\mathcal{E}}^a({y})}{\partial y_j} \\
+&=\frac{1}{\varepsilon}\Big\{\left[\phi'(y_{j+1}')
++ \phi'(y_{j+2}'+y_{j+1}')\right]
+-\left[\phi'(y_j')
++ \phi'(y_j'+y_{j-1}')\right]\Big\}.
+\end{split}
+\end{equation}
+
+\subsubsection{Linearization of ${{\mathcal{F}}^{{\rm a}}}$.}
+To linearize \eqref{atomforce} we let $u \in {\mathbb{R}}^{2N+3}$, $u_{\pm N} =
+u_{\pm (N+1)} = 0$, {{{be a displacement from the homogeneous
+  state}}} $y_j^F = Fj{\varepsilon};$ that is, we define
+\begin{align*}
+  & u_j = y_j - y_j^F  \quad \text{ for } j = -N-1,\dots,N+1.
+\end{align*}
+We then linearize the atomistic equilibrium equations \eqref{full}
+about the homogeneous state ${y}^F$ and obtain a linear system for the
+displacement ${u}^a$,
+\begin{equation*}
+\begin{aligned}
+({L^{{\rm a}}_F} {u^{{\rm a}}})_j&=f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+u^{a}_{j}&=0&\quad&\text{for} \quad j = -N-1,\,-N,\,N,\,N+1,
+\end{aligned}
+\end{equation*}
+where $({L^{{\rm a}}_F}{v})_j$ is
+given by
+\begin{equation*}
+({L^{{\rm a}}_F} {v})_j:=\phi''_F
+      \left[\frac{-v_{j+1} + 2 v_{j} - v_{j-1}}{{\varepsilon}^2} \right]
+      + \phi''_{2F}
+      \left[\frac{-v_{j+2} + 2 v_{j} - v_{j-2}}{{\varepsilon}^2} \right].
+\end{equation*}
+Here and throughout we define
+\[
+\phi''_{F} := \phi''(F)\quad\text{and}\quad
+\phi''_{2F} := \phi''(2F),
+\]
+where $\phi$ is the interatomic potential in~\eqref{atomaa}.  We will
+always assume that $\phi''_F > 0$ and $\phi''_{2F} < 0,$ which holds
+for typical pair potentials such as the Lennard-Jones potential under
+physically realistic strains $F$. {{{For example, if $\phi$ is the
+  Lennard--Jones potential, and if $\phi''(r_t) = 0$ then
+  $\phi'(r_t/2) / \phi(r_t) \approx 1.2 \times 10^4$. This shows that
+  the force to compress a chain to achieve a strain $F$ for which
+  $\phi''(2F) < 0$ is several orders of magnitude larger than the
+  force to fracture the chain.}}}
+
+\subsubsection{Stability of ${L^{{\rm a}}_F}$. }
+The stability properties of ${L^{{\rm a}}_F}$ can be best understood by using a
+representation derived in \cite{doblusort:qce.stab},
+\begin{equation}
+  \label{eq:Eq_second_diff_form}
+  \begin{split}
+    {\langle} {L^{{\rm a}}_F} u, u {\rangle}
+    &= {\varepsilon} A_F \sum_{\ell = -N+1}^N |u_\ell'|^2
+    - {\varepsilon}^3 \phi_{2F}'' \sum_{\ell = -N}^{N} |u_\ell''|^2
+    = A_F \|u'\|_{\ell^2_{\varepsilon}}^2 - {\varepsilon}^2 \phi_{2F}'' \|u''\|_{\ell^2_{\varepsilon}}^2, \\
+  \end{split}
+\end{equation}
+where $A_F$ is the continuum elastic modulus
+\[
+A_F=\phi_{F}'' + 4 \phi_{2F}''.
+\]
+Following the argument in \cite[Prop. 1]{doblusort:qce.stab}, we prove the following equality
+ in ~\cite{qcf.iterative} which describes the stability of the uniformly stretched
+ chain.
+
+\begin{proposition}
+  If $\phi_{2F}'' \leq 0$, then
+  \begin{displaymath}
+    \min_{ \substack{u \in {\mathbb{R}}^{2N+3} \setminus\{0\} \\ u_{\pm N} = u_{\pm (N+1)} = 0 } }
+    \frac{{\langle} {L^{{\rm a}}_F} u, u {\rangle}}{\|u'\|_{\ell^2_{\varepsilon}}^2} = A_F - {\varepsilon}^2 \nu_{\varepsilon} \phi_{2F}'',
+  \end{displaymath}
+  where $0 < \nu_{\varepsilon} \leq C$ for some universal constant
+  $C$.
+\end{proposition}
+
+\subsubsection{The critical strain} The previous result shows, in
+particular, that ${L^{{\rm a}}_F}$ is positive definite, uniformly as $N \to
+\infty$, if and only if $A_F > 0$. For realistic interaction
+potentials, ${L^{{\rm a}}_F}$ is positive definite in a ground state $F_0 >
+0$. For simplicity, we assume that $F_0 = 1$, and we ask how far the
+system can be ``stretched'' by applying increasing macroscopic strains
+$F$ until it loses its stability. In the limit as $N \to \infty$, this
+happens at the {\em critical strain} ${F_*}$ which solves the
+equation
+\begin{equation}\label{critical}
+  A_{F_*} = \phi''({F_*}) + 4 \phi''(2 {F_*}) = 0.
+\end{equation}
+
+\begin{remark}
+  \label{rem:abcs}
+  We introduced the two additional atoms with indices $\pm (N+1)$ so
+  that the uniform deformation $y = y^F$ is an equilibrium of the
+  atomistic model. As a matter of fact, our choice of boundary
+  condition here is very close in spirit to the idea of ``artificial
+  boundary conditions'' (see \cite[Section 2.1]{dobs-qcf2} or
+  \cite{Knap:2001a}), which are normally used to approximate the
+  effect of a far field. In the quasicontinuum approximations that we
+  present next, these additional boundary atoms are not required.
+\end{remark}
+
+\subsection{The Local QC approximation (QCL)}
+
+The local quasicontinuum (QCL) approximation uses the Cauchy-Born
+approximation to approximate the nonlocal atomistic model by a local
+continuum model~\cite{Dobson:2008a,Miller:2003a,Ortiz:1996a}.
+In our context, the Cauchy-Born approximation reads
+\begin{displaymath}
+  \phi\left({\varepsilon}^{-1}(y_{\ell+1}-y_{\ell-1})\right) \approx
+  {{\textstyle \frac{1}{2}}} \big[ \phi(2y_\ell') + \phi(2y_{\ell+1}')],
+\end{displaymath}
+and results in the QCL energy, for $y\in{\mathbb{R}}^{2N+3}$ satisfying the
+boundary conditions~\eqref{bc},
+\begin{equation}\label{lqcen}
+\begin{split}
+{{\mathcal{E}}^{{\rm qcl}}}({y})&= \sum_{j = -N+1}^N {\varepsilon} \left[\phi(y_j')
++ \phi(2y_j') \right] \\
+&\qquad+{\varepsilon} \left[\phi(y'_{-N})+\frac 12 \phi(2y'_{-N})+\phi(y'_{N+1})
++\frac 12 \phi(2y'_{N+1})\right]\\
+&= \sum_{j = -N+1}^N {\varepsilon} \left[\phi(y_j')
++ \phi(2y_j') \right] +{\varepsilon}\left[ 2\phi(F)+\phi(2F)\right].
+\end{split}
+\end{equation}
+Imposing the artificial boundary conditions of zero displacement from
+the uniformly deformed state, $y_j^F = Fj{\varepsilon},$ we obtain the QCL
+equilibrium equations
+\begin{equation*}
+\begin{aligned}
+-{{\mathcal{F}}^{{\rm qcl}}}_j({y^{{\rm qcl}}}) &= f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+{y^{{\rm qcl}}}_{j}&=Fj{\varepsilon}& \quad&\text{for} \quad j = -N,\,N,
+\end{aligned}
+\end{equation*}
+where
+\begin{equation} \label{lqcforce}
+  \begin{split}
+    {{\mathcal{F}}^{{\rm qcl}}}_{j}({y})&:=-\frac{1}{\varepsilon} \frac{\partial {{\mathcal{E}}^{{\rm qcl}}}({y})}{\partial y_j}
+    =\frac{1}{\varepsilon}\Big\{\left[\phi'(y_{j+1}')
+      + 2\phi'(2y_{j+1}')\right]
+    -\left[\phi'(y_j')
+      + 2\phi'(2y_j')\right]\Big\}.
+\end{split}
+\end{equation}
+In particular, we see from \eqref{lqcforce} that the QCL equilibrium
+equations are well-defined with only a single constraint at each
+boundary (see also Remark \ref{rem:abcs}), and we can restrict our
+consideration to $y\in{\mathbb{R}}^{2N+1}$ with the boundary conditions
+$y_{-N}=-F$ and $y_N=F$.
+
+Linearizing the QCL equilibrium equations \eqref{lqcforce} about the
+uniformly deformed state $y^F$ results in the system
+\begin{equation*}
+\begin{aligned}
+({L^{{\rm qcl}}_F}{u^{{\rm qcl}}})_j&=f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+{u^{{\rm qcl}}}_{j}&=0&\quad&\text{for} \quad j = -N,\,N,
+\end{aligned}
+\end{equation*}
+where $({L^{{\rm qcl}}_F}{v})_j$, for a displacement ${v} \in
+{\mathcal{U}},$ is given by
+\begin{equation*}
+({L^{{\rm qcl}}_F} {v})_j=
+(\phi''_F + 4 \phi''_{2F})
+	\left[\frac{-v_{j+1} + 2 v_{j} - v_{j-1}}{{\varepsilon}^2} \right]=-A_Fv_j'', \quad j=-N+1,\dots, N-1.
+\end{equation*}
+
+The increased efficiency of the local QC approximation is obtained
+when its equilibrium equations~\eqref{lqcforce} are coarsened by
+reducing the degrees of freedom, using piecewise linear interpolation
+between a subset of the atoms~\cite{Dobson:2008a,Miller:2003a}.  For
+the sake of simplicity of exposition, we do not treat coarsening in
+this paper.
+
+We note that
+\begin{equation*}
+{L^{{\rm qcl}}_F}=A_F{{L}}
+\end{equation*}
+where ${{L}}:{\mathcal{U}}\to{\mathcal{U}}$ is the discrete Laplacian~\eqref{lap}.
+Since the QCL operator is simply a scaled discrete Laplace operator,
+its stability analysis is straightforward:
+\begin{displaymath}
+  {\langle} {L^{{\rm qcl}}_F} u, u {\rangle} = A_F \|u'\|_{\ell^2_{\varepsilon}}^2 \qquad
+  \text{for all } u \in {\mathcal{U}}.
+\end{displaymath}
+In particular, it follows that ${L^{{\rm qcl}}_F}$ is stable if and only if $A_F >
+0$, that is, if and only if $F < F_*,$ where $F_*$ is the critical
+strain defined in~\eqref{critical}.
+
+\subsection{The force-based QC approximation (QCF)}
+
+In order to combine the accuracy of the atomistic model with the
+efficiency of the QCL approximation, the force-based quasicontinuum
+(QCF) method decomposes the computational reference lattice into an
+{\it atomistic region} $\mathcal{A}$ and a {\it continuum region}
+$\mathcal{C}$, and assigns forces to atoms according to the region
+they are located in. Since the local QC energy~\eqref{lqcen}
+approximates $y_j'+y_{j-1}'$ in \eqref{atomaa} by $2y_j',$ it is clear
+that the atomistic model should be retained wherever the strains are
+varying rapidly. The QCF operator is given
+by~\cite{Dobson:2008a,dobsonluskin08}
+\begin{equation}
+\label{qcfdefF}
+{{\mathcal{F}}^{{\rm qcf}}}_j({y})=
+\begin{cases}
+{{\mathcal{F}}^{{\rm a}}}_j({y})& \text{if $j\in \mathcal{A}$},\\
+{{\mathcal{F}}^{{\rm qcl}}}_j({y})& \text{if $j\in \mathcal{C}$},
+\end{cases}
+\end{equation}
+and the QCF equilibrium equations by
+\begin{equation*}
+\begin{aligned}
+-{{\mathcal{F}}^{{\rm qcf}}}_j({y^{{\rm qcf}}}) &= f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+{y^{{\rm qcf}}}_{j}&=Fj{\varepsilon}& \quad&\text{for} \quad j = -N,\,N.
+\end{aligned}
+\end{equation*}
+We recall that ${{\mathcal{F}}^{{\rm qcf}}}$ is a non-conservative
+force field and cannot be derived from an
+energy~\cite{Dobson:2008a}.
+
+For simplicity, we specify the atomistic and continuum regions as
+follows. We fix $K \in {\mathbb{N}}$, $1 \leq K \leq N-2$, and define
+\begin{displaymath}
+  \mathcal{A} = \{-K,\dots,K\} \quad \text{and} \quad
+  \mathcal{C} = \{-N+1, \dots, N-1\} \setminus \mathcal{A}.
+\end{displaymath}
+Linearization of ~\eqref{qcfdefF} about ${y}^F$ reads
+\begin{equation}
+  \label{qcf}
+  \begin{aligned}
+    ({L^{{\rm qcf}}_F} {u^{{\rm qcf}}})_j&=f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+    {u^{{\rm qcf}}}_{j}&=0&\quad&\text{for} \quad j = -N,\,N,
+  \end{aligned}
+\end{equation}
+where the linearized force-based operator is given explicitly by
+\begin{displaymath}
+  ({L^{{\rm qcf}}_F} v)_j := \left\{
+    \begin{array}{ll}
+      ({L^{{\rm qcl}}_F} v)_j, & \quad\text{for } j \in {\mathcal{C}}, \\
+      ({L^{{\rm a}}_F} v)_j, & \quad \text{for } j \in {\mathcal{A}}.
+  \end{array} \right.
+\end{displaymath}
+We note that, since atoms near the artificial boundary belong to
+$\mathcal{C}$, only one boundary condition is required at each end.
+
+We know from \cite{sharpstabilityqcf} that the stability analysis of
+the QCF operator ${L^{{\rm qcf}}_F}$ is highly non-trivial. We will therefore
+treat it separately and postpone it to Section \ref{sec:qcf}.
+
+\subsection{The original energy-based QC approximation (QCE)}
+In the original energy-based quasicontinuum (QCE) method
+\cite{Ortiz:1996a}, an energy functional is defined by assigning
+atomistic energy contributions in the atomistic region and continuum
+energy contributions in the continuum region. In the context of our
+model problem, it can be written as
+\begin{equation}\label{qce.equation}
+  {{\mathcal{E}}^{{\rm qce}}}(y) = {\varepsilon} \sum_{\ell \in {\mathcal{A}}} {\mathcal{E}}_\ell^a(y)
+  + {\varepsilon} \sum_{\ell \in {\mathcal{C}}} {\mathcal{E}}_\ell^c(y) \quad \text{for } y \in {\mathbb{R}}^{2N+1},
+\end{equation}
+where
+\begin{align*}
+  {\mathcal{E}}_\ell^c(y) =~& {{\textstyle \frac{1}{2}}} \big( \phi(2y_\ell') + \phi(y_\ell') + \phi(y_{\ell+1}') + \phi(2y_{\ell+1}') \big), \quad \text{and} \\
+  {\mathcal{E}}_\ell^a(y) =~& {{\textstyle \frac{1}{2}}} \big( \phi(y_{\ell-1}' + y_\ell') + \phi(y_\ell') + \phi(y_{\ell+1}') + \phi(y_{\ell+1}' + y_{\ell+2}') \big).
+\end{align*}
+
+The QCE method does not satisfy the patch test~\cite{mingyang,Dobson:2008b,Dobson:2008c,Shenoy:1999a},
+which be seen from the existence of
+``ghost forces'' at the interface, that is, $\nabla {{\mathcal{E}}^{{\rm qce}}}(y^F) = g
+\neq 0$. Consequently, the linearization of the QCE equilibrium
+equations about $y^F$ takes the form~(see \cite[Section
+2.4]{Dobson:2008b} and \cite[Section 2.4]{Dobson:2008c} for more
+detail)
+\begin{equation}
+  \label{qce}
+  \begin{aligned}
+    ({L^{{\rm qce}}_F}{u^{{\rm qce}}})_j-g_j&=f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+    {u^{{\rm qce}}}_{j}&=0&\quad&\text{for} \quad j = -N,\,N,
+  \end{aligned}
+\end{equation}
+where, for $0 \leq j \leq N-1,$ we have
+\begin{equation*}
+\begin{split}
+({L^{{\rm qce}}_F} {v})_j &= \phi''_F \frac{-v_{j+1} +2 v_j - v_{j-1}}{{\varepsilon}^2} \\
+& \hspace{-8mm} + \phi_{2F}'' \left\{ \begin{array}{lr}
+\displaystyle
+ 4 \frac{-v_{j+2} +2 v_j - v_{j-2}}{4 {\varepsilon}^2},
+& \hspace{-8mm} 0 \leq j \leq K-2, \\[6pt]
+\displaystyle
+ 4 \frac{-v_{j+2} +2 v_j - v_{j-2}}{4 {\varepsilon}^2}
++ \frac{1}{\varepsilon} \frac{v_{j+2} - v_{j}}{2 {\varepsilon}},  & j = K-1, \\[6pt]
+\displaystyle
+ 4 \frac{-v_{j+2} +2 v_j - v_{j-2}}{4 {\varepsilon}^2}
+- \frac{2}{\varepsilon} \frac{v_{j+1} - v_{j}}{\varepsilon}
++ \frac{1}{\varepsilon} \frac{v_{j+2} - v_{j}}{2 {\varepsilon}},
+& j = K, \\[6pt]
+\displaystyle
+4 \frac{-v_{j+1} +2 v_j - v_{j-1}}{{\varepsilon}^2}
+-  \frac{2}{\varepsilon} \frac{v_{j} - v_{j-1}}{\varepsilon}
++ \frac{1}{\varepsilon} \frac{v_{j} - v_{j-2}}{2 {\varepsilon}}, & \quad j = K+1, \\[6pt]
+\displaystyle
+4 \frac{-v_{j+1} +2 v_j - v_{j-1}}{{\varepsilon}^2}
++ \frac{1}{\varepsilon} \frac{v_{j} - v_{j-2}}{2 {\varepsilon}}, & j = K+2, \\[6pt]
+\displaystyle
+4 \frac{-v_{j+1} +2 v_j - v_{j-1}}{{\varepsilon}^2}, &
+\hspace{-16mm} K+3 \leq j \leq N-1,
+\end{array}\right.
+\end{split}
+\end{equation*}
+and where the vector of ``ghost forces,'' $g$, is defined by
+\begin{equation*}
+g_j = \begin{cases}
+0, & 0 \leq j \leq K-2, \\
+-\frac{1}{2{\varepsilon}} \phi'_{2F}, & j = K-1, \\
+\hphantom{-} \frac{1}{2{\varepsilon}} \phi'_{2F}, & j = K, \\
+\hphantom{-} \frac{1}{2{\varepsilon}} \phi'_{2F}, & j = K+1, \\
+-\frac{1}{2{\varepsilon}} \phi'_{2F}, & j = K+2, \\
+0, &  K+3 \leq j \leq N-1.\\
+\end{cases}
+\end{equation*}
+For space reasons, we only list the entries for $0\le j\le N-1.$ The
+equations for $j=-N+1,\dots,-1$ follow from symmetry.
+
+We prove in \cite{qcf.iterative} the following new sharp stability
+estimate for the QCE operator ${L^{{\rm qce}}_F}$ which implies that the ${L^{{\rm qce}}_F}$
+operator gives an O($1$) approximation for the critical strain, $F_*.$
+
+\begin{lemma}
+  \label{th:stab_qce}
+  If $K \geq 1$, $N \geq K+2$, and $\phi_{2F}'' \leq 0$, then
+  \begin{displaymath}
+    \inf_{\substack{u \in {\mathcal{U}} \\ \|u'\|_{\ell^2_{\varepsilon}} = 1}} {\langle} {L^{{\rm qce}}_F} u, u{\rangle}
+    = A_F + \lambda_K \phi_{2F}'',
+  \end{displaymath}
+  where ${{\textstyle \frac{1}{2}}} \leq \lambda_K \leq 1$. Asymptotically, as $K \to
+  \infty$, we have
+  \begin{displaymath}
+    \lambda_K \sim \lambda_* + O(e^{-cK}) \quad
+    \text{where } \lambda_* \approx  0.6595
+    \text{ and } c \approx 1.5826.
+  \end{displaymath}
+\end{lemma}
+
+This result will be used in Section~\ref{sec:gfc_method} where we
+analyze the ghost-force correction iteration, interpreted as a linear
+stationary iterative method for ${L^{{\rm qcf}}_F}$ with preconditioner ${L^{{\rm qce}}_F}$.
+
+\subsection{The quasi-nonlocal QC approximation (QNL)}
+\label{sec:model:qnl}
+The QCF method is the simplest idea to circumvent the patch test
+failure of the QCE method. An alternative approach was suggested in
+\cite{Shimokawa:2004,E:2006}, which is based on a modification of the
+energy at the interface. In this model, a next-nearest neighbor
+interaction term $\phi({\varepsilon}^{-1}(y_{\ell+1}-y_{\ell-1}))$ is left
+unchanged if at least one of the atoms $\ell+1, \ell-1$ belong to the
+atomistic region or an interface region (which is implicitly defined
+by \eqref{qnlenergy}), and is otherwise replaced, preserving symmetry,
+by a Cauchy-Born approximation,
+\begin{displaymath}
+  \phi\left({\varepsilon}^{-1}(y_{\ell+1}-y_{\ell-1})\right) \approx
+  {{\textstyle \frac{1}{2}}} \big[ \phi(2y_\ell') + \phi(2y_{\ell+1}')].
+\end{displaymath}
+This idea leads to the energy functional
+\begin{equation}\label{qnlenergy}
+  \begin{split}
+    {{\mathcal{E}}^{{\rm qnl}}}(y) := {\varepsilon} \sum_{\ell = -N+1}^N  \phi(y_\ell')
+    + {\varepsilon} \sum_{\ell \in {\mathcal{A}}} \phi(y_\ell' + y_{\ell+1}')
+    + {\varepsilon} \sum_{\ell \in {\mathcal{C}}} {{\textstyle \frac{1}{2}}} \big[ \phi(2y_\ell')
+    + \phi(2y_{\ell+1}')\big],
+  \end{split}
+\end{equation}
+where we set $\phi(y_{-N}')=\phi(y_{N+1}')=0$. The QNL approximation
+satisfies the patch test; that is, $y = y^F$ is an equilibrium of the QNL energy
+functional.
+
+The linearization of the QNL equilibrium equations about the uniform deformation $y^F$ is
+\begin{equation*}
+  \begin{aligned}
+    ({L^{{\rm qnl}}_F} {u^{{\rm qnl}}})_j&=f_j&\quad&\text{for} \quad j = -N+1, \dots, N-1,\\
+  {u^{{\rm qnl}}}_{j}&=0&\quad&\text{for} \quad j = -N,\,N,
+  \end{aligned}
+\end{equation*}
+where
+\begin{equation}
+\label{Lqnl}
+\begin{split}
+({L^{{\rm qnl}}_F} v)_j &= \phi''_F \frac{-v_{j+1} +2 v_j - v_{j-1}}{{\varepsilon}^2} \\
+& \hspace{-5mm} + \phi_{2F}'' \left\{ \begin{array}{lr}
+\displaystyle
+ 4 \frac{-v_{j+2} +2 v_j - v_{j-2}}{4 {\varepsilon}^2},
+& 0 \leq j \leq K-1, \\[6pt]
+\displaystyle
+ 4 \frac{-v_{j+2} +2 v_j - v_{j-2}}{4 {\varepsilon}^2}
+- \frac{-v_{j+2} + 2 v_{j+1} - v_{j}}{{\varepsilon}^2},
+& j = K, \\[6pt]
+\displaystyle
+4 \frac{-v_{j+1} +2 v_j - v_{j-1}}{{\varepsilon}^2}
++ \frac{-v_{j} + 2 v_{j-1} - v_{j-2}}{{\varepsilon}^2},
+& j = K+1, \\[6pt]
+\displaystyle
+4 \frac{-v_{j+1} +2 v_j - v_{j-1}}{{\varepsilon}^2}, &
+\hspace{-5mm} K+2 \leq j \leq N-1.
+\end{array} \right.
+\end{split}
+\end{equation}
+We observe from \eqref{Lqnl} that ${L^{{\rm qnl}}_F}$ is not pointwise consistent at
+$j=K$ and $j=K+1.$
+
+Repeating our stability analysis for the periodic QNL operator in
+\cite[Sec. 3.3]{doblusort:qce.stab} verbatim, we obtain the following
+result.
+
+\begin{proposition}
+  \label{th:stab_qnl}
+  If $K < N-1$, and $\phi_{2F} \leq 0$, then
+  \begin{displaymath}
+    \inf_{\substack{u \in {\mathcal{U}} \\ \|u'\|_{\ell^2_{\varepsilon}} = 1}} {\langle} {L^{{\rm qnl}}_F} u, u {\rangle} = A_F.
+  \end{displaymath}
+\end{proposition}
+
+\begin{remark}\label{depend}
+  Since $\phi_{2F}''=(A_F-\phi_F'')/4,$ the linearized operators
+  $(\phi''_F)^{-1}{L^{{\rm a}}_F},$ $(\phi''_F)^{-1}{L^{{\rm qcl}}_F},$
+  $(\phi''_F)^{-1}{L^{{\rm qcf}}_F},$ $(\phi''_F)^{-1}{L^{{\rm qce}}_F},$ and
+  $(\phi''_F)^{-1}{L^{{\rm qnl}}_F}$ depend only on $A_F/\phi''_F$, $N$ and $K$.
+\end{remark}
+
+\section{Stability and Spectrum of the QCF operator}
+\label{sec:qcf}
+In this section, we collect various properties of the linearized QCF
+operator, which are, for the most part, variants of our results in
+\cite{dobs-qcf2,sharpstabilityqcf}. We begin by stating a result
+for the lack of positive-definiteness of ${L^{{\rm qcf}}_F},$
+which lies at the heart of many of the difficulties one encounters in
+analyzing the QCF method.
+
+\begin{theorem}[Lack of Positive-Definiteness of QCF, Theorem 1, \cite{dobs-qcf2}]
+  \label{th:nocoerc}
+  If $\phi_F'' > 0$ and $\phi_{2F}'' \in \mathbb{R} \setminus \{0\}$
+  then, for sufficiently large $N,$ the operator ${L^{{\rm qcf}}_F}$ is {\em not}
+  positive-definite. More precisely, there exist $N_0 \in \mathbb{N}$
+  and $C_1 \geq C_2 > 0$ such that, for all $N \geq N_0$ and $2 \leq K
+  \leq N/2$,
+  \begin{displaymath}
+    - C_1 N^{1/2} \leq  \inf_{\substack{{v} \in {\mathcal{U}} \\ \|{v}'\|_{\ell^2_{\varepsilon}} = 1}}
+   \big \langle {L^{{\rm qcf}}_F} {v}, {v} \big\rangle
+    \leq - C_2 N^{1/2}.
+  \end{displaymath}
+\end{theorem}
+
+ 
+
+As a consequence of Theorem \ref{th:nocoerc}, we analyzed the
+stability of ${L^{{\rm qcf}}_F}$ in alternative norms. Following the proof of
+\cite[Theorem 3]{sharpstabilityqcf} verbatim (see also \cite[Remark
+3]{sharpstabilityqcf}) gives the following sharp stability result.
+
+\begin{proposition}
+  \label{th:sharp_stab_U2inf}
+  If $A_F > 0$ and $\phi_{2F}'' \leq 0$, then ${L^{{\rm qcf}}_F}$ is invertible with
+  \begin{displaymath}
+    \big\|({L^{{\rm qcf}}_F})^{-1}\big\|_{L({\mathcal{U}}^{0,\infty},\ {\mathcal{U}}^{2,\infty})} \leq 1/A_F.
+  \end{displaymath}
+  If $A_F = 0,$ then ${L^{{\rm qcf}}_F}$ is singular.
+\end{proposition}
+
+\medskip This result shows that ${L^{{\rm qcf}}_F}$ is operator stable up to the
+critical strain ${F_*}$ at which the atomistic model loses its
+stability as well (cf. Section \ref{sec:model_at}). In the remainder
+of this section, we will investigate, in numerical experiments, the
+spectral properties of the ${L^{{\rm qcf}}_F}$ operator for strains $F$ such that
+$A_F > 0$ and $\phi_{2F}'' \leq 0$.
+
+\subsection{Spectral properties of ${L^{{\rm qcf}}_F}$ in ${\mathcal{U}}^{0,2}=\ell^2_{\varepsilon}$}
+\label{sec:qcf:U02}
+The spectral properties of the ${L^{{\rm qcf}}_F}$ operator are crucial for
+analyzing the performance of iterative methods in Hilbert spaces.  The
+basis of our analysis of ${L^{{\rm qcf}}_F}$ in the Hilbert space ${\mathcal{U}}^{0,2}$ is
+the remarkable observation that, even though ${L^{{\rm qcf}}_F}$ is non-normal, it
+is nevertheless diagonalizable and its spectrum is identical to that
+of ${L^{{\rm qnl}}_F}$. We first observed this in
+\cite[Section~4.4]{sharpstabilityqcf} for the case of periodic
+boundary conditions.  Repeating the same numerical experiments for
+Dirichlet boundary conditions, we obtain similar results. Table
+\ref{tbl:qcf_ana:conj_evals}, where we display the error between the
+spectrum of ${L^{{\rm qcf}}_F}$ and ${L^{{\rm qnl}}_F},$ gives rise to the following
+conjecture.
+
+\begin{table}[t]
+  \begin{equation*}
+\begin{array}{r|rrrrr}
+      &       A_F = 0.8 &       0.6 &       0.4 &       0.2 &      0.04 \\
+\hline
+     N = 8 &  4.83e\hbox{--}13 &  4.26e\hbox{--}13 &  3.13e\hbox{--}13 &  3.41e\hbox{--}13 &  1.71e\hbox{--}13 \\
+    32 &  1.73e\hbox{--}11 &  1.27e\hbox{--}11 &  9.55e\hbox{--}12 &  9.55e\hbox{--}12 &  1.41e\hbox{--}11 \\
+   128 &  8.08e\hbox{--}10 &  4.00e\hbox{--}10 &  4.07e\hbox{--}10 &  4.15e\hbox{--}10 &  4.15e\hbox{--}10 \\
+   512 &  1.06e\hbox{--}08 &  8.73e\hbox{--}09 &  1.40e\hbox{--}08 &  8.38e\hbox{--}09 &  8.73e\hbox{--}09 \\
+\end{array}
+  \end{equation*}
+    \caption{\label{tbl:qcf_ana:conj_evals} The difference between the
+    spectra of ${L^{{\rm qcf}}_F}$ and
+    ${L^{{\rm qnl}}_F}.$ The table displays the $\ell^\infty$ norm of errors in the
+    ordered vectors of eigenvalues for various choices of $A_F$ with $\phi_F'' = 1$, for increasing
+    $N$, $K = \lfloor\sqrt{N}\rfloor + 1$.  All entries are zero to the
+    precision of the eigenvalue solver.  }
+  \vspace{-7mm}
+\end{table}
+
+\begin{conjecture}
+  \label{th:samespec}
+  For all $N \geq 4,\ 1 \leq K \leq N-2,\text{ and } F > 0,$ the
+  operator ${L^{{\rm qcf}}_F}$ is diagonalizable and its spectrum is identical to
+  the spectrum of ${L^{{\rm qnl}}_F}$.
+\end{conjecture}
+
+\medskip
+We denote the eigenvalues of ${L^{{\rm qnl}}_F}$ (and ${L^{{\rm qcf}}_F}$) by
+\begin{displaymath}
+  0<{\lambda^{{\rm qnl}}}_1\le ... {\lambda^{{\rm qnl}}}_{\ell}\le ...\le {\lambda^{{\rm qnl}}}_{2N-1}.
+\end{displaymath}
+The following lemma provides a lower bound for ${\lambda^{{\rm qnl}}}_{1},$ an upper
+bound for ${\lambda^{{\rm qnl}}}_{2N-1},$ and consequently an upper bound for
+$\operatorname{cond}({L^{{\rm qnl}}_F}) = {{\lambda^{{\rm qnl}}}_{2N-1}}/{{\lambda^{{\rm qnl}}}_{1}}$. Assuming the validity of
+Conjecture \ref{th:samespec}, this translates directly to a result on
+the spectrum of ${L^{{\rm qcf}}_F}$.
+
+\begin{lemma}\label{qnlcond}
+If $K < N-1$ and $\phi_{2F}'' \leq 0$, then
+\begin{equation*}
+\begin{gathered}
+{\lambda^{{\rm qnl}}}_{1}\ge  2\,A_F, \qquad
+{\lambda^{{\rm qnl}}}_{2N-1}\le \left(A_F-4\phi_{2F}''\right){\varepsilon}^{-2}=\phi_{F}''{\varepsilon}^{-2},
+\quad \text{and} \\
+\operatorname{cond}({L^{{\rm qnl}}_F}) =
+\frac{{\lambda^{{\rm qnl}}}_{2N-1}}{{\lambda^{{\rm qnl}}}_{1}} \le
+\left(\frac{\phi_{F}''}{2A_F}\right){\varepsilon}^{-2}.
+\end{gathered}
+\end{equation*}
+\end{lemma}
+\begin{proof}
+It follows from Proposition~\ref{th:stab_qnl}
+and \eqref{ray1} that
+\[
+{\lambda^{{\rm qnl}}}_{1}= \inf_{\substack{v \in {\mathcal{U}}\\v \neq 0}}
+    \frac{{\langle} {L^{{\rm qnl}}_F} v,\, v {\rangle} }{\<v,\,v{\rangle}} =
+    \inf_{\substack{v \in {\mathcal{U}}\\v \neq 0}}
+    \frac{{\langle} {L^{{\rm qnl}}_F} v,\, v {\rangle} }{\<v',\,v'{\rangle}}\cdot \frac{\<v',\,v'{\rangle}}{\<v,v{\rangle}}
+    \ge A_F \inf_{\substack{v \in {\mathcal{U}}\\v \neq 0}}\frac{\<v',\,v'{\rangle}}{\<v,v{\rangle}}
+    \ge 2 A_F
+\]
+since the {\em infimum} of the Rayleigh quotient ${\langle} v', v'{\rangle}/\<v,v{\rangle}$
+is attained for $v \in {\mathcal{U}}$ where $v_\ell=\sin((N-\ell)\pi/ (2N))$
+~\cite[Exercise 13.9]{SuliMayers} and has the value
+\begin{equation}\label{ray1}
+\inf_{\substack{v \in {\mathcal{U}}\\v \neq 0}}
+    \frac{{\langle} v', v'{\rangle}}{\<v,v{\rangle}}
+    =4 N^2 \sin^2\left(  \frac{\pi}{4N} \right) \ge2.
+    \end{equation}
+
+The estimate for the maximal eigenvalue follows similarly from
+\begin{equation*}
+{\lambda^{{\rm qnl}}}_{2N-1} = \sup_{\substack{v \in {\mathcal{U}}\\v \neq 0}}
+    \frac{{\langle} {L^{{\rm qnl}}_F} v, v{\rangle}}{\<v,v{\rangle}}
+\end{equation*}
+and the representation \eqref{Lqnl}.
+\end{proof}
+
+\medskip For the analysis of iterative methods, particularly the GMRES
+method, we are also interested in the condition number of the basis of
+eigenvectors of ${L^{{\rm qcf}}_F}$ as $N$ tends to infinity. Assuming the
+validity of Conjecture \ref{th:samespec}, we can write ${L^{{\rm qcf}}_F} = V
+\Lambda^{{\rm qcf}} V^{-1}$ where $\Lambda^{{\rm qcf}}$ is
+diagonal. In Figure \ref{fig:condV_U02}, we plot the condition number
+for increasing values of $N$ and $K$, and for various choices of
+$A_F$ with $\phi_{F}''=1$ (it follows from Remark~\ref{depend}
+that $V$ actually depends only on $A_F/\phi''_F$ and $N$). Even though it is difficult to determine
+from this graph whether ${\rm cond}(V)$ is bounded as $N \to \infty$,
+it is fairly clear that the condition number grows significantly
+slower than $\log(N)$. We formulate this in the next conjecture.
+
+\begin{conjecture}
+  \label{th:qcf:cond_U02}
+  Let $V$ denote the matrix of eigenvectors for the force-based QC
+  operator ${L^{{\rm qcf}}_F}$. If $A_F > 0$, then $\operatorname{cond}(V) = o\left(\log(N)\right)$ as $N
+  \to \infty$.
+\end{conjecture}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=11cm]{condV_U02}
+    \caption{\label{fig:condV_U02} Condition number of the matrix $V$
+      plotted against $N$, with atomistic region size $K =
+      \lfloor\sqrt{N}\rfloor + 1$, and for various values of $A_F$,
+      with fixed $\phi_{F}''=1$. Here, ${L^{{\rm qcf}}_F} = V \Lambda^{{\rm qcf}}
+      V^{-1}$ is the spectral decomposition of ${L^{{\rm qcf}}_F}$. }
+  \end{center}
+\end{figure}
+
+\medskip
+
+\subsection{Spectral properties of ${L^{{\rm qcf}}_F}$ in ${\mathcal{U}}^{1,2}$}
+\label{sec:qcf:U12}
+To study the preconditioning of ${L^{{\rm qcf}}_F}$ by
+${L^{{\rm qcl}}_F}=A_F{{L}},$ we consider
+the (generalized) eigenvalue problem
+\begin{equation}
+  \label{eq:defn_U12-evals}
+  {L^{{\rm qcf}}_F} v = \lambda {{L}} v,\qquad v\in{\mathcal{U}},
+\end{equation}
+which can, equivalently, be written as
+\begin{equation}\label{eigv}
+  {{L}}^{-1} {L^{{\rm qcf}}_F} v = \lambda v, \qquad v \in {\mathcal{U}},
+\end{equation}
+or as
+\begin{equation}\label{eigw}
+  {{L}}^{-1/2} {L^{{\rm qcf}}_F} {{L}}^{-1/2} w = \lambda w,\qquad w\in{\mathcal{U}},
+\end{equation}
+with the basis transform $w = {{L}}^{1/2} v$, in either case reducing it
+to a standard eigenvalue problem in $\ell^2_{\varepsilon}$.
+
+In Table \ref{tbl:qcf:spec_U12}, we display the numerical experiment
+that corresponds to the same experiment shown in Table
+\ref{tbl:qcf_ana:conj_evals}. We observe that also the
+${\mathcal{U}}^{1,2}$-spectra of the ${L^{{\rm qcf}}_F}$ and ${L^{{\rm qnl}}_F}$ operators are identical
+to numerical precision.
+
+\begin{table}[t]
+  \begin{equation*}
+\begin{array}{r|rrrrr}
+     &  A_F =  0.8 &   0.6 &   0.4 & 0.2 &   0.04 \\
+\hline
+    N =  8 &  3.33e\hbox{--}15 &  1.13e\hbox{--}14 &  1.67e\hbox{--}15 &  2.14e\hbox{--}15 &  9.99e\hbox{--}16 \\
+    32 &  1.88e\hbox{--}13 &  1.83e\hbox{--}13 &  4.62e\hbox{--}14 &  6.48e\hbox{--}14 &  3.94e\hbox{--}14 \\
+   128 &  1.34e\hbox{--}12 &  5.13e\hbox{--}13 &  5.72e\hbox{--}13 &  3.85e\hbox{--}13 &  5.51e\hbox{--}13 \\
+   512 &  2.22e\hbox{--}11 &  9.78e\hbox{--}12 &  7.02e\hbox{--}12 &  4.32e\hbox{--}12 &  4.56e\hbox{--}12 \\
+\end{array}
+  \end{equation*}
+    \caption{\label{tbl:qcf:spec_U12} The difference between the
+    spectra of ${{L}}^{-1} {L^{{\rm qcf}}_F}$ and ${{L}}^{-1} {L^{{\rm qnl}}_F}.$ The
+    table displays the $\ell^\infty$ norm of errors in the ordered
+    vectors of eigenvalues for various choices of $F$, for increasing
+    $N$, $K = \lfloor\sqrt{N}\rfloor + 1$, and with fixed $\phi_F'' =
+    1$.  All entries are zero to the precision of the eigenvalue
+    solver.  }
+  \vspace{-7mm}
+\end{table}
+
+\begin{conjecture}
+  \label{th:spec_U12}
+  For all $N \geq 4,\ 1 \leq K \leq N-2,\text{ and } F > 0,$ the
+  operator ${{L}}^{-1}{L^{{\rm qcf}}_F}$ is diagonalizable and its spectrum is
+  identical to the spectrum of ${{L}}^{-1}{L^{{\rm qnl}}_F}$.
+\end{conjecture}
+
+\medskip In the following lemma we completely characterize the
+spectrum of ${{L}}^{-1} {L^{{\rm qnl}}_F}$, and thereby, subject to the validity of
+Conjecture \ref{th:spec_U12}, also the spectrum of ${{L}}^{-1}{L^{{\rm qcf}}_F}$. We
+denote the spectrum of ${{L}}^{-1}{L^{{\rm qcf}}_F}$ by $\{ \mu_j^{\rm qnl} : j = 1,
+\dots, 2N-1\}$.
+
+\begin{lemma}
+  \label{th:spec_Lqnl_U12}
+  Let $K \leq N-2$ and $A_F > 0$, then the (unordered) spectrum of
+  ${{L}}^{-1}{L^{{\rm qnl}}_F}$ (that is, the ${\mathcal{U}}^{1,2}$-spectrum) is given by
+  \begin{align*}
+    \mu_j^{\rm qnl} =
+    \begin{cases}
+      A_F - {4 \phi_{2F}''} \sin^2\big({{\textstyle \frac{{j \pi}}{{4 K+4}}}}\big), &
+      j = 1, \dots, 2K+1, \\
+      A_F, & j = 2K+2, \dots, 2N-1.
+    \end{cases}
+  \end{align*}
+  In particular, if $\phi_{2F}'' \leq 0,$ then
+  \begin{displaymath}
+    \frac{\max_j \mu_j^{\rm qnl}}{\min_j \mu_j^{\rm qnl}}
+    = 1 - \frac{4 \phi_{2F}''}{A_F}
+      \sin^2\left({{\textstyle \frac{{(2K+1)\pi}}{{4K+4}}}}\right)
+      =\frac{\phi_F''}{A_F}+\frac{4 \phi_{2F}''}{A_F}
+      \sin^2\left({{\textstyle \frac{{\pi}}{{4K+4}}}}\right)
+   = \frac{\phi_F''}{A_F} + O(K^{-2}).
+  \end{displaymath}
+\end{lemma}
+\begin{proof}
+  We will use the variational representation of ${L^{{\rm qnl}}_F}$ from
+  \cite[Section 3.3]{doblusort:qce.stab}, which reads
+  \begin{displaymath}
+    \big{\langle} {L^{{\rm qnl}}_F} u, v \big{\rangle} = A_F {\langle} u', v' {\rangle}
+    -  \phi_{2F}'' {\varepsilon} \sum_{\ell = -K}^{K} (u_{\ell+1}' - u_\ell')
+    (v_{\ell+1}' - v_\ell') \quad \text{for } u,\,v \in{\mathcal{U}}.
+  \end{displaymath}
+  Summation by parts in the second term yields
+  \begin{displaymath}
+    \big{\langle} {L^{{\rm qnl}}_F} u, v \big{\rangle} = A_F {\langle} u', v'{\rangle} - \phi_{2F}'' {\langle} M u', v' {\rangle} \quad \text{for } u,\,v \in{\mathcal{U}},
+  \end{displaymath}
+  where $M$ is the $2N \times 2N$ matrix given by
+  \begin{displaymath}
+    M = {\scriptsize \left(\begin{array}{rrr|rrrrr|rrr}
+      0 &      &   &    &      &      &      &    &   &      &   \\[-1mm]
+        &\ddots&   &    &      &      &      &    &   &      &   \\[-1mm]
+        &      & 0 &    &      &      &      &    &   &      &   \\
+        \hline
+        &      &   &  1 &   -1 &      &      &    &   &      &   \\
+        &      &   & -1 &    2 &   -1 &      &    &   &      &   \\[-1mm]
+        &      &   &    &\ddots&\ddots&\ddots&    &   &      &   \\[-1mm]
+        &      &   &    &      &   -1 &    2 & -1 &   &      &   \\
+        &      &   &    &      &      &   -1 &  1 &   &      &   \\
+        \hline
+        &      &   &    &      &      &      &    & 0 &      &   \\[-1mm]
+        &      &   &    &      &      &      &    &   &\ddots&   \\[-1mm]
+        &      &   &    &      &      &      &    &   &      & 0
+    \end{array} \right), }
+\end{displaymath}
+and where the first and last non-zero rows are, respectively, the rows
+$-K$ and $K+1$.  We call the restriction of the {\em conjugate
+  operator} ${\widehat{L}^{{\rm qnl}}_F}=A_F I - \phi_{2F}'' M:{\mathbb{R}}^{2N}\to {\mathbb{R}}^{2N}$ to
+the $2N-1$ dimensional invariant gradient space ${\mathbb{R}}^{2N}_* = \{
+\varphi \in {\mathbb{R}}^{2N} : \sum_\ell \varphi_\ell = 0 \}$ the restricted
+conjugate QNL operator ${\widetilde{L}^{{\rm qnl}}_F}=A_F I - \phi_{2F}'' M:{\mathbb{R}}^{2N}_*\to
+{\mathbb{R}}^{2N}_*,$ and we note that we can write the eigenvalue
+relation~\eqref{eq:defn_U12-evals} in weak form as
+\begin{equation}\label{same}
+    {\langle} {L^{{\rm qnl}}_F} u, v {\rangle} = {\langle} {\widetilde{L}^{{\rm qnl}}_F} u', v' {\rangle} = \lambda {\langle} u',
+    v'{\rangle} \qquad \forall v\in{\mathcal{U}}.
+\end{equation}
+
+We can see from \eqref{same} that the $2N-1$
+generalized ${\mathcal{U}}^{1,2}$-eigenvalues of ${L^{{\rm qnl}}_F}$ and the standard
+  $\ell^2$-eigenvalues of ${\widetilde{L}^{{\rm qnl}}_F}:{\mathbb{R}}^{2N}_*\to {\mathbb{R}}^{2N}_*$ are the same.
+  If $\nu_j$ are the $2N-1$ eigenvalues of ${\widetilde{L}^{{\rm qnl}}_F}$ with eigenvectors $\varphi^{(j)}$ in ${\mathbb{R}}^{2N}_*$; then, letting
+  $u^{(j)} \in {\mathcal{U}}$ be the (unique) functions for which $(u^{(j)})'
+  = \varphi^{(j)}$, we obtain
+  \begin{displaymath}
+    \big{\langle} {L^{{\rm qnl}}_F} u^{(j)}, v \big{\rangle} = \big{\langle} {\widetilde{L}^{{\rm qnl}}_F} (u^{(j)})', v' \big{\rangle} =
+     \nu_j \big{\langle} (u^{(j)})', v'\big{\rangle} \qquad \forall v\in{\mathcal{U}},
+  \end{displaymath}
+  which is equivalent to \eqref{eq:defn_U12-evals}.
+
+  The operator ${\widetilde{L}^{{\rm qnl}}_F}:{\mathbb{R}}^{2N}_*\to {\mathbb{R}}^{2N}_*$ has a $(2N -
+  2K-2)$-multiple eigenvalue with value $A_F$ and corresponding
+  orthogonal eigenvectors $\varphi^{(j)}\in{\mathbb{R}}^{2N}_*$ can be taken to
+  be the projection onto ${\mathbb{R}}^{2N}_*$ of the canonical basis vectors
+  corresponding to the zero-diagonal entries of $M.$
+  We will see that the remaining $2K+1$ eigenvalues of ${\widetilde{L}^{{\rm qnl}}_F}:{\mathbb{R}}^{2N}_*\to
+  {\mathbb{R}}^{2N}_*$ take the form
+  \begin{displaymath}
+    \nu_j = A_F - \phi_{2F}'' \tilde{\nu}_j,
+  \end{displaymath}
+  where $\tilde{\nu}_j$, $j = 1, \dots, 2K+1$ are the non-zero
+  eigenvalues of the non-zero block of $M$, which we denote
+  $\widetilde{M}$. It is easy to check that the eigenvectors of the
+  matrix $\widetilde{M}$ are given by
+  \begin{displaymath}
+    g_\ell^{(j)} = \cos\big( j \pi (\ell + K - 1/2) / (2K+2) \big),
+    \quad \ell = -K, \dots, K+1,
+  \end{displaymath}
+  for $j = 0, \dots, 2K+1$, and the corresponding eigenvalues by
+  \begin{displaymath}
+    \tilde\nu_j = 4 \sin^2 \big( j \pi / (4K+4) \big),
+    \quad j = 0, \dots, 2K+1.
+  \end{displaymath}
+  The first eigenvector $g^{(0)}$ is constant, and hence all other
+  eigenvectors have mean zero. This implies that the eigenvalues
+  $\nu_j$, $j = 1, \dots, 2K+1,$ give the remaining eigenvalues of
+  ${\widetilde{L}^{{\rm qnl}}_F}:{\mathbb{R}}^{2N}_*\to {\mathbb{R}}^{2N}_*$. This concludes the proof of the
+  lemma.
+\end{proof}
+
+\begin{remark}
+  Even though Lemma \ref{th:spec_Lqnl_U12} gives uniform bounds on the
+  spectrum of ${L^{{\rm qnl}}_F}$ in ${\mathcal{U}}^{1,2},$ it does not give the desired
+  sharper result that eigenvalues are clustered, for example, at
+  $A_F$. As a matter of fact, Lemma \ref{th:spec_Lqnl_U12} shows that
+  this is never the case. However, we see that, if $K$ remains bounded
+  as $N \to \infty$, then all but a finite number of eigenvalues of
+  ${{L}}^{-1/2}{L^{{\rm qcf}}_F} {{L}}^{-1/2}$ are identically equal to $A_F$.
+\end{remark}
+
+\begin{figure}[t]
+  \begin{center}
+    \includegraphics[width=11cm]{qcfCondP}
+  \end{center}
+  \caption{\label{fig:qcfCondP} Condition number of the matrix ${{ \tilde V}}$
+    plotted against the system size $N$ for $A_F/\phi''_F =
+    0.4,$ and various atomistic region sizes $K,$ where ${{L}}^{-1}
+    {L^{{\rm qcf}}_F} = {{ \tilde V}} \widetilde \Lambda^{{\rm qcf}} {{ \tilde V}}^{-1}$ is the
+    spectral decomposition of ${{L}}^{-1}{L^{{\rm qcf}}_F}$.
+    Since $(\phi''_F)^{-1}{L^{{\rm qcf}}_F}$ depends only
+on $A_F/\phi''_F$ and $N,$ the matrix ${{ \tilde V}}$ depends only on $A_F/\phi''_F$
+and $N.$ For each curve we have
+    $\operatorname{cond}({{ \tilde V}}$) is O($N^3$), but in fact the curves appear to grow
+    like $N^{3/2} K^{3/2}.$
+    }
+\end{figure}
+
+\begin{figure}[t]
+  \begin{center}
+    \includegraphics[width=11cm]{qcfCondDP}
+  \end{center}
+  \caption{\label{fig:qcfCondPw} Condition number of the matrix
+    ${{ \widetilde W}}$ plotted against the system size $N$ for $A_F/\phi''_F =0.4,$
+    and various atomistic region sizes $K,$ where
+    ${{L}}^{-1/2} {L^{{\rm qcf}}_F} {{L}}^{-1/2} = {{ \widetilde W}} \widetilde \Lambda^{{\rm
+        qcf}} {{ \widetilde W}}^{-1}$ is the spectral decomposition of ${{L}}^{-1/2}
+    {L^{{\rm qcf}}_F} {{L}}^{-1/2}$. For each curve, $\operatorname{cond}({{ \widetilde W}}$) is O($N^3$).}
+\end{figure}
+
+\medskip
+
+We conclude this study by considering the condition number of the
+matrix of eigenvectors for the eigenvalue problems~\eqref{eigv}
+and~\eqref{eigw}.  We write ${{L}}^{-1}{L^{{\rm qcf}}_F} = {{ \tilde V}} \tilde
+\Lambda^{{\rm qcf}} {{ \tilde V}}^{-1},$ where $\tilde \Lambda^{{\rm qcf}}$
+is the diagonal matrix of eigenvalues of ${{L}}^{-1}{L^{{\rm qnl}}_F}$ and ${{ \tilde V}}$
+is the associated matrix of eigenvectors.  In
+Figure~\ref{fig:qcfCondP}, we have plotted numerical results for the
+condition number of the matrix ${{ \tilde V}}.$
+We note that great care must
+be taken when computing the basis of eigenvectors since one eigenvalue
+has a high multiplicity (cf. Lemma \ref{th:spec_Lqnl_U12}).  As
+described in Appendix~\ref{app:cond_calc}, the block structure of the
+matrix ${{L}}^{-1}{L^{{\rm qcf}}_F}$ allows us to analytically compute most of the
+eigenvectors corresponding to the high multiplicity eigenvalue and to
+separately compute all remaining eigenvectors.
+
+The numerical experiment displayed in Figure~\ref{fig:qcfCondP} leads
+to the following conjecture.
+
+\begin{conjecture}
+  \label{th:qcf:condP_U02}
+  Let ${{ \tilde V}}$ denote the matrix of eigenvectors for the preconditioned
+  force-based QC operator ${{L}}^{-1} {L^{{\rm qcf}}_F}$.  If $A_F > 0$, then
+  $\operatorname{cond}({{ \tilde V}}) = O\left(N^{3} \right)$ as $N \to \infty$.
+\end{conjecture}
+
+\medskip It follows from \eqref{eigv} and \eqref{eigw} that we can
+write ${{L}}^{-1/2} {L^{{\rm qcf}}_F} {{L}}^{-1/2} = {{ \widetilde W}} \tilde \Lambda^{{\rm
+    qcf}} {{ \widetilde W}}^{-1}$ where ${{ \widetilde W}}={{L}}^{1/2}{{ \tilde V}}$ is the associated
+matrix of eigenvectors.  In Figure~\ref{fig:qcfCondPw}, we have
+plotted numerical results for the condition number of the matrix
+${{ \widetilde W}}.$ These calculations can be simplified by observing that, if we
+define the operator $D: {\mathbb{R}}^{2N-1} \rightarrow {\mathbb{R}}^{2N}$ by $D v := v'$
+then ${{ \widetilde W}}^T {{ \widetilde W}} = {{ \tilde V}}^T L {{ \tilde V}} = {{ \tilde V}}^T D^T D {{ \tilde V}}.$ Since
+the condition number of a matrix $A$ depends only on the eigenvalues
+of $A^T A$, it follows that $\operatorname{cond}(D{{ \tilde V}})=\operatorname{cond}({{ \widetilde W}})$.
+
+The numerical experiment displayed in Figure~\ref{fig:qcfCondPw} leads
+to the following conjecture.
+
+\begin{conjecture}
+  \label{th:qcf:condP_U02w}
+  Let ${{ \widetilde W}}$ denote the matrix of eigenvectors for the preconditioned
+  force-based QC operator ${{L}}^{-1/2} {L^{{\rm qcf}}_F} {{L}}^{-1/2}.$ If
+  $A_F>0$, then $\operatorname{cond}({{ \widetilde W}}) = O\left(N^{3} \right)$ as
+  $N \to \infty$.
+  \end{conjecture}
+
+\section{Iterative Methods for the Nonlinear QCF System}
+\label{sec:nonlinear}
+In this section, we briefly review and analyze two common solution
+methods for the QCF equilibrium equations. The first method, the {\em
+  ghost force correction (GFC) scheme}, is often considered an
+independent approximation scheme rather than an iterative method for
+the solution of the QCF system. However, it was shown in
+\cite{Dobson:2008a} that the ghost force correction, when iterated to
+self-consistency, does in fact give rise to the QCF method. In the
+following section, we will show that a linearization of the GFC method
+predicts a lattice instability at a strain significantly less than the
+critical strain of the atomistic model.
+
+The second method that we discuss solves the QCF equilibrium equations
+by computing the location along the search direction where the
+residual is orthogonal to the search direction~\cite{Miller:2008}.
+We show in Section~\ref{sec:modifiedcg} that the indefiniteness of
+${L^{{\rm qcf}}_F}$ implies that this method cannot be expected to be numerically
+stable for the QCF system.
+
+\subsection{The Ghost Force Correction}
+\label{sec:gfc_method}
+After discovering that the original energy-based QC method (QCE) is
+inconsistent at the interface, a dead load correction was proposed to
+remove the so-called {\em ghost forces}~\cite{Shenoy:1999a}.  The idea
+of this {\em ghost force correction (GFC)} is the following: Since the
+Cauchy--Born continuum model is consistent with the atomistic model,
+the ``defective'' (inconsistent) forces of the QCE method at the
+interface are simply replaced by the Cauchy--Born forces in the continuum
+region and by the atomistic forces in the atomistic region.
+The discrepancy between the forces of
+the QCE method and those of the QCF method are called the {\em ghost
+  forces}, and are defined as follows:
+\begin{displaymath}
+  g(y) := {\mathcal{F}}^{\rm qcf}(y) - {\mathcal{F}}^{\rm qce}(y)
+\end{displaymath}
+where
+\begin{displaymath}
+{\mathcal{F}}^{\rm qce}(y) := -{\varepsilon}^{-1} \nabla {\mathcal{E}}^{\rm qce}(y).
+\end{displaymath}
+It is clear that the ghost forces are concentrated in a neighborhood
+of the atomistic-to-continuum interface and can therefore be computed
+efficiently \cite{Shenoy:1999a}. The GFC is then normally applied
+during a quasistatic loading process. In the following example
+algorithm, the loading parameter is the macroscopic strain $F>0$ and
+the corresponding space of admissible deformations is
+$
+{\mathcal{Y}}_F=y^F+{\mathcal{U}}.
+$
+
+\medskip \noindent {\bf GFC Iteration: } \\[-4mm]
+\begin{enumerate}
+\item[{\bf 0.}] Input: $y^{(0)} \in {\mathcal{Y}}_1$ such that ${\mathcal{F}}^{\rm
+    qcf}(y^{(0)}) + f \approx 0$; increment $\delta F > 0$
+\item[{\bf 1.}] For $n = 1, 2, 3, \dots$ do
+\item[{\bf 2.}] \qquad Evaluate $g^{(n)} = g(\hat{y}^{(n-1)})$, where
+  $\hat{y}^{(n-1)} = y^{(n-1)} + x \delta F $
+\item[{\bf 3.}] \qquad Find $y^{(n)} \in {{\rm argmin}} \,
+  \big\{{{\mathcal{E}}^{{\rm qce}}}(y) - {\langle} f, y {\rangle} - {\langle} g^{(n)}, y {\rangle} : y \in {\mathcal{Y}}_{1 + n\delta F} \big\}.$
+\end{enumerate}
+
+\begin{remark}
+  Increased efficiency can be obtained by allowing nonuniform steps
+  and multiple GFC iterations at a fixed load~\cite{dobsonluskin08},
+  thus introducing a second inner loop. For the purpose of the present
+  paper, we will focus on the simpler algorithm above.
+\end{remark}
+
+\medskip
+We now consider the GFC iteration above for purely
+tensile loading which is given by $f=0.$  We also take the initial
+iterate to be the uniform deformation for $F=1,$ that is, $y^{(0)}=y^1=x,$
+and $\delta F$ to be small.
+Then it is easy to see that the GFC iteration gives the uniform deformation
+$y^{(n)}=y^{1+n\delta F}$ until $1+n\delta F>F^{\rm gfc},$ where
+$F^{\rm gfc}$ is the uniform strain at which ${L^{{\rm qce}}_F}$ becomes
+unstable.  We recall from Lemma~\ref{th:stab_qce} that ${L^{{\rm qce}}_F}$ becomes
+unstable at $F^{\rm gfc}$ satisfying
+\[
+A_{F^{\rm gfc}} + \lambda_K \phi_{2F^{\rm gfc}}''=0,
+\]
+where ${{\textstyle \frac{1}{2}}} \leq \lambda_K \leq 1$ and
+$\phi_{2F^{\rm gfc}}''<0,$ so $F^{\rm gfc}<F_*.$
+
+The critical strain $F^{\rm qce}$ for the uncorrected  energy
+${{\mathcal{E}}^{{\rm qce}}}(y)$ was
+investigated in \cite{doblusort:qce.stab} by linearizing ${{\mathcal{E}}^{{\rm qce}}}(y)$
+about
+\[
+y_{\rm qce}^F\in {{\rm argmin}} \,
+  \big\{{{\mathcal{E}}^{{\rm qce}}}(y)  : y \in {\mathcal{Y}}_{F} \big\}
+  \]
+rather than about $y^F.$  It was shown, in agreement with the
+computational experiments in \cite{doblusort:qce.stab}
+and \cite{Miller:2008}, that the GFC method
+does improve the accuracy of the computation for the critical strain,
+that is,
+\[
+F^{\rm qce}<F^{\rm gfc}<F_*.
+\]
+  See \cite{doblusort:qce.stab}
+for a more precise statement of these results.
+
+\subsection{A modified conjugate gradient method}
+\label{sec:modifiedcg}
+Another popular approach to solving the QCF equilibrium equations is
+to replace the univariate optimization used for step size selection in
+the nonlinear conjugate gradient method~\cite{NocedalWright99} with
+the computation of a step size where the residual is orthogonal to the
+current search direction~\cite{Miller:2008}.
+More specifically, if $d^{(n)}$ is the current search direction, then
+this method computes $y^{(n+1)} = y^{(n)}+\alpha^{(n)} d^{(n)}$ such
+that
+\begin{equation} \label{miller}
+  \big{\langle}{\mathcal{F}}^{\rm qcf}(y^{(n+1)}) + f,\, d^{(n)}\big{\rangle} \approx 0.
+\end{equation}
+
+We can easily see that this method is numerically unstable by
+considering a linearization of~\eqref{miller} about the uniform
+configuration $y^F$ to obtain
+\begin{equation*}
+  \big{\langle}-{L^{{\rm qcf}}_F}\big(u^{(n)}+\alpha^{(n)} d^{(n)}\big)
+  + f ,\, d^{(n)}\big{\rangle}= 0,
+\end{equation*}
+or equivalently,
+\begin{equation*}
+  - \alpha^{(n)} \big{\langle} {L^{{\rm qcf}}_F} d^{(n)},\, d^{(n)} \big{\rangle}
+  + \big{\langle} {L^{{\rm qcf}}_F} u^{(n)},\, d^{(n)} \big{\rangle}
+  + \big{\langle} f,\, d^{(n)} \big{\rangle} = 0.
+\end{equation*}
+
+However, according to Theorem~\ref{th:nocoerc}, ${L^{{\rm qcf}}_F}$ is indefinite,
+which implies that there exist directions $d$ such that ${\langle} {L^{{\rm qcf}}_F} d, d
+{\rangle} = 0$. Hence, if such a singular direction $d$ is chosen (for
+example, if the initial iterate satisfies ${L^{{\rm qcf}}_F} u^{(0)} = d$) then the
+step size $\alpha^{(n)}$ is undefined. More generally, if a direction
+$d^{(n)}$ is ``near'' such a singular direction (for example, ${L^{{\rm qcf}}_F}
+u^{(0)} \approx d$), then the computation of $\alpha^{(n)}$ is
+numerically unstable.
+
+\section{GMRES Solution of the Linear QCF Equations}
+\label{sec:gmres}
+We now consider the generalized minimal residual method (GMRES) to
+find (approximate) solutions to the linear, force-based QC equilibrium
+equations
+\begin{equation}
+  {L^{{\rm qcf}}_F} {u^{{\rm qcf}}} = f
+  \label{eq:Lqcf_eq}.
+\end{equation}
+GMRES is an attractive iterative method for the solution of
+nonsymmetric linear equations since the iterates satisfy a minimality
+property for the residual.  This minimality property is the basis for
+our analysis of the convergence of the GMRES method for the solution
+of the QCF equations.
+
+\subsection{Standard GMRES}
+\label{sec:gmres_standard}
+We recall that GMRES~\cite{saad} builds a sequence of Krylov subspaces
+\begin{equation*}
+  {\mathcal{K}}_m := \operatorname{span}\Big\{ r^{(0)} ,\, {L^{{\rm qcf}}_F} r^{(0)},
+    ({L^{{\rm qcf}}_F})^2 r^{(0)}, \dots, \,({L^{{\rm qcf}}_F})^{m-1} r^{(0)}\Big\},
+\end{equation*}
+where $r^{(0)}:= f - {L^{{\rm qcf}}_F} u^{(0)}$ is the initial residual, and it
+finds an approximate solution
+\begin{equation}
+  \label{eq:gmres}
+  u^{(m)} := {{\rm argmin}}_{v \in u^{(0)}+{\mathcal{K}}_m} \big\|
+  f - {L^{{\rm qcf}}_F} v \big\|_{\ell^2_{\varepsilon}}
+\end{equation}
+that minimizes the $\ell^2_{\varepsilon}$-norm of the residual $r^{(m)} := f -
+{L^{{\rm qcf}}_F} u^{(m)}$ for~\eqref{eq:Lqcf_eq}. The residual $r^{(m)}$
+satisfies the minimality property
+\begin{equation}
+  \label{res}
+  \big\|r^{(m)}\big\|_{\ell^2_{\varepsilon}}=\min_{v\in u^{(0)}+{\mathcal{K}}_m}
+  \big\| f - {L^{{\rm qcf}}_F} v \big\|_{\ell^2_{\varepsilon}}
+  = \min_{\substack{p_{m} \in {\mathcal{P}}_{m}\\ p_m (0) = 1}}
+  \big\|p_m({L^{{\rm qcf}}_F})r^{(0)}\big\|_{\ell^2_{\varepsilon}}
+\end{equation}
+where
+\begin{equation*}
+{\mathcal{P}}_m = \{\text{polynomials $p$ of degree }\leq m \}.
+\end{equation*}
+It follows from \eqref{res} that $r^{(m)}$ depends only on $r^{(0)},$
+$A_F/\phi_F'', N,$ and $K.$
+
+GMRES solves the minimization problem \eqref{eq:gmres} by reducing it
+to a least squares problem for the coefficients of an
+$\ell^2_{\varepsilon}-$orthonormal sequence $\{v_1,\,\dots,v_{m+1}\}$ computed
+by the Arnoldi process.  For details, see~\cite{saad,tref97}.
+
+The convergence analysis does not require a symmetric matrix, and we
+will see that Conjectures~\ref{th:samespec} and~\ref{th:qcf:cond_U02}
+regarding the spectrum of eigenvalues and conditioning of eigenvectors
+are exactly what is needed for an error analysis of GMRES applied to
+${L^{{\rm qcf}}_F}.$
+
+\begin{proposition}
+  \label{th:gmres_nop}
+  If Conjecture~\ref{th:samespec} holds, then
+\begin{equation}\label{slow}
+\begin{split}
+\|r^{(m)}\|_{\ell^2_{\varepsilon}}&
+\le 2 \operatorname{cond}(V) \left(\frac{1-\frac1N\sqrt{\frac{2A_F}{\phi_{F}''}}}{1+\frac 1N\sqrt{\frac{2A_F}{\phi_{F}''}}}\right)^{m}
+\|r^{(0)}\|_{\ell^2_{\varepsilon}}.
+\end{split}
+\end{equation}
+\end{proposition}
+
+\remark{We recall from Conjecture~\ref{th:qcf:cond_U02} that
+$\operatorname{cond}(V)=o\left(\log(N)\right).$ We note that the estimate~\eqref{slow} gives a reduction of the
+convergence rate for strains near the critical strain $A_{F_*}=0.$}
+\begin{proof}
+By Conjecture~\ref{th:samespec}, ${L^{{\rm qcf}}_F}$ is diagonalizable, and we
+have that ${L^{{\rm qcf}}_F} = V \Lambda^{{\rm qcf}} V^{-1}$ where $V$ contains the
+eigenvectors of ${L^{{\rm qcf}}_F}$ as its columns and where $\Lambda^{{\rm qcf}}$ is the
+diagonal matrix of eigenvalues of ${L^{{\rm qcf}}_F}.$ We denote the set of
+eigenvalues of ${L^{{\rm qcf}}_F}$ by $\sigma({L^{{\rm qcf}}_F}).$ We then have by
+~\eqref{res} that
+\begin{equation*}
+  \begin{split}
+    \|r^{(m)}\|_{\ell^2_{\varepsilon}}
+    &= \min_{\substack{p_{m} \in {\mathcal{P}}_{m}\\p_m (0) = 1}}
+    \big\|p_m({L^{{\rm qcf}}_F})r^{(0)}\big\|_{\ell^2_{\varepsilon}}
+    = \min_{\substack{p_{m} \in {\mathcal{P}}_{m}\\ p_m (0) = 1}}
+    \big\|Vp_m(\Lambda^{{\rm qcf}})V^{-1}r^{(0)}\big\|_{\ell^2_{\varepsilon}}\\
+    &\le \operatorname{cond}(V) \inf_{\substack{p_{m} \in {\mathcal{P}}_{m}\\ p_m (0) = 1}}
+    \big\| p_m \big\|_{\sigma({L^{{\rm qcf}}_F})} \big\|r^{(0)}\big\|_{\ell^2_{\varepsilon}}
+\end{split}
+\end{equation*}
+where
+\begin{equation*}
+\| p_m \|_{\sigma({L^{{\rm qcf}}_F})} =
+    \sup_{\lambda \in \sigma({L^{{\rm qcf}}_F})} | p_m(\lambda) |.
+\end{equation*}
+
+By Conjecture~\ref{th:samespec}, ${L^{{\rm qcf}}_F}$ and ${L^{{\rm qnl}}_F}$ share the same
+spectrum, so we have that
+\[
+\inf_{\substack{p_{m} \in {\mathcal{P}}_{m}\\
+p_m (0) = 1}} \| p_m \|_{\sigma({L^{{\rm qcf}}_F})}
+=\inf_{\substack{p_{m} \in {\mathcal{P}}_{m}\\
+p_m (0) = 1}} \| p_m \|_{\sigma({L^{{\rm qnl}}_F})}
+\le
+\inf_{\substack{p_{m} \in {\mathcal{P}}_{m}\\
+p_m (0) = 1}}\quad\max_{{\lambda^{{\rm qnl}}}_{1} \leq \lambda \leq {\lambda^{{\rm qnl}}}_{2N-1}} |p_m(\lambda)|.
+\]
+We now recall ~\cite{saad} that
+$$
+\inf_{\substack{p_m \in {\mathcal{P}}_{m}\\
+p_m (0) = 1}}\quad\max_{{\lambda^{{\rm qnl}}}_{1} \leq \lambda \leq {\lambda^{{\rm qnl}}}_{2N-1}} |p_m
+(\lambda)|
+\leq
+2\left(\frac{1-\sqrt{\gamma}}{1+\sqrt{\gamma}}\right)^{m}
+$$
+where $\gamma=1/\operatorname{cond}({L^{{\rm qnl}}_F})={\lambda^{{\rm qnl}}}_{1}/{\lambda^{{\rm qnl}}}_{2N-1}.$
+We have
+by Lemma~\ref{qnlcond} that $\gamma
+\le(2A_F{\varepsilon}^2)/\phi_{F}''.$
+It thus follows that
+\begin{equation*}
+\begin{split}
+\|r^{(m)}\|_{\ell^2_{\varepsilon}}&\le
+2 \operatorname{cond}(V) \left(\frac{1-\sqrt{\gamma}}{1+\sqrt{\gamma}}\right)^{m}
+\left\|r^{(0)}\right\|_{\ell^2_{\varepsilon}}
+\\
+&\le 2 \operatorname{cond}(V) \left(\frac{1-{\varepsilon}\sqrt{\frac{2A_F}{\phi_{F}''}}}{1+{\varepsilon}\sqrt{\frac{2A_F}{\phi_{F}''}}}\right)^{m}
+\|r^{(0)}\|_{\ell^2_{\varepsilon}}.\qedhere
+\end{split}
+\end{equation*}
+\end{proof}
+
+In Figures \ref{fig:gmres_res} and \ref{fig:gmres_err}, we display the
+residual and error of the standard GMRES iterates when the algorithm
+is applied to the solution of the QCF system with right-hand side
+\begin{equation}
+  \label{eq:num_ex_rhs}
+  f(x) = h(x) \cos(3 \pi x) \quad \text{where} \quad
+  h(x) = \begin{cases}
+    \ \ 1, & x \geq 0, \\
+    -1, & x < 0,
+  \end{cases}
+\end{equation}
+which is smooth in the continuum region but has a discontinuity in the
+atomistic region.
+We also set $A_F = 0.5$ and $\phi_F'' = 1$. We observe the
+slow convergence predicted by the theory of this section. However, we
+also observe alternation of slow and fast regimes, which our theory
+was unable to predict.
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=11cm]{gmres_res}
+  \end{center}
+  \caption{\label{fig:gmres_res} Application of standard GMRES to the
+    QCF system \eqref{eq:Lqcf_eq} with right-hand side
+    \eqref{eq:num_ex_rhs}, $A_F = 0.5,$ and $\phi_F'' = 1$. We plot
+    the $\ell^2_{\varepsilon}$-norm of the residual against the iteration
+    number $m$ for various choices of $N$ and $K$. We observe the slow
+    convergence of the residual partially predicted by the theory in
+    section \ref{sec:gmres_standard}.  We recall that there are $2N-1$
+    degrees of freedom. }
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=11cm]{gmres_err}
+  \end{center}
+  \caption{\label{fig:gmres_err} Application of standard GMRES to the
+    QCF system \eqref{eq:Lqcf_eq} with right-hand side
+    \eqref{eq:num_ex_rhs}, $A_F = 0.5,$ and $\phi_F'' = 1$. We plot
+    the $\ell^2_{\varepsilon}$-norm of the error $e^{(m)} = u^{(m)} - u^{\rm
+      qcf}$ against the iteration number $m$ for various choices of
+    $N$ and $K$. We observe that $\|e^{(m)}\|_{\ell^2_{\varepsilon}}$ closely
+    mirrors the norm of the residual $\|r^{(m)}\|_{\ell^2_\ell}$. }
+\end{figure}
+
+\subsection{Preconditioned GMRES with $P={{L}}$}
+\label{sec:P-GMRES}
+We next consider the GMRES algorithm left-preconditioned by $P={{L}},$
+which is the GMRES algorithm applied to the left-preconditioned QCF
+equilibrium equations~\cite{saad}
+\begin{equation}
+{{L}}^{-1}{L^{{\rm qcf}}_F} {u^{{\rm qcf}}} = {{L}}^{-1}f
+\label{eq:Lqcf_eqp}.
+\end{equation}
+We now denote the $m$th left-preconditioned Krylov subspace by
+\begin{equation*}
+  \tilde {\mathcal{K}}_m =: \operatorname{span} \Big\{
+  {{L}}^{-1}r^{(0)},\, \big({{L}}^{-1}{L^{{\rm qcf}}_F}\big)
+  {{L}}^{-1}r^{(0)},
+  \dots, \,
+  \big({{L}}^{-1}{L^{{\rm qcf}}_F}\big)^{m-1} {{L}}^{-1}r^{(0)}\Big\}
+\end{equation*}
+and compute the minimizer
+\begin{equation*}
+  u^{(m)} := {{\rm argmin}}_{v \in u^{(0)}+\tilde{\mathcal{K}}_m} \big\|
+  {{L}}^{-1}\big(f - {L^{{\rm qcf}}_F} v\big)\big\|_{\ell^2_{\varepsilon}}.
+\end{equation*}
+
+\begin{proposition}
+  \label{th:convergence_gmres_p}
+  If Conjecture~\ref{th:spec_U12} holds, then
+  \begin{equation}\label{vest}
+    \begin{split}
+      \big\|{{L}}^{-1}r^{(m)}\big\|_{\ell^2_{\varepsilon}}&\le
+      2 \operatorname{cond}({{ \tilde V}}) \left({{\textstyle \frac{{1 - \sqrt{\frac{A_F}{\phi''_F}}}}{{1 + \sqrt{\frac{A_F}{\phi''_F}}}}}}\right)^m
+      \big\|{{L}}^{-1}r^{(0)}\big\|_{\ell^2_{\varepsilon}}.
+    \end{split}
+  \end{equation}
+\end{proposition}
+\remark{We recall that Conjecture~\ref{th:qcf:condP_U02} states that
+  $\operatorname{cond}({{ \tilde V}})=O\left(N^3\right).$}
+\begin{proof}
+  As in the proof of Proposition \ref{th:gmres_nop} above, the
+  residual satisfies
+  \begin{equation}\label{resp}
+    \begin{split}
+      \left\|{{L}}^{-1}r^{(m)}\right\|_{\ell^2_{\varepsilon}}&=\min_{v\in u^{(0)}+\tilde{\mathcal{K}}_m}\left \| {{L}}^{-1}(f - {L^{{\rm qcf}}_F} v) \right\|_{\ell^2_{\varepsilon}}\\
+      &=\min_{\substack{p_{m} \in {\mathcal{P}}_{m}\\
+          p_m (0) = 1}}  \left\|p_m\left({{L}}^{-1}{L^{{\rm qcf}}_F}\right){{L}}^{-1}r^{(0)}\right\|_{\ell^2_{\varepsilon}}\\
+      &=\min_{\substack{p_{m} \in {\mathcal{P}}_{m}\\
+          p_m (0) = 1}} \left\|{{ \tilde V}} p_m(\tilde\Lambda^{{\rm qcf}}){{ \tilde V}}^{-1}{{L}}^{-1}r^{(0)}\right\|_{\ell^2_{\varepsilon}}\\
+      &\le \operatorname{cond}({{ \tilde V}})
+      \inf_{\substack{p_{m} \in {\mathcal{P}}_{m}\\
+          p_m (0) = 1}} \left\| p_m \right\|_{\sigma\left({{L}}^{-1}{L^{{\rm qcf}}_F}\right)}\left\|{{L}}^{-1}r^{(0)}\right\|_{\ell^2_{\varepsilon}}\\
+    \end{split}
+  \end{equation}
+  where ${{ \tilde V}}$ is a matrix with the eigenvectors of ${{L}}^{-1}{L^{{\rm qcf}}_F}$
+  as its columns and ${{ \tilde V}}^{-1} {{L}}^{-1}{L^{{\rm qcf}}_F} {{ \tilde V}}$ is the
+  diagonal matrix $\tilde\Lambda^{{\rm qcf}}.$ By
+  Conjecture~\ref{th:spec_U12}, ${{L}}^{-1} {L^{{\rm qcf}}_F}$ has the same spectrum
+  as ${{L}}^{-1} {L^{{\rm qnl}}_F},$ and by Lemma~\ref{th:spec_Lqnl_U12}, we have
+  that $\tilde \gamma := \mu_1^{\rm qnl} / \mu_{2N-1}^{\rm qnl} \ge
+  {A_F}/{\phi''_F}.$ Using the bound on the spectrum, we arrive at the
+  estimate ~\eqref{vest}.
+  It follows from \eqref{resp} that ${{L}}^{-1}r^{(m)}$ depends only on ${{L}}^{-1}r^{(0)},$
+$A_F/\phi_F'',$ and $N.$
+\end{proof}
+
+Numerical experiments describing the convergence of the preconditioned
+GMRES method are displayed in Figures \ref{fig:gmres_p_res} and
+\ref{fig:gmres_p_err}. In the first iteration, we observe a large
+decrease in the residual, which can be explained by the fact that $1$
+is a multiple eigenvalue. Next, we see that the iteration for the two
+cases with $K = 4$ converges to machine precision in 10
+iterations. This is an immediate consequence of Lemma
+\ref{th:spec_Lqnl_U12}, which shows that ${{L}}^{-1} {L^{{\rm qcf}}_F}$ has exactly
+$2K+2$ distinct eigenvalues. Finally, we observe precisely the
+convergence rate for the residual predicted in Proposition
+\ref{th:convergence_gmres_p}, which is independent of $N$ and
+$K$. However, we also notice in Figure \ref{fig:gmres_p_err} that the
+error is not directly related to the residual. This may be caused by a
+large condition number of the eigenbasis, and means that the residual
+is not necessarily a reliable termination criterion. Finally, we note
+that, even though in this experiment $A_F$ is close to zero (that is,
+the systems is close to an instability), we still observe rapid
+convergence of the method.
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=11cm]{gmres_p_res}
+  \end{center}
+  \caption{\label{fig:gmres_p_res} Application of preconditioned GMRES
+    to the QCF system \eqref{eq:Lqcf_eq} with right-hand side
+    \eqref{eq:num_ex_rhs}, and with $A_F = 0.1$ and $\phi_F'' = 1$. We
+    plot the $\ell^2_{\varepsilon}$-norm of the preconditioned residual against
+    the iteration number $m$ for various choices of $N$ and $K$. We
+    observe precisely the convergence rate $\|L^{-1}
+    r^{(m)}\|_{\ell^2_{\varepsilon}} \sim q^m$ with $q = (1 -
+    \sqrt{A_F/\phi_F''}) / (1+\sqrt{A_F/\phi_F''})$, predicted in
+    Proposition \ref{th:convergence_gmres_p}. }
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=11cm]{gmres_p_err}
+  \end{center}
+  \caption{\label{fig:gmres_p_err} Application of preconditioned GMRES
+    to the QCF system \eqref{eq:Lqcf_eq} with right-hand side
+    \eqref{eq:num_ex_rhs}, and with $A_F = 0.1$ and $\phi_F'' = 1$. We
+    plot the $\ell^2_{\varepsilon}$-norm of the error $e^{(m)} = u^{(m)} -
+    u^{\rm qcf}$ against the iteration number $m$ for various choices
+    of $N$ and $K$. The expected rate is $\|e^{(m)}\|_{\ell^2_{\varepsilon}}
+    \sim q^m$ where $q = (1 - \sqrt{A_F/\phi_F''}) /
+    (1+\sqrt{A_F/\phi_F''})$. }
+\end{figure}
+
+\subsection{Preconditioned GMRES with $P={{L}}$ in the ${\mathcal{U}}^{1,2}$ norm}
+\label{sec:PQ-GMRES}
+A possible reason for the poor connection between residual and error
+in the preconditioned GMRES method is that we have minimized the
+residual in an inappropriate norm.  A more natural norm than $\|
+{{L}}^{-1} r^{(m)}\|_{\ell^2_{\varepsilon}}$ is the ${\mathcal{U}}^{1,2}$-norm ~\eqref{pos} of ${{L}}^{-1}
+r^{(m)}$
+\begin{displaymath}
+  \| {{L}}^{-1} r^{(m)} \|_{{\mathcal{U}}^{1,2}}= \| {{L}}^{-1/2} r^{(m)}\|_{\ell^2_{\varepsilon}}=\|r^{(m)}\|_{{\mathcal{U}}^{-1,2}}.
+\end{displaymath}
+This gives a clear motivation for minimizing the preconditioned
+residual ${{L}}^{-1} r^{(m)}$ in the ${\mathcal{U}}^{1,2}$-norm (see also
+\cite[Sec. 13]{Simoncini:2007} for a more extensive discussion of this
+idea and interesting generalizations).
+
+This leads to a variant of the preconditioned GMRES method where, at
+the $m$th step, we compute the minimizer
+\begin{equation*}
+  u^{(m)} := {{\rm argmin}}_{v \in u^{(0)}+\tilde{\mathcal{K}}_m} \big\| {{L}}^{-1}\big(f - {L^{{\rm qcf}}_F} v\big) \big\|_{{\mathcal{U}}^{1,2}},
+\end{equation*}
+by computing an Arnoldi sequence $\{\tilde v_1,\,\dots,\tilde
+v_{m+1}\}$ that is ${{\mathcal{U}}^{1,2}}-$orthonormal for the
+left-preconditioned equations~\eqref{eq:Lqcf_eqp}.  We then obtain,
+subject to the validity of Conjecture~\ref{th:spec_U12}, that the
+residuals satisfy
+\begin{equation}
+  \label{respp}
+  \begin{split}
+    \big\|{{L}}^{-1}r^{(m)}\big\|_{{\mathcal{U}}^{1,2}}
+    &= \min_{v\in u^{(0)}+\tilde{\mathcal{K}}_m} \big\| {{L}}^{-1}\big(f -
+    {L^{{\rm qcf}}_F} v\big)\big \|_{{\mathcal{U}}^{1,2}} \\
+    &= \min_{\substack{p_{m} \in {\mathcal{P}}_{m}\\p_m (0) = 1}}
+    \big\|p_m\big({{L}}^{-1}{L^{{\rm qcf}}_F}\big){{L}}^{-1}r^{(0)}\big\|_{{\mathcal{U}}^{1,2}}\\
+    &= \min_{\substack{p_{m} \in {\mathcal{P}}_{m}\\ p_m (0) = 1}}
+    \big\|{{ \tilde V}} p_m\big(\tilde\Lambda^{{\rm qcf}}\big){{ \tilde V}}^{-1}
+    {{L}}^{-1}r^{(0)}\big\|_{{\mathcal{U}}^{1,2}}\\
+    &\le \operatorname{cond}\big({{L}}^{1/2}{{ \tilde V}}\big)
+    \inf_{\substack{p_{m} \in {\mathcal{P}}_{m}\\ p_m (0) = 1}}
+    \big\| p_m \big\|_{\sigma\left({{L}}^{-1}{L^{{\rm qcf}}_F}\right)}
+    \big\|{{L}}^{-1}r^{(0)}\big\|_{{\mathcal{U}}^{1,2}} \\
+    &\le 2 \,\operatorname{cond}\big({{ \widetilde W}}\big)
+    \left({{\textstyle \frac{{1 - \sqrt{\frac{A_F}{\phi''_F}}}}{{
+        1 + \sqrt{\frac{A_F}{\phi''_F}}}}}}\right)^m
+    \big\|{{L}}^{-1}r^{(0)}\big\|_{{\mathcal{U}}^{1,2}}.
+  \end{split}
+\end{equation}
+It follows from \eqref{respp} that ${{L}}^{-1}r^{(m)}$ depends only on
+${{L}}^{-1}r^{(0)},$ $A_F/\phi_F'',$ and $N.$
+
+We have thus proven the following convergence result.
+
+\begin{proposition}
+  \label{th:convergence_gmres_pq}
+  If Conjecture~\ref{th:spec_U12} holds, then
+  \begin{equation*}
+    \begin{split}
+      \big\|{{L}}^{-1}r^{(m)}\big\|_{{\mathcal{U}}^{1,2}}&
+      \le 2 \,\operatorname{cond}\big({{ \widetilde W}}\big)
+      \left({{\textstyle \frac{{1 - \sqrt{\frac{A_F}{\phi''_F}}}}{{1 + \sqrt{\frac{A_F}{\phi''_F}}}}}}\right)^m
+      \big\|{{L}}^{-1}r^{(0)}\big\|_{{\mathcal{U}}^{1,2}}.
+    \end{split}
+  \end{equation*}
+\end{proposition}
+\remark{We recall from Conjecture~~\ref{th:qcf:condP_U02w} that
+$\operatorname{cond}({{ \widetilde W}})=O\left(N^3\right).$}
+
+We have tested this variant of the preconditioned GMRES method for the
+system \eqref{eq:Lqcf_eq} with right-hand side \eqref{eq:num_ex_rhs}
+and displayed the detailed convergence behavior in Figures
+\ref{fig:gmres_pq_res} and \ref{fig:gmres_pq_err}. All our
+observations about the residual that we made in the previous section
+are still valid; in particular, the spectrum of ${{L}}^{-1}{L^{{\rm qnl}}_F}$ (that
+is, of ${{L}}^{-1}{L^{{\rm qcf}}_F}$) fully predicts the convergence of the
+residual. Moreover, we notice that the residual and the error are now
+closely related, that is, the residual can be taken as a reliable
+termination criterion for the iterative method. Of course, we have not
+presented a proof for this statement and further investigations should
+be performed to verify this.
+
+To conclude we remark that, even though we find the GMRES
+method in the ${\mathcal{U}}^{1,2}$-inner product more attractive from a
+theoretical point of view, we have no evidence that it is
+considerably more efficient in practice than the more standard
+preconditioned GMRES method presented in Section 5.2. As a
+matter of fact, additional numerical experiments, the details
+of which we do not display here for space reasons,  show that
+the decay of the error in the ${\mathcal{U}}^{1,2}$-norm is quite similar
+for both methods, for a variety of choices of $N$, $K$, and
+$f$.
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=11cm]{gmres_pq_res}
+  \end{center}
+  \caption{\label{fig:gmres_pq_res} Application of the preconditioned
+    GMRES algorithm with ${\mathcal{U}}^{1,2}$-inner product to the QCF system
+    \eqref{eq:Lqcf_eq} with right-hand side \eqref{eq:num_ex_rhs}, and with $A_F = 0.1$ and $\phi_F''
+    = 1$. We
+    plot the ${\mathcal{U}}^{-1,2}$-norm ~\eqref{neg} of the residual against the iteration
+    number $m$, for various choices of $N$ and $K$. We observe precisely the convergence behaviour predicted by
+    Proposition \ref{th:convergence_gmres_pq}, namely $\|
+    r^{(m)}\|_{{\mathcal{U}}^{-1,2}} \sim q^m$ where $q = (1 -
+    \sqrt{A_F/\phi_F''}) / (1+\sqrt{A_F/\phi_F''})$.}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[width=11cm]{gmres_pq_err}
+  \end{center}
+  \caption{\label{fig:gmres_pq_err} Application of the preconditioned
+    GMRES algorithm with ${\mathcal{U}}^{1,2}$-inner product to the QCF system
+    \eqref{eq:Lqcf_eq} with right-hand side \eqref{eq:num_ex_rhs}, and
+    with $A_F = 0.1$ and $\phi_F'' = 1$. We plot the ${\mathcal{U}}^{1,2}$-norm
+    of the error $e^{(m)} = u^{(m)} - u^{\rm qcf}$ against the
+    iteration number $m$, for various choices of $N$ and $K$. We
+    observe that $\| e^{(m)} \|_{{\mathcal{U}}^{1,2}}$ closely mirrors the norm
+    of the residual $\| {{L}}^{-1/2} r^{(m)}\|_{\ell^2_{\varepsilon}},$  that is, the residual
+    provides a reliable prediction for the actual error. }
+\end{figure}
+
+\section*{Conclusion}
+
+We began by studying the widely used ghost force correction method
+(GFC)~\cite{Shenoy:1999a}, which can be understood as a linear stationary method for QCF
+using the QCE operator as a preconditioner. We showed that the GFC method
+becomes unstable for our model problem before the critical strain
+is reached. In practice, this means that the ghost force correction
+method would predict a reduced critical strain for the onset of
+defect formation or motion.  We also showed that a popular modified
+nonlinear conjugate gradient method to solve the QCF equations~\cite{Miller:2008}
+is numerically unstable for our model problem.
+
+We then proposed and studied several variants of the generalized minimal
+residual method (GMRES), which are a natural choice for the
+non-symmetric QCF operator. Since our experience with stationary
+methods indicates that the QCL preconditioner combines efficiency and
+reliability~\cite{qcf.iterative}, we focused exclusively on this preconditioner. Our
+analysis and computational experiments have led us to propose a GMRES
+method, which uses the QCL method as a preconditioner as well as the
+underlying inner product. This method is reliable for
+our model problem up to the critical
+strain, and the residual appears to offer a more effective termination criterion.
+
+Future research will
+explore the extension of the algorithms and analysis in this paper to
+the multi-dimensional and nonlinear setting to develop predictive and
+efficient iterative solution methods for more general force-based
+hybrid and multiphysics
+methods~\cite{hybrid_review,kohlhoff,cadd,Miller:2008}.
+Our investigations may also prove relevant for some hybrid methods that
+utilize overlapping or bridging domains
+~\cite[see Method III]{BadiaParksBochevGunzburgerLehoucq:2007}.
+
+\appendix
+\section{Eigenbasis Computation for ${{L}}^{-1} {L^{{\rm qcf}}_F}$.}
+\label{app:cond_calc}
+We note that care must be taken when computing the basis of
+eigenvectors since the eigenvalue $A_F$ has a multiplicity of
+$(2N-2K-2)$ (cf. Lemma \ref{th:spec_Lqnl_U12}). This renders the
+problem highly ill-conditioned and naive usage of a standard
+eigensolver leads to unstable results. To circumvent this difficulty,
+we observe from \eqref{qcf} that ${L^{{\rm qcf}}_F} e_j=A_F{{L}} e_j$ for
+$j=-N+1,\dots, -K-3$ and $j= K+3,\dots, N-1$, and hence
+${{L}}^{-1}{L^{{\rm qcf}}_F}$ has the block structure
+\begin{equation*}
+    {{L}}^{-1}{L^{{\rm qcf}}_F} = {\scriptsize \left(\begin{array}{rrr|r|rrr}
+    A_F &      &     & \multirow{3}{*}{${X_1}$} &     &      &   \\[-1mm]
+        &\ddots&     &      &   &      &   \\[-1mm]
+        &      & A_F &      &   &      &   \\
+      \hline
+        &      &     & \multirow{3}{*}{${X_2}$} &     &      &   \\
+	&      &     &   &   &      &   \\
+	&      &     &   &   &      &   \\
+      \hline
+        &      &     & \multirow{3}{*}{${X_3}$} & A_F &      &   \\[-1mm]
+        &      &     &     &     &\ddots&   \\[-1mm]
+        &      &     &     &     &      & A_F
+    \end{array} \right), }
+\end{equation*}
+where $X_2$ is a $(2K+5) \times (2K+5)$ matrix.  From this form, we
+see that there are $2N-2K-6$ standard unit vectors that are
+eigenvectors corresponding to the eigenvalue $A_F.$ According to
+Lemma~\ref{th:spec_Lqnl_U12}, the multiplicity of $A_F$ is $2N-2K-2,$
+so that we have accounted for all but four eigenvectors of the high
+multiplicity eigenvalue $A_F.$
+
+Next, we reduce the dimensionality of the eigenvalue problem to
+\begin{equation*}
+  X_2 v_2 = \lambda v_2.
+\end{equation*}
+We then extend these eigenvectors to eigenvectors of ${{L}}^{-1} {L^{{\rm qcf}}_F}$
+by defining
+\begin{equation*}
+  v = \left[
+    \begin{array}{c}
+      v_1\\
+      v_2\\
+      v_3
+    \end{array}
+  \right]
+\end{equation*}
+where $v_1:=(\lambda-A_F)^{-1}X_1 v_2$ and $v_3:=(\lambda-A_F)^{-1}X_3
+v_2.$ Note that $v_i$ ($i=1,3$) is well defined provided that $\lambda
+\neq A_F$ or $X_i v_2 = 0,$ and we observe numerically that $X_i v_2 =
+0$ whenever $\lambda = A_F.$ Finally, the eigenvectors obtained in
+this manner are normalized before computing the condition number of
+the eigenbasis.
+
+\begin{thebibliography}{10}
+
+\bibitem{BadiaParksBochevGunzburgerLehoucq:2007}
+S.~Badia, M.~L. Parks, P.~B. Bochev, M.~Gunzburger, and R.~B. Lehoucq.
+\newblock On atomistic-to-continuum coupling by blending.
+\newblock {\em SIAM J. Multiscale Modeling \& Simulation}, 7(1):381--406, 2008.
+
+\bibitem{arlequin1}
+P.~Bauman, H.~B. Dhia, N.~Elkhodja, J.~Oden, , and S.~Prudhomme.
+\newblock On the application of the {A}rlequin method to the coupling of
+  particle and continuum models.
+\newblock {\em Computational Mechanics}, 42:511--530, 2008.
+
+\bibitem{ted03}
+T.~Belytschko and S.~P. Xiao.
+\newblock A bridging domain method for coupling continua with molecular
+  dynamics.
+\newblock {\em Computer Methods in Applied Mechanics and Engineering},
+  193:1645--1669, 2004.
+
+\bibitem{hybrid_review}
+N.~Bernstein, J.~R. Kermode, and G.~Cs{\'{a}}nyi.
+\newblock Hybrid atomistic simulation methods for materials systems.
+\newblock {\em Reports on Progress in Physics}, 72:pp. 026501, 2009.
+
+\bibitem{blan05}
+X.~Blanc, C.~Le~Bris, and F.~Legoll.
+\newblock Analysis of a prototypical multiscale method coupling atomistic and
+  continuum mechanics.
+\newblock {\em M2AN Math. Model. Numer. Anal.}, 39(4):797--826, 2005.
+
+\bibitem{Dobson:2008a}
+M.~Dobson and M.~Luskin.
+\newblock Analysis of a force-based quasicontinuum approximation.
+\newblock {\em M2AN Math. Model. Numer. Anal.}, 42(1):113--139, 2008.
+
+\bibitem{dobsonluskin08}
+M.~Dobson and M.~Luskin.
+\newblock Iterative solution of the quasicontinuum equilibrium equations with
+  continuation.
+\newblock {\em Journal of Scientific Computing}, 37:19--41, 2008.
+
+\bibitem{Dobson:2008c}
+M.~Dobson and M.~Luskin.
+\newblock {An analysis of the effect of ghost force oscillation on the
+  quasicontinuum error}.
+\newblock {\em Mathematical Modelling and Numerical Analysis}, 43:591--604,
+  2009.
+
+\bibitem{Dobson:2008b}
+M.~Dobson and M.~Luskin.
+\newblock {An optimal order error analysis of the one-dimensional
+  quasicontinuum approximation}.
+\newblock {\em SIAM. J. Numer. Anal.}, 47:2455--2475, 2009.
+
+\bibitem{doblusort:qce.stab}
+M.~Dobson, M.~Luskin, and C.~Ortner.
+\newblock Accuracy of quasicontinuum approximations near instabilities.
+\newblock arXiv:0905.2914v2, 2009.
+
+\bibitem{qcf.iterative}
+M.~Dobson, M.~Luskin, and C.~Ortner.
+\newblock Analysis of iterative methods for the force-based quasicontinuum
+  method.
+\newblock manuscript, 2009.
+
+\bibitem{sharpstabilityqcf}
+M.~Dobson, M.~Luskin, and C.~Ortner.
+\newblock Sharp stability estimates for the force-based quasicontinuum method.
+\newblock arXiv:0907.3861, 2009.
+
+\bibitem{dobs-qcf2}
+M.~Dobson, M.~Luskin, and C.~Ortner.
+\newblock Stability, instability, and error of the force-based quasicontinuum
+  approximation.
+\newblock {\em Archive for Rational Mechanics and Analysis}, to appear.
+
+\bibitem{E:2006}
+W.~E, J.~Lu, and J.~Yang.
+\newblock {Uniform accuracy of the quasicontinuum method}.
+\newblock {\em {Phys. Rev. B}}, 74(21):214115, 2004.
+
+\bibitem{gaviniorbital}
+V.~Gavini, K.~Bhattacharya, and M.~Ortiz.
+\newblock Quasi-continuum orbital-free density-functional theory: A route to
+  multi-million atom non-periodic {DFT} calculation.
+\newblock {\em J. Mech. Phys. Solids}, 55:697--718, 2007.
+
+\bibitem{Gunzburger:2008a}
+M.~Gunzburger and Y.~Zhang.
+\newblock A quadrature-rule type approximation for the quasicontinuum method.
+\newblock {\em Multiscale Modeling and Simulation}, to appear.
+
+\bibitem{Knap:2001a}
+J.~Knap and M.~Ortiz.
+\newblock {An Analysis of the Quasicontinuum Method}.
+\newblock {\em J. Mech. Phys. Solids}, 49:1899--1923, 2001.
+
+\bibitem{kohlhoff}
+S.~Kohlhoff, P.~Gumbsch, and H.~F. Fischmeister.
+\newblock Crack propagation in bcc crystals studied with a combined
+  finite-element and atomistic model.
+\newblock {\em Phil. Mag. A}, 64(4):851--878, 1991.
+
+\bibitem{LinP:2006a}
+P.~Lin.
+\newblock Convergence analysis of a quasi-continuum approximation for a
+  two-dimensional material without defects.
+\newblock {\em SIAM J. Numer. Anal.}, 45(1):313--332 (electronic), 2007.
+
+\bibitem{Miller:2003a}
+R.~Miller and E.~Tadmor.
+\newblock {The Quasicontinuum Method: Overview, Applications and Current
+  Directions}.
+\newblock {\em Journal of Computer-Aided Materials Design}, 9:203--239, 2003.
+
+\bibitem{Miller:2008}
+R.~Miller and E.~Tadmor.
+\newblock Benchmarking multiscale methods.
+\newblock {\em Modelling and Simulation in Materials Science and Engineering},
+  17:053001 (51pp), 2009.
+
+\bibitem{mingyang}
+P.~Ming and J.~Z. Yang.
+\newblock Analysis of a one-dimensional nonlocal quasicontinuum method.
+\newblock {\em Multiscale Modeling and Simulation}, 7:1838--1875, 2009.
+
+\bibitem{NocedalWright99}
+J.~Nocedal and S.~Wright.
+\newblock {\em Numerical Optimization}.
+\newblock Springer-Verlag, New York, 1999.
+
+\bibitem{Ortiz:1996a}
+M.~Ortiz, R.~Phillips, and E.~B. Tadmor.
+\newblock {Quasicontinuum Analysis of Defects in Solids}.
+\newblock {\em {Philosophical Magazine A}}, 73(6):1529--1563, 1996.
+
+\bibitem{Ortner:2008a}
+C.~Ortner and E.~S{\"u}li.
+\newblock Analysis of a quasicontinuum method in one dimension.
+\newblock {\em M2AN Math. Model. Numer. Anal.}, 42(1):57--91, 2008.
+
+\bibitem{saad}
+Y.~Saad.
+\newblock {\em Iterative Methods for Sparse Linear Systems}, volume~2.
+\newblock Society for Industrial and Applied Mathematics (SIAM), 2003.
+
+\bibitem{Shenoy:1999a}
+V.~B. Shenoy, R.~Miller, E.~B. Tadmor, D.~Rodney, R.~Phillips, and M.~Ortiz.
+\newblock {An adaptive finite element approach to atomic-scale mechanics--the
+  quasicontinuum method}.
+\newblock {\em {J. Mech. Phys. Solids}}, 47(3):611--642, 1999.
+
+\bibitem{cadd}
+L.~E. Shilkrot, R.~E. Miller, and W.~A. Curtin.
+\newblock Coupled atomistic and discrete dislocation plasticity.
+\newblock {\em Phys. Rev. Lett.}, 89(2):025501, 2002.
+
+\bibitem{Shimokawa:2004}
+T.~Shimokawa, J.~Mortensen, J.~Schiotz, and K.~Jacobsen.
+\newblock {Matching conditions in the quasicontinuum method: Removal of the
+  error introduced at the interface between the coarse-grained and fully
+  atomistic region}.
+\newblock {\em {Phys. Rev. B}}, 69(21):214104, 2004.
+
+\bibitem{Simoncini:2007}
+V.~Simoncini and D.~B. Szyld.
+\newblock Recent computational developments in {K}rylov subspace methods for
+  linear systems.
+\newblock {\em Numer. Linear Algebra Appl.}, 14(1):1--59, 2007.
+
+\bibitem{SuliMayers}
+E.~S{\"u}li and D.~F. Mayers.
+\newblock {\em An introduction to numerical analysis}.
+\newblock Cambridge University Press, Cambridge, 2003.
+
+\bibitem{tref97}
+L.~N. Trefethen and D.~Bau~III.
+\newblock {\em Numerical Linear Algebra}.
+\newblock Society for Industrial and Applied Mathematics (SIAM), 1997.
+
+\end{thebibliography}
+
+\end{document}
+
