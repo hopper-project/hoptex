@@ -396,6 +396,7 @@ def put_mathml(tex, mathml):
     eqid = cursor.fetchall()
     if len(eqid) == 0:
         print('INSERT operation failed')
+        raise RuntimeError
     else:
         #eqid = cursor.fetchall()[0][0]
         print('MathML inserted for {}'.format(eqid[0][0]))
