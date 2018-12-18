@@ -385,21 +385,20 @@ def put_mathml(tex, mathml):
     #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
     sql_command = ('''UPDATE equation_metadata SET mathml='{}' \
-            WHERE BINARY tex="{}"''').format(mathml,add_backslash(tex))
+            WHERE BINARY tex="{}"''').format(add_backslash(mathml),add_backslash(tex))
     nr = cursor.execute(sql_command)
     #if nr != 1:
     #    print('INSERT operation failed for {}'.format(eqid))
 
-    """
     sql_command = ('''SELECT equation_id FROM equation_metadata \
-            WHERE BINARY tex="{}"''').format(tex)
+            WHERE BINARY mathml="{}"''').format(add_backslash(mathml))
     nr = cursor.execute(sql_command)
-    if nr != 1:
-        print('INSERT operation failed for {}'.format(eqid))
+    eqid = cursor.fetchall()
+    if len(eqid) == 0:
+        print('INSERT operation failed')
     else:
-        eqid = cursor.fetchall()[0][0]
-        print('MathML inserted for {}'.format(eqid))
-    """
+        #eqid = cursor.fetchall()[0][0]
+        print('MathML inserted for {}'.format(eqid[0][0]))
 
     db.commit()
     db.close()
