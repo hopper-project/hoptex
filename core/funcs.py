@@ -170,6 +170,26 @@ def generate_sanitized_document(text):
     output = '\n\n'.join(preamble+body+postamble)
     return output
 
+def format_tex_equation(text, eq):
+    """Given an article and an equation from the article, returns a properly
+    formatted LaTeX document that only contains the equation given."""
+    text = remove_comments(text)
+    text = remove_inline_math(text)
+    if not (re.search(bdoc, text) and re.search(edoc, text)):
+        return ""
+    packages = re.findall(r'(?s)\\usepackage(?:\[.*?\])?\{.*?\}',text)
+    docclass = re.search(r'\\documentclass(?:\[.*?\])?\{.*?\}',text)
+    """Uses documentclass article if no custom document class is specified"""
+    if (docclass):
+        docclass = docclass.group(0) + '\n'
+        docclass = re.sub(r'\{.*?\}', "{article}", docclass)
+    else:
+        docclass = '\\documentclass{article}\n'
+    preamble = [docclass] + packages + ['\\begin{document}\n']
+    postamble = ["\\end{document}"]
+    output = '\n\n'.join(preamble + [eq] + postamble)
+    return output
+
 def sanitized_doc_from_file(filename):
     with open(filename,mode='r',encoding='latin-1') as fh:
         text = fh.read()
@@ -426,7 +446,7 @@ def get_mathml(tex):
     """Gets mathml of tex from the database if available.
     If not found, returns an empty string"""
 
-    db = MySQLdb.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
+    db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
     cursor = db.cursor()
     #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
