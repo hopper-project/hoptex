@@ -19,7 +19,7 @@ def main():
     db.close()
 
     subprocess.call(["rm -rf ./dest/json_dest/*"], shell=True)
-    subprocess.call(["rm -rf ./dest/xhtml/*"], shell=True)
+    subprocess.call(["rm -rf ./dest/xhtml_dest/*"], shell=True)
     subprocess.call(["rm -rf ./sep/*"], shell=True)
 
 if __name__ == "__main__":
