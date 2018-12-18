@@ -446,7 +446,7 @@ def get_mathml(tex):
     """Gets mathml of tex from the database if available.
     If not found, returns an empty string"""
 
-    db = MySQLdb.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
+    db = pymysql.connect(host='128.59.9.239', user='root', port=3306, db='arxiv')
     cursor = db.cursor()
     #cursor.execute("SET sql_mode='NO_BACKSLASH_ESCAPES'")
 
