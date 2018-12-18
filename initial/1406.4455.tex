@@ -1,0 +1,2477 @@
+\documentclass[11pt]{amsart}
+\usepackage[margin=1in]{geometry} 
+\usepackage{graphicx} 
+\graphicspath{{Figures/}}
+
+\usepackage{rotating}
+\usepackage{color}
+\usepackage{bm}  
+\usepackage{amssymb,amsmath,amsfonts}
+\usepackage{amscd}
+\usepackage{verbatim}
+\usepackage{subfigure}
+
+\DeclareMathAlphabet\mathbold{OML}{cmm}{b}{it}
+
+\definecolor{black}{rgb}{0,0,0}
+
+ 
+
+\numberwithin{equation}{section}
+ 
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{remark}{Remark}[section]
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem{definition}{Definition}[section]
+\newtheorem{algorithm}{Algorithm}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{definition}\newtheorem{example}{Example}[section]
+
+ 
+ 
+ 
+ 
+ 
+
+\def\b1{{\mathbf 1}}
+
+ 
+
+ 
+ 
+ 
+
+ 
+
+                       
+    
+ 
+
+ 
+                     
+       
+              
+              
+
+              
+
+ 
+
+ 
+ 
+\title[Preconditioning of weighted ${{\boldsymbol H}}({\operatorname{div}})$-norm and applications]
+{Preconditioning of weighted ${{\boldsymbol H}}({\operatorname{div}})$-norm and applications to numerical simulation of 
+highly heterogeneous media}
+
+\author[J.~Kraus, R.~Lazarov, M.~Lymbery, S.~Margenov, L.~Zikatanov]
+{Johannes Kraus, Raytcho  Lazarov, Maria Lymbery, Svetozar Margenov, and Ludmil Zikatanov}
+
+\address{Thea-Leymann-Str. 9 45141 Essen, Germany}
+\email{johannes.kraus@uni-due.de}
+
+\address{Department of Mathematics, 
+Texas A \& M University, College Station, TX 77843, USA and Institute
+of Mathematics  and Informatics, Bulgarian Academy of Sciences, Acad. G. Bonchev St., Bl. 8,  1113 - Sofia, Bulgaria}
+\email{lazarov@math.tamu.edu}
+
+\address{Institute of Information and Communication Technologies, Bulgarian Academy of Sciences,
+Acad. G. Bonchev St., Block 2,  1113 - Sofia, BULGARIA}
+\email{mariq@parallel.bas.bg}
+
+\address{Institute of Information and Communication Technologies, Bulgarian Academy of Sciences,
+Acad. G. Bonchev St., Block 2,  1113 - Sofia, BULGARIA}
+\email{margenov@parallel.bas.bg}
+
+\address{Department of Mathematics, The Pennsylvania State University,
+  University Park, PA 16802, USA and Institute of Mathematics and
+  Informatics, Bulgarian Academy of Sciences, Acad. G. Bonchev St.,
+  Bl. 8, 1113 - Sofia, Bulgaria} \email{ludmil@psu.edu}
+
+\keywords{mixed finite elements, least-squares, high contrast media, robust preconditioners
+for weighted ${{\boldsymbol H}}({\operatorname{div}})$-norm, discrete Poincar\'e inequality}
+
+ 
+\subjclass{65F10, 65N20, 65N30}
+ 
+\date{February 26, 2013--beginning; Today is \today}
+ \thanks{}
+
+\begin{document}
+ 
+\begin{abstract}
+In this paper we propose and analyze  a preconditioner for a system arising from a finite element
+approximation of second order elliptic problems describing processes in 
+highly heterogeneous media.
+Our approach uses the technique of multilevel methods (see,
+e.g. \cite{2008VassilevskiP-aa}) and the recently proposed
+preconditioner based on additive Schur complement approximation by
+J. Kraus (see, \cite{Kraus_12}). The main results are the design and a 
+theoretical and numerical justification of an iterative method for
+such problems that is robust with respect to the contrast of the
+media, defined as the ratio between the maximum and minimum values of
+the coefficient (related to the permeability/conductivity).
+\end{abstract}
+\maketitle
+
+\section{Introduction}\label{sec:intro}
+We consider the following second order elliptic 
+boundary value problem written in mixed form 
+for the unknown scalar functions $p(x)$ 
+and the vector function ${{\mathbf u}}$: 
+\begin{subequations}
+\begin{alignat}{2} 
+\label{equation-1}
+ {{\mathbf u}} + K(x) \nabla p &= 0 \qquad && \text{in $\Omega$,}\\
+\label{equation-2}
+{\operatorname{div}} {{\mathbf u}}  &= f && \text{in $\Omega$},\\
+\label{D BC}
+p &= 0 && \text{on $\Gamma_D$ , } \\%$\partial \Omega$.}
+\label{N BC} 
+{{\mathbf u}} \cdot {{\mathbf n}}  &=0 && \text{on $\Gamma_N$. }
+\end{alignat}
+\end{subequations}
+Here, $K: \mathbb{R}^d\mapsto \mathbb{R}^{d\times d}$ is a
+function taking values in symmetric, 
+positive definite (SPD) $d\times d$ matrices for almost all $x \in \Omega$.
+ The given forcing term $f $ is function in $ L^2(\Omega)$,   
+ $\Omega \subset \mathbb{R}^d$ ($d=2,3$) is a bounded polyhedral
+ domain, and its boundary $\partial \Omega $ is split into two
+ non-overlapping parts $\Gamma_D$ and $\Gamma_N$.  In the case pure
+ Neumann problem, i.e. $\Gamma_N=\partial \Omega$, we assume that $f$
+ satisfies the compatibility condition $\int_\Omega f dx=0$. In such a
+ case the solution is determined uniquely by taking $\int_\Omega p ~dx=0$.
+ To simplify our presentation, we shall assume that $\Gamma_D$ is an
+ non-empty set with strictly positive measure which is also closed
+ with respect to $\partial \Omega$, so the above problem
+ has unique solution $ p \in H^1(\Omega)$.
+
+This equation is a model used for example in heat and mass
+transfer,  flows in porous media, diffusion of passive chemicals, 
+electromagnetics,  and other applied areas. 
+Here we target applications of equations \eqref{equation-1} - \eqref{N
+  BC} to flows in {\it highly heterogeneous} media of high contrast. 
+This means that the coefficient $K(x)$ represents media with
+multiscale features, such as many inclusions where $K(x)$ has small
+values and long connected subdomains where $K(x)$ has large values. An
+important characteristic for such media is the contrast $\kappa$,
+defined by \eqref{contrast}. In the terminology of flows in porous
+media the coefficient $K(x)$ is called permeability and the unknown 
+variables $p$ and ${{\mathbf u}}$ are called pressure and 
+velocity, respectively.
+
+Flows in porous media appear in many industrial, scientific, engineering, and 
+environmental applications. One common characteristic of these diverse areas 
+of applications is that porous media are intrinsically multiscale and 
+typically display heterogeneities over a wide range of length-scales.
+The computer generated permeability coefficient $K(x)$ which exhibits such
+features and is used in petroleum engineering simulations as a
+benchmark is found in the SPE10 Project~\cite{SPE10_project}.
+
+Depending on the application and its goals, solving the governing equations of flows in porous media might be sought at: 
+(a) a coarse scale (e.g., if only the global pressure drop for a given 
+flow rate is needed, and no other fine 
+scale details of the solution are important), 
+or  a coarse scale enriched with some desirable fine scale details, and 
+(b) the finest scale  that resolves media heterogeneities, if computationally 
+this is possible. 
+The numerical solution of latter class of problems is a challenging task that has attracted a 
+substantial attention in the scientific and engineering community.
+
+The aim of this paper is finite element approximations of the problem 
+\eqref{equation-1} -- \eqref{N BC} on a mesh that resolves the finest scale of
+the permeability. This leads to a very large system of algebraic equations 
+and its efficient solution is the object of this paper.  We give two finite element
+approximations, dual mixed and least-squares FEM, and  develop, study 
+and test an optimal (with respect to the contrast ${\kappa}$ and the mesh
+size $h$)  preconditioner for the corresponding algebraic problem.
+
+The system arising from the finite element approximation
+has symmetric matrix, which is indefinite in the case of a mixed method
+and positive definite in the case of a least-squares approximation. In
+both cases the preconditioner is a block diagonal matrix, which in
+combination with a minimal residual method in the case of mixed method
+and conjugate gradient iteration in the case of least-squares FEM,
+leads to an optimal preconditioner so that the number of iterations
+does not depend neither on the contrast nor on the mesh size.
+
+In the least-squares methods written as a system of linear equations
+for the unknown ${{\mathbf u}}$ and $p$, the upper left block (corresponding to
+the vector variable ${{\mathbf u}}$) is a symmetric and positive definite matrix,
+corresponding to the finite element approximation of the weighted
+bilinear form $(K^{-1}{{\mathbf u}}, {{\mathbf v}}) + ({\operatorname{div}} {{\mathbf u}}, {\operatorname{div}} {{\mathbf v}})$ with
+${{\boldsymbol H}}({\operatorname{div}})$-conforming finite elements.  For the mixed method this form
+plays also essential role (see,
+e.g. \cite{Arnold1997preconditioning}).  It is known that the
+preconditioner of Arnold, Falk, and Winther,
+\cite{Arnold1997preconditioning, Arnold2000MG}, is optimal if $K(x)$
+is a constant matrix. However, since $K(x)$ is the permeability of
+heterogeneous media of high contrast, the corresponding matrix is very
+ill-conditioned and consequently construction of an optimal
+preconditioner is a nontrivial task.
+The main result and novelty of this paper is design, theoretical justification, and 
+experimental  study of a preconditioner for the matrix corresponding 
+to the above weighted bilinear form 
+that will produce an optimal iterative method  which converges independently
+of the contrast $\kappa$.  Such construction is based on the
+method developed in~\cite{Kraus_Lymb_Mar_2014}.
+
+The paper is organized as follows. In Section \ref{sec:problem} the dual mixed and 
+least-squares variational formulations of the boundary value 
+problem~\eqref{equation-1}--\eqref{N BC} are given.  Next we
+introduce the weighted ${{\boldsymbol H}}({\operatorname{div}})$ bilinear form and show proper
+inf-sup condition using the corresponding weighted norm. We emphasize
+that the constant in the inf-sup condition, coercivity and the
+boundedness of the corresponding forms do not depend on the contrast
+of the media defined by \eqref{contrast}.
+In Section~\ref{s:FEM} we introduce finite element approximations for the mixed and least-squared formulations. A key point in this part is Lemma \ref{lem:stab_fin}  
+where we establish an inf-sup condition 
+on a discrete level with a constant independent on the contrast. The detailed proof of the
+Lemma is given in the Appendix. In Section \ref{s:precon}, which is central to the paper,
+we describe the preconditioning method for the finite element  systems. 
+Starting with the definition of a block-diagonal preconditioner for the dual-mixed formulation
+in operator notation, see Section~\ref{sec:b-diag-operator}, a reformulation of the FE problem
+in matrix notation is given in Section~\ref{sec:matrix-notation}.
+The key issue in designing a contrast-independent Krylov solver becomes the construction
+of a robust preconditioner for the weighted $H({\operatorname{div}})$-norm. This is addressed in 
+details in Section~\ref{sec:robust-H_div-precond} by, first, discussing an abstract auxiliary
+space two-grid method, see Section~\ref{sec:as-2-grid-precond}, and then, defining an
+auxiliary space multigrid (ASMG) method, see Section~\ref{sec:asmg}. Two variants of the
+algorithm are described in Section~\ref{sec:algorithms} differing only in the choice of the basis
+in which smoothing and residual updates are performed. Finally, in Section~\ref{sec:numerics}, we 
+present the numerical results for three different examples of porous media in two dimensions
+in order to test the robustness of the preconditioner with respect to media contrast and its
+optimality with respect to the mesh-size. All numerical results confirm our theoretical findings.
+
+\section{Problem formulation}\label{sec:problem}
+
+\subsection{Notation and preliminaries}
+
+For functions defined on ${{\Omega}}$ we shall use the standard notations for
+Sobolev spaces.  Namely, $H^s({{\Omega}})$, $s \ge 0$ an integer, is the
+space of functions having their generalized derivatives up to order
+$s$ square-integrable on ${{\Omega}}$.  We denote by $(\cdot,\cdot)$ the
+$L^2$ and $[L^2]^d$ inner products. 
+The standard norms on $H^s$ are denoted by $\|\cdot\|_{s}$. 
+For $s=0$ we shall often use $\|\cdot\|$ without subscript. 
+When the
+norm is weighted with a matrix valued function $\omega(x)$,
+with $\omega(x)$ SPD for almost all $x\in \Omega$ we use the
+notation:
+\[
+\|{{\mathbf v}}\|_{0,\omega} := 
+\|\omega^{1/2}{{\mathbf v}}\|, \quad
+|\phi|_{1,\omega}:= \|\nabla \phi\|_{0,\omega} =\|\omega^{1/2}\nabla \phi\|.
+\]
+Occasionally, when we consider only a subset of $\Omega$, say,
+$T\subset \Omega$ we will indicate this in the notation for the norms
+and seminorms, i.e., we have $\|\cdot\|_{s,T}$,
+$\|\cdot\|_{s,\omega,T}$, $|\cdot|_{s,T}$, and $|\cdot|_{s,\omega,T}$.
+
+In the following, if $\omega\in \mathbb{R}^{d\times d}$ is symmetric matrix,
+the norm $\|\omega\|_{\ell^2}$ is, as usual, the spectral radius of
+$\omega$.  
+We introduce the number 
+\begin{equation}\label{contrast}
+\kappa = \max_{x \in \Omega} (\|K(x)\|_{\ell^2}\|K^{-1}(x)\|_{\ell^2}). 
+\end{equation}
+called the contrast of the media, is assumed that this could be many
+orders of magnitude.  For scalar permeability $K(x)$, obviously,
+$\kappa = \max_{x \in {{\Omega}}}K(x)/\min_{x \in {{\Omega}}}K(x)$.  
+The values of $\kappa$ typically are very large (up to $10^8$). 
+
+The Hilbert space ${{\boldsymbol H}}({\operatorname{div}})$ consists of square-integrable
+vector-fields on ${{\Omega}}$ with square-integrable divergence. The inner product in
+${{\boldsymbol H}}({\operatorname{div}})$ is given by
+\begin{equation}\label{H-div-prod}
+\Lambda({{\mathbf u}}, {{\mathbf v}})= ({{\mathbf u}},{{\mathbf v}}) + ({\operatorname{div}} {{\mathbf u}}, {\operatorname{div}} {{\mathbf v}}).
+\end{equation}
+Further we use the notation of the Sobolev spaces $H^1_D({{\Omega}})$ and ${{\boldsymbol H}}_N({\operatorname{div}})$
+\begin{equation}\label{H-D}
+H^1_D({{\Omega}}) = \{ \phi \in H^1({{\Omega}}): ~~\phi(x)=0 \quad \text{on} \quad \Gamma_D\}.
+\end{equation}
+In the case when $\Gamma_D=\emptyset$ we have
+\begin{equation}\label{H-D-2}
+H^1_D({{\Omega}}) = \{ \phi \in H^1({{\Omega}}): ~~\int_{\Omega}\phi=0\}.
+\end{equation}
+Note that for $\phi\in H^1_D({{\Omega}})$ the seminorms
+$|\phi|_1=\|\nabla \phi\|$ and 
+$|\phi|_{1,\omega}=\|\omega^{1/2}\nabla \phi\|$  
+are in fact norms on $H^1_D(\Omega)$ and we denote these norms
+by 
+$\|\phi\|_1$ and $\|\phi\|_{1,\omega}$. 
+The
+space   ${{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}})$ is defined as follows: 
+\begin{equation}\label{H-N}
+  {{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}}) 
+:= {{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}}; {{\Omega}})= \{ {{\mathbf v}} \in {{\boldsymbol H}}({\operatorname{div}}; {{\Omega}}): ~~{{\mathbf v}}(x) \cdot {{\mathbf n}}=0 \quad \text{on} \quad \Gamma_N\}.
+\end{equation}
+
+Together with \eqref{H-div-prod} the weighted inner product in the space ${{\boldsymbol H}}({\operatorname{div}})$ 
+will play a fundamental role in our analysis  
+\begin{equation}\label{WH-div-prod}
+\Lambda_{{\alpha}}({{\mathbf u}}, {{\mathbf v}})= ({{\alpha}}~{{\mathbf u}},{{\mathbf v}}) + ({\operatorname{div}} {{\mathbf u}}, {\operatorname{div}} {{\mathbf v}}), 
+\quad \alpha(x) = K^{-1}(x).
+\end{equation}
+We also denote
+\[
+\|{{\mathbf v}}\|^2_{\Lambda_\alpha}  = 
+\Lambda_{{\alpha}}({{\mathbf v}}, {{\mathbf v}})= 
+\|{{\mathbf v}}\|^2_{0,\alpha} + \|{\operatorname{div}} {{\mathbf v}}\|^2.
+\]
+Note, that a weighted bilinear form of the type $
+\Lambda_{\alpha,\beta}({{\mathbf u}}, {{\mathbf v}})= \alpha ({{\mathbf u}}, {{\mathbf v}}) + \beta ({\operatorname{div}}
+{{\mathbf u}}, {\operatorname{div}} {{\mathbf v}}) $, with $\alpha > 0$ and $\beta > 0$ constants, was
+used by Arnold, Falk, and Winther in \cite{Arnold2000MG} to design
+multigrid methods for ${{\boldsymbol H}}({\operatorname{div}})$-systems.  A key moment in their
+study was the construction of a multigrid method that converges
+uniformly with respect to the parameters $\alpha$ and $\beta$. The
+important difference between our bilinear form $\Lambda_\alpha$
+compared with $ \Lambda_{\alpha,\beta}$ is that in our form $\alpha$
+is a highly heterogeneous function with high contrast.
+This makes the proof of a proper {\it inf-sup} condition more delicate
+and the construction of an efficient preconditioner more complicated.
+
+The main objective of this work is a derivation and theoretical justification
+of numerical methods for solving the problem \eqref{equation-1} --
+\eqref{N BC} 
+that are robust with respect to the media contrast, or in the ideal case, 
+do not depend on the contrast
+$\kappa$. In this regard, in the following we write $x \lesssim y$ to
+denote the existence of a constant $C$ such that $x\le Cy$. In case
+$x\lesssim y$ and $y\lesssim x$ we write $x\eqsim y$. It is important
+to remember that in our analysis the constants hidden in $\lesssim$ or
+$\eqsim$ are always independent of the contrast and the mesh size.
+
+Note that for  all $\xi\in\mathbb{R}^d$, $x\in \Omega$ and writing $K$
+for $K(x)$ we have
+\begin{eqnarray*}
+\|K^{-1}\|_{\ell^2}(K\xi\cdot\xi)& \ge &
+(\xi\cdot\xi)\|K^{-1}\|_{\ell^2}
+\inf_{\theta\in \mathbb{R}^d}\frac{(K\theta\cdot \theta)}{(\theta\cdot\theta)}\\
+&= &
+(\xi\cdot\xi) \, \|K^{-1}\|_{\ell^2}
+\inf_{\theta\in
+  \mathbb{R}^d}\frac{(\theta\cdot\theta)}{(K^{-1}\theta\cdot\theta)}
+=
+(\xi\cdot\xi)\|K^{-1}\|_{\ell^2}\frac{1}{\|K^{-1}\|_{\ell^2}}=(\xi\cdot\xi).
+\end{eqnarray*}
+Based on this, without loss of generality we assume that 
+the following inequality holds
+\begin{equation}\label{bound_below_K}
+(\xi\cdot \xi) \le  (K(x)\xi\cdot\xi), \quad \xi\in \mathbb{R}^d.   
+\end{equation}  
+As seen from the considerations above, such an assumption is always
+fulfilled if we scale the coefficient and work with
+\[
+K(x)\leftarrow 
+K(x)\left\|\|K^{-1}(x)\|_{\ell^2}\right\|_{L^{\infty}(\Omega)}. 
+\] 
+Clearly, such rescaling does not change the value of $\kappa$. 
+
+We note that the standard elliptic theory ensures existence and
+uniqueness of a unique solution $p \in H^1_D({{\Omega}})$. However, since the
+coefficient matrix $K(x)$ is piece-wise smooth and may have very large
+jumps, the solution $p$ has low regularity, say $H^{1+s}({{\Omega}})$,
+where $s>0$ could depend on the contrast $\kappa$ in a subtle (and 
+unfavorable) way. We need to take this into account when proving the
+stability of the discrete methods with constants independent of
+$\kappa$.
+
+\subsection{Weak formulations of the elliptic problem}\label{s:weak}
+
+Now we introduce the dual mixed and least-squares formulations of the 
+problem \eqref{equation-1} -- \eqref{N BC}.
+
+\subsubsection{Dual mixed formulation}\label{ss:dual_form}
+To present the dual mixed weak form we require the following notation 
+$
+{{\boldsymbol V}} \equiv {{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}};\Omega)$ 
+and 
+$
+W \equiv \{ q \in L^2(\Omega) ~~\text{and} ~(q,1)=0  ~~~\text{if} ~~~ \Gamma_N=\partial \Omega \}.
+$
+
+We multiply the first equation by $K^{-1}(x)$ and 
+a test function $ {{\mathbf v}}$,  integrate over ${{\Omega}}$, and perform integration by parts to get
+\begin{equation}\label{first}
+(K^{-1}(x) {{\mathbf u}}, {{\mathbf v}}) - (p, {\operatorname{div}} {{\mathbf v}}) = 0
+\end{equation}
+Next, we  multiply the second equation by a test function
+$q$ and integrate over ${{\Omega}}$ to get
+\begin{equation}\label{div-eqn}
+({\operatorname{div}} {{\mathbf u}}, q)=(f,q).
+\end{equation}
+Then the weak form of  the problem \eqref{equation-1} -- \eqref{N BC}
+ is: find  ${{\mathbf u}} \in {{\boldsymbol V}}$ and $p \in W$ such that
+\begin{equation}\label{eq:dual_mixed}
+{{\mathcal A}}^{DM}({{\mathbf u}},p; {{\mathbf v}},q)= - (f, q),
+\quad \mbox{for all}\quad ({{\mathbf v}}, q) \in {{\boldsymbol V}} \times W,
+\end{equation}
+where the bilinear form 
+${{\mathcal A}}^{DM}({{\mathbf u}},p; {{\mathbf v}},q): ({{\boldsymbol V}}, W)  \times ( {{\boldsymbol V}}, W) \to {\mathbb{R}}$ is defined as
+\begin{equation}\label{A-form-mixed}
+{{\mathcal A}}^{DM}({{\mathbf u}},p; {{\mathbf v}},q):=({{\alpha}} {{\mathbf u}}, {{\mathbf v}})
+-(p, {\operatorname{div}} {{\mathbf v}}) - ({\operatorname{div}} {{\mathbf u}}, q). 
+\end{equation}
+
+\begin{remark}
+It is clear that we could test the equation \eqref{div-eqn} 
+with $q={\operatorname{div}} {{\mathbf v}}$, multiply 
+by an arbitrary positive constant  $\beta$, and add to 
+equation \eqref{first}. This will result in a slightly different bilinear form
+$$
+{{\mathcal A}}^{DM}_\beta ({{\mathbf u}},p; {{\mathbf v}},q)
+:=({{\alpha}} {{\mathbf u}}, {{\mathbf v}}) + \beta ({\operatorname{div}} {{\mathbf u}}, {\operatorname{div}} {{\mathbf v}})-(p, {\operatorname{div}} {{\mathbf v}}) - ({\operatorname{div}} {{\mathbf u}}, q). 
+$$
+and modified right hand side of \eqref{eq:dual_mixed} equal to $ - (f,
+q) + \beta ( f, {\operatorname{div}} {{\mathbf v}})$.  This modified problem will have the same
+solution. However, such formulation might be beneficial in the design
+of a better preconditioner for the finite element system, see,
+e.g. \cite{vassilevski1996preconditioning}.
+\end{remark}
+
+\subsubsection{Least-squares formulation} 
+In this case we take the 
+$L^2$-norm of the second equation \eqref{equation-2} and the weighted $L^2$-norm
+with weight $K^{-1/2}$ of the first equations in \eqref{equation-1}
+to obtain a quadratic functional, e.g. \cite{pehlivanov1994least}.
+Then the minimizer of this least-squares functional satisfies
+the following weak form: find ${{\mathbf u}} \in {{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}})$ and $p \in H^1_D({{\Omega}})$ such that 
+\begin{equation}\label{eq:LS}
+{{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q)=(f, {\operatorname{div}} {{\mathbf v}}), 
+\quad \mbox{for all}\quad ({{\mathbf v}}, q) \in {{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}}) \times H^1_D({{\Omega}}),
+\end{equation}
+where the bilinear form 
+${{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q): ({{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}}), H^1_D({{\Omega}}) ) \times ({{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}}), H^1_D({{\Omega}}) ) \to {\mathbb{R}}$
+is defined as
+\begin{equation}\label{A-form-LS}
+{{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q):=({{\alpha}} {{\mathbf u}}, {{\mathbf v}}) +({\operatorname{div}} {{\mathbf u}}, {\operatorname{div}} {{\mathbf v}}) + (p, {\operatorname{div}} {{\mathbf v}}) + ({\operatorname{div}} {{\mathbf u}}, q) + (K \nabla p, \nabla q).
+\end{equation}
+Clearly, the bilinear 
+form $ {{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q)$ is symmetric and coercive, see, e.g.
+\cite{pehlivanov1994least}.  We would like to establish the coercivity with a 
+constant independent of the
+contrast $\kappa$ and later we provide a proof of this. 
+
+\subsection{Stability of the weak formulations}
+Now we study the stability of the discrete problems \eqref{eq:dual_mixed} and 
+\eqref{eq:LS}.  We shall use the Poincar\'e inequality
+\begin{equation}\label{Poincare}
+\text{there is $C_P>0$ such that} ~~\mbox{for all}\quad 
+q \in H^1_D(\Omega) \quad
+\|q\|^2 \le C_P \| \nabla q\|^2. 
+\end{equation}
+The constant $C_P$ depends only on the geometry of the domain
+$\Omega$ and the splitting of $\partial \Omega$ into $\Gamma_D$ and 
+$\Gamma_N$. Moreover, due to \eqref{bound_below_K} on the
+coefficient $K(x)$ we also have the inequality
+$$
+\|q\|^2 \le C_P \| \nabla q\|^2 \le 
+C_P \|\nabla q\|^2_{0,K}.
+$$
+
+\subsubsection{Stability of the mixed formulation}
+First, we consider the mixed form. For this we need continuity  and 
+ {\it inf-sup} condition (see, e.g. \cite{1991BrezziF_FortinM-aa})
+for the bilinear form  ${{\mathcal A}}^{DM}({{\mathbf u}},p; {{\mathbf v}},q)$
+on the spaces $ {{\boldsymbol V}} $ and $L^2(\Omega)$  equipped with  the weighted norm 
+$ (\Lambda_{{\alpha}}({{\mathbf v}},{{\mathbf v}}))^{\frac{1}{2}}$ and the standard $L^2$-norm $\|p\|$,
+respectively.
+
+\begin{lemma} \label{lem:stab_var}
+Let $W=L^2(\Omega)$, ${{\boldsymbol V}}={{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}})$, and $\Vert {{\mathbf v}} \Vert_{\Lambda_{{\alpha}}}:=
+(\Lambda_{{\alpha}}({{\mathbf v}},{{\mathbf v}}))^{\frac{1}{2}}$. Then the following inequalities hold 
+\begin{enumerate}
+\item 
+For all ${{\mathbf u}}, {{\mathbf v}}\in{{\boldsymbol V}}$ and  for all  $p, q\in W$
+\begin{equation}\label{continuity}
+{{\mathcal A}}^{DM}({{\mathbf u}},p; {{\mathbf v}},q) 
+\le ( \|{{\mathbf u}}\|^2_{\Lambda_{{\alpha}}} +\|p\|^2)^\frac12( \|{{\mathbf v}}\|^2_{\Lambda_{{\alpha}}} +\|q\|^2)^\frac12;
+\end{equation}  
+\item There is a constant ${{\alpha}}_0>0$ independent of $\alpha$ such that
+\begin{equation}\label{A-infsup}
+\sup_{{{\mathbf v}} \in {{\boldsymbol V}}, \, q \in L^2} 
+\frac{{{\mathcal A}}^{DM}({{\mathbf u}},p; {{\mathbf v}},q) }{(\|{{\mathbf v}}\|^2_{\Lambda_{{\alpha}}} +\|q\|^2)^\frac12} 
+\ge \alpha_0 ( \|{{\mathbf u}}\|^2_{\Lambda_{{\alpha}}} +\|p\|^2 )^\frac12
+\end{equation}
+
+\end{enumerate}
+
+\end{lemma}
+\begin{proof}
+The first inequality follows immediately by applying Schwarz inequality to all three terms and having
+in mind that ${{\alpha}} $ is a positive function. Proving the {\it inf-sup} condition \eqref{A-infsup} is equivalent 
+to proving the following inequality (see, \cite{Ern-Guermond}):
+ \begin{equation}\label{inf_sup_stab_var}
+  \inf_{q\in W} \sup_{{{\mathbf v}}\in{{\boldsymbol V}}}\frac{(\nabla\cdot {{\mathbf v}},q)}{\Vert {{\mathbf v}} \Vert_{\Lambda_{{\alpha}}}
+\Vert q \Vert}\ge 
+\gamma >0, \qquad \mbox{for all}\quad {{\mathbf v}}\in{{\boldsymbol V}},\quad \mbox{for all}\quad q\in W. 
+ \end{equation}
+ As is well known, if $\gamma $ is independent of the contrast
+ $\kappa$, then so is $\alpha_0$ and for more details on the relation
+ between the constants $\gamma$ and $\alpha_0$ we refer to
+ \cite{Xu2003Zikatanov}. It is clear then that proving a contrast
+ independent estimate for $\gamma$, which we show next, automatically
+ leads to a contrast independent $\alpha_0$.
+
+Inf-sup condition \eqref{inf_sup_stab_var} for Raviart-Thomas 
+finite element spaces  and standard ${{\boldsymbol H}}_N({\operatorname{div}})$-norm is a well known fact.  
+However, we have slight modification the ${{\boldsymbol H}}_N({\operatorname{div}})$-norm 
+and we would like to show that the constant $\gamma$ does not
+depend on the contrast $\kappa$. For this reason we provide a proof.
+
+We first prove that for all $q\in W$ there exists ${{\mathbf w}}\in{{\boldsymbol V}}$ such that 
+\begin{equation}\label{lem:stab_var_1}
+\|{{\mathbf w}}\|_{0,\alpha}^2\le C_P \, \Vert q \Vert^2.
+\end{equation}
+For this let $\varphi\in H_D^1(\Omega)$ be the solution to the variational problem
+\begin{equation}\label{eq:standard-variational}
+( K(x) \nabla \varphi,\nabla\chi ) = (q, \chi), 
+\quad \mbox{for all}\quad \chi\in H_D^1(\Omega).
+\end{equation}
+We then set ${{\mathbf w}} = K \nabla \varphi$. By construction ${{\mathbf w}} \in {{\boldsymbol V}}$ 
+with ${\operatorname{div}} {{\mathbf w}}= -q$ which holds in $L^2(\Omega)$. 
+Since $\alpha K = I_{d\times d}$ for almost all $x\in \Omega$,  then
+\begin{eqnarray*}
+\|{{\mathbf w}}\|_{0,\alpha}^2& = & 
+(\alpha\;K\nabla\varphi,{{\mathbf w}})= (\nabla\varphi,{{\mathbf w}})
+= -(\varphi,{\operatorname{div}} {{\mathbf w}})=(\varphi, q)\\ &\le& 
+\|\varphi\|\|q\|
+\le \sqrt{C_P}(\nabla\varphi,\nabla\varphi)^\frac12 \|q\|\\
+&\le& \sqrt{C_P} \,|\nabla\varphi|_{0,K}\|q\|
+= \sqrt{C_P} \|{{\mathbf w}}\|_{0,\alpha}\|q\|.
+\end{eqnarray*}
+Here, we used the Poincar\'e inequality \eqref{Poincare} and the fact
+that from~\eqref{bound_below_K} we have 
+$ (K(x)\xi\cdot\xi) \ge (\xi\cdot\xi)$ for $\xi\in \mathbb{R}^d$ and $x\in \Omega$.
+
+Next, for any $q\in L^2(\Omega)$ we have  
+\begin{eqnarray*}
+\sup_{{{\mathbf v}}\in {{\boldsymbol V}}} \frac{(q,{\operatorname{div}} {{\mathbf v}})}{\|{{\mathbf v}}\|_{\Lambda_\alpha}} &\ge &
+\frac{(q,{\operatorname{div}} {{\mathbf w}})}{\|{{\mathbf w}}\|_{\Lambda_\alpha}}=  
+\frac{\|q\|^2}{ (\|{{\mathbf w}}\|_{0,\alpha}^2+\|{\operatorname{div}} {{\mathbf w}}\|^2)^\frac12}\\
+& = & 
+\frac{\|q\|^2}{( \|{{\mathbf w}}\|_{0,\alpha}^2+\|q\|^2)^\frac12}
+\ge \frac{\|q\|}{\sqrt{C_P+1}}.
+\end{eqnarray*}
+This completes the proof.
+\end{proof}
+
+\subsubsection{Stability of the least-squares formulation}
+For this we require continuity  and  coercivity of the bilinear form
+${{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q)$
+on the space $ {{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}}) \times H^1_0(\Omega)\equiv {{\boldsymbol V}} \times W$. 
+The   space $ {{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}})$  is  
+equipped with  the weighted norm 
+$ (\Lambda_{{\alpha}}({{\mathbf v}},{{\mathbf v}}))^{\frac{1}{2}}$ and the  space $H^1_D(\Omega)$ is equipped with the
+norm $\|q\|_{1,K}=\|K^{1/2}\nabla q\|$. 
+
+\begin{lemma} \label{lem:stab_var_LS}
+Let $W=H^1_D(\Omega)$ and ${{\boldsymbol V}}={{\boldsymbol H}_{\hspace{-0.2mm}N}}({\operatorname{div}})$.
+Then the following inequalities hold: 
+\begin{enumerate}
+\item  For all ${{\mathbf u}}, {{\mathbf v}}\in{{\boldsymbol V}}$ and  for all  $p, q\in W$
+\begin{equation}\label{continuity_LS}
+{{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q) 
+\le 2( \|{{\mathbf u}}\|^2_{\Lambda_{{\alpha}}} +\|p\|^2_{1,K})^\frac12( \|{{\mathbf v}}\|^2_{\Lambda_{{\alpha}}} +\|q\|^2_{1,K})^\frac12;
+\end{equation}  
+\item 
+For all ${{\mathbf v}}\in{{\boldsymbol V}}$ and $q \in W$ then
+\begin{equation}\label{A-coercivity}
+{{\mathcal A}}^{LS}({{\mathbf v}},q; {{\mathbf v}},q) 
+\ge \frac13 ( \|{{\mathbf v}}\|^2_{\Lambda_{{\alpha}}} +\|q\|^2_{1,K})
+\end{equation}
+\end{enumerate}
+
+\end{lemma}
+\begin{proof}
+The bound \eqref{continuity_LS} follows easily by first transforming the terms
+$({\operatorname{div}} {{\mathbf u}}, q) $ and $ ({\operatorname{div}} {{\mathbf v}}, p)$ using integration by parts to
+$-(\nabla q, {{\mathbf u}}) $ and $ -(\nabla p,  {{\mathbf v}})$ and then using Schwarz inequality.
+
+For the bound \eqref{A-coercivity} we fist note that 
+\begin{equation}\label{div_bound}
+{{\mathcal A}}^{LS}({{\mathbf v}},q; {{\mathbf v}},q)  = \|{\operatorname{div}} {{\mathbf v}} \|^2 + (\alpha {{\mathbf v}} - \nabla q, {{\mathbf v}} - K \nabla q) 
+\ge \|{\operatorname{div}} {{\mathbf v}} \|^2.
+\end{equation}
+Next, we proceed as follows: using the Schwarz inequality, the
+Poincar\'e inequality, $\alpha K = I_{d\times d}$, and
+also $2ab\le \frac{1}{\epsilon}a^2+{\epsilon}b^2$ for all
+$\epsilon > 0$, $a,b\in \mathbb{R}$ gives
+\begin{eqnarray*}
+{{\mathcal A}}^{LS}({{\mathbf v}},q; {{\mathbf v}},q)   &&  \ge  (1-\frac{1}{\epsilon})\|{\operatorname{div}} {{\mathbf v}}\|^2  +  
+\|{{\mathbf v}}\|_{0,\alpha}^2 + \|q\|^2_{1,K} - \epsilon \|q \|^2 \\
+ &&   \ge (1-\frac{1}{\epsilon})\|{\operatorname{div}} {{\mathbf v}} \|^2 
++ \|{{\mathbf v}}\|^2_{0,\alpha} + (1 - \epsilon C_P)\|\nabla q\|_{0,K}, \quad \epsilon >0.
+\end{eqnarray*}
+Choosing $\epsilon = \frac{1}{2 C_P}$ 
+we get
+$$
+{{\mathcal A}}^{LS}({{\mathbf v}},q; {{\mathbf v}},q) \ge (1-2 C_P)\|{\operatorname{div}} {{\mathbf v}} \|^2 
++ \|{{\mathbf v}}\|_{0,\alpha}^2 + \frac12 \|\nabla q\|_{0,K}^2.
+$$
+Now multiplying inequality \eqref{div_bound} by a 
+constant $\beta >0$ and adding it to this inequality we have
+$$
+(1+ \beta) {{\mathcal A}}^{LS}({{\mathbf v}},q; {{\mathbf v}},q) \ge ( 1-2 C_P + \beta) \|{\operatorname{div}} {{\mathbf v}} \|^2 
++ \|{{\mathbf v}}\|^2_{0,\alpha} + \frac12 \|\nabla q\|_{0,K}^2.
+$$
+If $C_P\le \frac12$, then we choose $\beta=\frac12$ and obtain \eqref{A-coercivity}.
+If $C_P \ge \frac12$, then
+choosing $\beta > 0 $, such that $  1-2 C_P + \beta= \frac12$, we derive
+the lower bound for 
+${{\mathcal A}}^{LS}({{\mathbf v}},q; {{\mathbf v}},q)$ with $ (4 C_P -1)/(4C_P+ 1)$, which obviously is greater or equal to
+$\frac13$. Thus we have  the desired bound \eqref{A-coercivity}.
+\end{proof}
+\begin{remark}
+We stress that, under the assumption \eqref{bound_below_K} 
+and the choice of the norms in the spaces ${{\boldsymbol V}}$ and $W$,  
+ the coercivity constant of the bilinear form in the least-squares formulation
+does not depend on the contrast $\kappa$.
+\end{remark}
+
+\section{FEM approximations}\label{s:FEM}
+
+\subsection{Finite element partitioning and spaces}\label{ss:FE_spaces}
+We assume that the domain $\Omega$ is connected and is triangulated
+with $d$ dimensional simplices. The triangulation is denoted by
+$\mathcal{T}_h$ and we assume that the simplices forming
+$\mathcal{T}_h$ are shape regular (the ratio between the diameter of a
+simplex and the inscribed ball is bounded above). 
+Now we consider the finite element approximation of the problem
+\eqref{equation-1} -- \eqref{N BC} using the finite dimensional
+spaces  ${{\boldsymbol V}_{\hspace{-0.2mm}h}} \subset {{\boldsymbol V}}$ 
+and $W_h \subset W$ of piece-wise polynomial functions. 
+
+It is well known that for the vector variable ${{\mathbf u}}$ we can use ${{\boldsymbol H}}({\operatorname{div}})$-conforming 
+or Raviart-Thomas space ${{\mathcal{RT}}_{{k}}}$ or Brezzi-Douglas-Marini ${{\mathcal{BDM}}_{{k+1}}}$ finite elements. 
+However, since we have a problem with low regularity it is natural to use the lowest order
+finite element spaces. For the vector variable ${{\mathbf u}}$ we use the standard
+Raviart-Thomas 
+$\text{RT}_0$ for simplices and cubes. In the case of simplices we can apply 
+also Brezzi-Douglas-Marini
+$\text{BDM}_1$  finite elements.
+
+For the two formulations, least-squares and mixed, we use $W$-conforming  finite elements spaces for pressure $p$. Note that for the least-squares formulation $W=H^1_D(\Omega)$ while for the mixed formulation $W=L^2(\Omega)$.
+For both cases we  show that the corresponding finite element methods are stable uniformly with 
+respect to the contrast $\kappa$.
+
+\subsection{Mixed FEM and its stability}
+Thus, 
+we take 
+\begin{equation}\label{space Vh}
+{{\boldsymbol V}_{\hspace{-0.2mm}h}}=\{ {{\mathbf v}} \in {{\boldsymbol V}}: \, {{\mathbf v}} |_T \in {{\mathcal{RT}}_{{0}}} \,\,\, \mbox{for} \,\, T \in {\mathcal T}_h\} 
+\end{equation}
+and 
+\begin{equation}\label{space Wh}
+W_h =\{ q \in L^2(\Omega): \, q|_{T} \in {\mathcal P}_0, 
+\, \text{i.e. $q$ is a piece-wise constant function on} \,\,  {\mathcal T}_h\}.
+\end{equation}
+The mixed finite element approximation 
+of  the problem \eqref{equation-1} -- \eqref{N BC}
+ is: find  ${{\mathbf u}}_h \in {{\boldsymbol V}_{\hspace{-0.2mm}h}}$ and $p_h \in W_h$ such that
+\begin{equation}\label{eq:dual_mixed_FEM}
+{{\mathcal A}}^{DM}({{\mathbf u}}_h,p_h; {{\mathbf v}},q)=(f,q), 
+\quad \mbox{for all}\quad ({{\mathbf v}}, q) \in {{\boldsymbol V}_{\hspace{-0.2mm}h}} \times W_h,
+\end{equation}
+where the bilinear form $ {{\mathcal A}}^{DM}({{\mathbf u}}_h,p_h; {{\mathbf v}},q)$ is defined by 
+\eqref{A-form-mixed}.
+Our goal is to prove the discrete variant of the {\it inf-sup} condition.
+\begin{lemma}\label{lem:stab_fin}
+Let ${{\boldsymbol V}_{\hspace{-0.2mm}h}}$ be the space defined by \eqref{space Vh} and $W_h$ be the space defined by
+\eqref{space Wh}.
+Then independently of the contrast $\kappa$ and the step-size $h$
+the following inequality holds true:
+\begin{equation}\label{inf_sup_fin_set}
+ \inf_{q_h\in W_h}\sup_{{{\mathbf v}}_h\in{{\boldsymbol V}_{\hspace{-0.2mm}h}}}
+\frac{({\operatorname{div}} {{\mathbf v}}_h,q_h)}{\Vert {{\mathbf v}}_h\Vert_{\Lambda_{{\alpha}}} \Vert q_h\Vert}\ge 
+\gamma >0 . 
+\end{equation}
+\end{lemma}
+\begin{proof}
+This is stated and proved as Theorem~\ref{theorem:inf-sup} in the
+Appendix. 
+\end{proof}
+As a consequence of Lemma \ref{lem:stab_fin} and \eqref{continuity}  we have
+\begin{theorem}\label{DM_stability}
+The following bounds are valid for all ${{\mathbf u}} \in {{\boldsymbol V}_{\hspace{-0.2mm}h}}$ and $ p \in W_h$:
+\begin{equation}\label{DM-Fem_stability}
+\alpha_0 ( \|{{\mathbf u}}\|^2_{\Lambda_{{\alpha}}} +\|p\|^2)^\frac12 \le \sup_{{{\mathbf v}} \in{{\boldsymbol V}_{\hspace{-0.2mm}h}}, q\in W_h} 
+\frac{{{\mathcal A}}^{DM}({{\mathbf u}},p; {{\mathbf v}},q) }{(\|{{\mathbf v}}\|^2_{\Lambda_{{\alpha}}} +\|q\|^2)^\frac12} \le 
+( \|{{\mathbf u}}\|^2_{\Lambda_{{\alpha}}} +\|p\|^2)^\frac12.
+\end{equation} 
+The constant $\alpha_0$ may depend on the shape regularity of the 
+mesh, but is  independent of the contrast $\kappa$ and the mesh-size $h$.
+\end{theorem}
+
+\subsection{Least-squares FEM and its stability}
+For the least-squares formulation the space $W_h$ for the pressure $p$  
+consists of standard conforming  Lagrangian 
+finite elements involving linear polynomials  ${\mathcal P}_1$ (on triangles) 
+and bilinear polynomials ${\mathcal Q}_1$ (on rectangles).
+
+Since in this case we have conforming spaces, then the results of Lemma 
+\ref{lem:stab_var_LS} are valid so that finite element method is stable. Thus we have
+\begin{theorem}\label{LS_stability}
+The bilinear form $ {{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q)$ is coercive and bounded on ${{\boldsymbol V}_{\hspace{-0.2mm}h}} \times W_h$
+so that the following bounds are valid for all ${{\mathbf v}} \in {{\boldsymbol V}_{\hspace{-0.2mm}h}}$ and $ q \in W_h$:
+\begin{equation}\label{LS-Fem_coercivity}
+\frac13 ( \|{{\mathbf v}}\|^2_{\Lambda_{{\alpha}}} +\|q\|^2_{1,K})  \le {{\mathcal A}}^{LS}({{\mathbf v}},q; {{\mathbf v}},q)   
+\end{equation}
+and 
+\begin{equation}\label{LS-FEM-continuity}
+ {{\mathcal A}}^{LS}({{\mathbf u}},p; {{\mathbf v}},q)  \le 2
+(\|{{\mathbf u}}\|^2_{\Lambda_{{\alpha}}} +\|p\|^2_{1,K})^\frac12
+( \|{{\mathbf v}}\|^2_{\Lambda_{{\alpha}}} +\|q\|^2_{1,K})^\frac12.
+\end{equation} 
+\end{theorem}
+We note that the coercivity and the stability of the
+  least-squares FEM immediately show that we have an efficient preconditioner
+  for this problem as long as we know how to solve an weighted ${{\boldsymbol H}}({\operatorname{div}})$
+  problem and also a scalar elliptic problem. Moreover, since the
+  stiffness matrix resulting from the least-squares FEM
+  is an SPD matrix, such a preconditioner can be used
+  in the conjugate gradient algorithm to obtain an efficient and optimal
+  solution method.  
+\section{Preconditioning}\label{s:precon}
+
+\subsection{Block-diagonal preconditioner for the system of the finite element method}\label{sec:b-diag-operator}
+Now we consider the problem \eqref{eq:dual_mixed} and for definiteness
+we restrict ourselves to the lowest order Raviart-Thomas mixed finite
+elements on a rectangular grid. The goal of this section is to develop
+and justify a preconditioner for the algebraic problem resulting from
+the Galerkin method \eqref{eq:dual_mixed} that is independent of the
+contrast of the media.
+
+Then \eqref{eq:dual_mixed} can be written as an operator equation in $X_h={{\boldsymbol V}}_h\times W_h$.
+Namely, for ${\bm x}_h =({{\mathbf u}}_h, p_h)$ we have 
+\begin{equation}\label{mixed-operator}
+ \mathcal{A}_h {\bm x}_h = {\bm f}_h, \quad \mbox{for} \quad
+{\bm f}_h =({\bm 0}, f_h) \in X_h,
+\end{equation}
+where for all
+$\bm{y}_h=({{\mathbf v}}_h,q_h)\in X_h$ 
+$$
+( \mathcal{A}_h {\bm x}_h, {\bm y}_h) = {{\mathcal A}}^{DM}({{\mathbf u}}_h,p_h; {{\mathbf v}}_h,q_h)
+\quad
+\mbox{or} \quad
+ ( \mathcal{A}_h {\bm x}_h, {\bm y}_h) = {{\mathcal A}}^{LS}({{\mathbf u}}_h,p_h; {{\mathbf v}}_h,q_h).
+$$
+Obviously, the operator $\mathcal{A}_h:X_h\rightarrow X_h^{\star}$ is self-adjoint
+on $X_h={{\boldsymbol V}}_h\times W_h$ and indefinite in the case of 
+dual mixed formulation and positive definite  in the case of least-squares approximation.
+
+As it has been shown in~\cite{1991BrezziF_FortinM-aa}, the operator norms 
+corresponding to the mixed finite element disretization~\eqref{eq:dual_mixed}
+\begin{equation}\label{eq:operator_norms}
+ \Vert\mathcal{A}_h\Vert_{\mathcal{L}(X_h,X_h^{\star})}\;\; \mbox{and}\;\; 
+\Vert\mathcal{A}_h^{-1}\Vert_{\mathcal{L}(X_h^{\star},X_h)} \;\; \mbox{are uniformly bounded}. 
+\end{equation}
+The same is valid for the operator norms corresponding to the least squares formulation.
+
+Now our goal is to construct a positive definite self-adjoint operator 
+$\mathcal{B}_h:X_h\rightarrow X_h^{\star}$ such that all eigenvalues of 
+$\mathcal{B}_h^{-1}\mathcal{A}_h$ are bounded 
+uniformly independent of $h$ and, what is even more important, independent of the 
+contrast $\kappa$. From~\eqref{eq:operator_norms} it follows that 
+\begin{equation}\label{eq:precond_norms}
+ \Vert\mathcal{B}_h\Vert_{\mathcal{L}(X_h,X_h^{\star})}\;\; \mbox{and}\;\; 
+\Vert\mathcal{B}_h^{-1}\Vert_{\mathcal{L}(X_h^{\star},X_h)} \;\; \mbox{being uniformly bounded in} \;\; h \;\; \mbox{and} 
+\;\; \kappa
+\end{equation}
+is sufficient for $\mathcal{B}_h$ to be a uniform and robust
+preconditioner for the minimum residual (MinRes) iteration for the
+mixed method and conjugate gradient (CG) for the least-squares
+method. 
+
+Let the block-diagonal preconditioner $\mathcal{B}_h$ be defined as
+\begin{equation}\label{eq:AFW_preconditioner}
+ \mathcal{B}_h:=\left[
+\begin{array}{cc}
+ A_h & 0\\[2ex]
+ 0 & D_h
+\end{array}
+\right]
+\end{equation}
+where $A_h:\,{{\boldsymbol V}}_h\rightarrow {{\boldsymbol V}}_h^{*}$ is given by
+$$
+(A_h{{\mathbf u}}_h,{{\mathbf v}}_h):=\Lambda_{{\alpha}}({{\mathbf u}}_h,{{\mathbf v}}_h)=
+({{\alpha}} \, {{\mathbf u}}_h,{{\mathbf v}}_h)+(\nabla\cdot {{\mathbf u}}_h,\nabla\cdot {{\mathbf v}}_h)
+$$
+and $D_h: ~W_h \to W_h^*$ is either $I_h$, the identity on $W_h$ (for the mixed method) or
+is defined by the relation $(D_h p_h, q_h)=(K \nabla p_h, \nabla q_h)$ for the least-squares
+finite element method. 
+
+\begin{remark}\label{iterations}
+As easily seen, preconditioning is an equivalence relation,
+  
+  that is, if
+  $Z_1\eqsim Z_2$ and $Z_2\eqsim Z_3$ for some operators $Z_1$,
+  $Z_2$ and $Z_3$, then $Z_1\eqsim Z_3$. Therefore, uniform condition
+  number estimates for $\mathcal{B}_h$, directly carry over to the
+  case when $\mathcal{B}_h$ is replaced by any of its uniform (with
+  respect to the contrast $\kappa$ and with respect to the mesh size $h$) preconditioners.  
+\end{remark}
+
+Then condition~\eqref{eq:precond_norms} reduces to $\Vert A_h
+\Vert_{\mathcal{L}({{\boldsymbol V}}_h,{{\boldsymbol V}}_h^{\star})}$ and $\Vert
+A_h^{-1}\Vert_{\mathcal{L}({{\boldsymbol V}}_h^{\star},{{\boldsymbol V}}_h)}$ being uniformly
+bounded in $h$ and $\kappa$, which in the case of the mixed method is
+sufficient for optimality of the preconditioner,
+see~\cite{Arnold1997preconditioning}.  For the case of the least-squares
+formulation ~\eqref{eq:precond_norms} we also need uniform boundedness
+of $\Vert D_h \Vert_{\mathcal{L}(W_h, W_h^{\star})}$ and
+$\Vert D_h^{-1}\Vert_{\mathcal{L}(W_h^{\star},W_h)}$.
+Optimal
+  preconditioners using multigrid and domain decomposition methods for
+  solving the system
+$D_h p_h=c_h$
+have been developed by many authors
+  in the last three decades. One approach for the solution of
+$D_h p_h=c_h$
+(which is, in some sense, the closest one to our work)
+is the multilevel and auxiliary space multigrid methods proposed
+in~\cite{Kraus_12,Kraus_Lymb_Mar_2014}. 
+
+Thus, the main task  in this section is the development and study of
+a robust and uniformly convergent (with respect to $h$ and $\kappa$)
+iterative method for solving systems with
+$A_h {{\mathbf u}}_h={{\mathbf b}}_h$. 
+
+\subsection{Reformulation of the FE problem using matrix notation}\label{sec:matrix-notation}
+The derivation and the justification of the
+preconditioner
+will be in the
+framework of algebraic multilevel/multigrid methods. As a first step
+we rewrite the operator equation \eqref{mixed-operator} in a matrix
+form. For doing this, instead of functions ${\bm x}_h =({{\mathbf u}}_h, p_h)
+\in {{\boldsymbol V}}_h \times W_h$ we use the vectors consisting of the
+degrees of freedom determining ${\bm x}_h$ 
+through the nodal basis functions, namely,
+$$
+{\bm x}=\left[
+\begin{array}{c}
+ {\bf u} \\
+ {\bf p}
+\end{array} \right ],
+\quad \mbox{where} \quad
+\quad {\bf u} \in \mathbb{R}^{|\mathcal{E}_h|},
+\quad {\bf p} \in \mathbb{R}^{|\mathcal{T}_h|},
+\quad \mbox{are vector columns} 
+$$
+and $ {|\mathcal{E}_h|}$ is the number of edges in $ \mathcal{E}_h$, excluding those 
+on $\Gamma_N$, and $ {|\mathcal{T}_h|}$  is the number of
+rectangles of the partition $ \mathcal{T}_h$.  Then $A$, ${B_{\operatorname{div}}}$,
+$\widetilde A$, $R$, denote matrices being either square or
+rectangular.  As a result of this convention
+the equation \eqref{mixed-operator} can be written in a matrix form  
+for mixed and least-squares approximations, correspondingly,
+
+\begin{equation}\label{eq:saddle_point_sys}
+ \left[
+\begin{array}{cc}
+{{M}_{{\alpha}}} & -{B_{\operatorname{div}}}^T \\
+-{B_{\operatorname{div}}} & 0
+\end{array}
+\right]
+\left[
+\begin{array}{c}
+ {\bf u} \\
+ {\bf p}
+\end{array}
+\right]=
+\left[
+\begin{array}{c}
+ \bf{0} \\
+ \bf{f}
+\end{array}
+\right], 
+\quad
+\left[
+\begin{array}{cc}
+ A & {B_{\operatorname{div}}}^T \\
+{B_{\operatorname{div}}} & D
+\end{array}
+\right]
+\left[
+\begin{array}{c}
+ {\bf u} \\
+ {\bf p}
+\end{array}
+\right]=
+\left[
+\begin{array}{c}
+ \bf{0} \\
+ \bf{f}
+\end{array}
+\right], 
+\end{equation}
+where 
+$
+{{\mathbf v}}^T {{M}_{{\alpha}}} {{\mathbf u}} =(\alpha {{\mathbf u}}_h, {{\mathbf v}}_h)$,
+${{\mathbf v}}^T {B_{\operatorname{div}}}^T {\bm p}=(p_h, {\operatorname{div}} {{\mathbf v}}_h)$,
+${\bm q}^T {B_{\operatorname{div}}} {{\mathbf u}}=({\operatorname{div}} {{\mathbf u}}_h, q_h)$,
+$ {{\mathbf v}}^T A{{\mathbf u}} = \Lambda_{{\alpha}}({{\mathbf u}}_h,{{\mathbf v}}_h)$, 
+and $  {\bm q}^T D {\bm p}=(K \nabla p_h, \nabla q_h).
+$
+Our aim now is to derive and study a preconditioner for the algebraic system 
+ \eqref{eq:saddle_point_sys}, which due to the above considerations reduces 
+to efficient preconditioning of 
+the system
+\begin{equation}\label{algebraic-hdiv}
+A {{\mathbf u}} = {{\mathbf b}}, \quad {{\mathbf u}}, {{\mathbf b}} \in  \mathbb{R}^N, \quad N:={|\mathcal{E}_h|}.
+\end{equation}
+
+\subsection{Robust preconditioning of the weighted ${{\boldsymbol H}}({\operatorname{div}})$-norm}\label{sec:robust-H_div-precond}
+
+The preconditioning technique described in this section is based on additive Schur complement
+approximation (ASCA), see, \cite{Kraus_12}. For the sake of self-containedness, first we will
+recall the auxiliary space two-grid and multigrid methods that have recently been introduced
+in~\cite{Kraus_Lymb_Mar_2014}. Then we formulate two variants of the algorithm 
+resulting from ASCA that are subject to
+numerical testing in Section~\ref{sec:numerics}.
+
+\subsubsection{Auxiliary space two-grid preconditioner}\label{sec:as-2-grid-precond}
+
+The first step in the construction of the preconditioner involves a covering
+$\Omega$ by $n$  overlapping subdomains $\Omega_{i}$, i.e.,  
+\begin{equation*}
+ \overline{\Omega}=\bigcup_{i=1}^{n} \overline{\Omega}_{i}.
+\end{equation*}
+This overlapping covering of $\Omega$ is to some
+extent
+arbitrary with generous overlap.
+For practical purposes however, we consider the situation shown on Figure \ref{fig:covering}.
+In this particular case any finite element in the partition $\mathcal{T}_h$
+will belong to no more than four subdomains.
+We associate subdomain matrices $A_{i}$,
+$i=1,\dots,n$ with the subdomains $\Omega_{i}$ and assume that
+they have the following assembling property
+$$
+A=\sum_{i=1}^{n} R_{{i}}^T A_{{i}} R_{{i}},
+$$
+where $ R_{i}$ is a rectangular matrix that extends by zero the vector associated with the
+degrees of freedom of ${{\mathbf u}}_h$ in $\Omega_i$ to a vector representing the degrees of 
+freedom in the whole domain $\Omega$.
+Assume further that the set $\mathcal{D}$ of degrees of freedom (DOF) of ${{\mathbf u}}_h$ 
+is partitioned into a set $\mathcal{D}_{\rm f}$, fine DOF, and a set
+$\mathcal{D}_{\rm c}$, coarse DOF, so that
+\begin{equation}\label{eq:partitioning_DOF}
+\mathcal{D} = \mathcal{D}_{\rm f} \oplus \mathcal{D}_{\rm c},
+\end{equation}
+where $N_1:=\vert\mathcal{D}_{\rm f} \vert$ and $N_2:=\vert\mathcal{D}_{\rm c} \vert$
+denote the cardinalities of $\mathcal{D}_{\rm f}$ and $\mathcal{D}_{\rm c}$, respectively,
+with $N_1 + N_2 =N:=|{\mathcal E}_h|$. Recall that  $ |{\mathcal E}_h|$ 
+is the number of edges in the partitioning ${\mathcal T}_h$ with the 
+edges on $\Gamma_N$ excluded.
+Such splitting is not obvious for the mixed finite element 
+method and will be explained in detail later.
+The splitting 
+\eqref{eq:partitioning_DOF} induces a representation of the matrices $A$ and
+$A_{i}$ into two-by-two block form, i.e.,
+\begin{equation}\label{eq:A_two_by_two-x}
+A=\left[
+        \begin{array}{cc}
+        A_{11} & A_{12} \\
+        A_{21} & A_{22}
+        \end{array}
+\right],\qquad
+ A_{i}=\left[
+        \begin{array}{cc}
+        A_{i:11} & A_{i:12} \\
+        A_{i:21} & A_{i:22}
+        \end{array}
+\right], \quad i=1,\dots,n.
+\end{equation}
+We now introduce the following auxiliary domain decomposition matrix
+\begin{equation}\label{eq:auxA}
+\widetilde{A}=
+\left[ \begin{array}{ccccc}
+A_{1:11} &&&& A_{1:12} R_{1:2} \\[0.5ex]
+& A_{2:11} &&& A_{2:12} R_{2:2} \\[0.5ex]
+&& \ddots && \vdots \\[0.5ex]
+&&& A_{{n}:11} & A_{{n}:12} R_{n:2} \\[0.5ex]
+R_{1:2}^T A_{1:21} & R_{2:2}^T A_{2:21} & \hdots & R^T_{n:2} A_{{n}:21} 
+& \displaystyle \sum_{i=1}^{n} R^T_{i:2} A_{i:22} R_{i:2}
+                \end{array}
+\right] ,
+\end{equation}
+Setting 
+$\widetilde{A}_{11}={\rm diag}\{A_{1:11}, \ldots, A_{{n}:11}\}$,
+$\widetilde{A}_{22}=\sum_{i=1}^{n} R^T_{i:2} A_{i:22} R_{i:2}$ we have 
+\begin{equation}\label{eq:A_two_by_two}
+\widetilde{A}=\left[
+        \begin{array}{cc}
+        \widetilde{A}_{11} & \widetilde{A}_{12} \\
+        \widetilde{A}_{21} & \widetilde{A}_{22}
+        \end{array}
+\right].
+\end{equation}
+Note that if $A$ is an SPD matrix then $\widetilde{A}$ is a symmetric and positive semi-definite matrix.
+Moreover, $A \in {{\mathbb{R}}^{{N{\times}N}}}$ and
+$\widetilde{A} \in {{\mathbb{R}}^{{\widetilde{N}{\times}\widetilde{N}}}}$
+are related via
+\begin{equation}
+A=R \widetilde{A} R^T 
+\end{equation}
+where
+\begin{equation}\label{eq:R}
+R=\left[ \begin{array}{cc}
+           R_1 & 0 \\ 0 & I_2
+           \end{array}
+\right] , \qquad
+R_1^T=\left[ \begin{array}{c}
+           R_{1:1} \\ R_{2:1} \\ \vdots \\ R_{n:1}
+           \end{array}
+\right] .
+\end{equation}
+\begin{definition}[cf.~\cite{Kraus_12}]
+The additive Schur complement approximation (ASCA) of the exact Schur complement
+$S=A_{22} - A_{21} A_{11}^{-1} A_{12}$ is denoted by $Q$ and defined as the
+Schur complement of
+$\widetilde{A}$, i.e., 
+$$Q:= \widetilde{A}_{22} - 
+\widetilde{A}_{21} \widetilde{A}_{11}^{-1} \widetilde{A}_{12}
+=\sum_{i=1}^{n} R_{{i}:2}^T (A_{{i}:22} - A_{{i}:21} 
+A_{{i}:11}^{-1} A_{{i}:12}) R_{{i}:2}.
+$$
+\end{definition}
+\begin{remark}
+Note that $\widetilde{A}_{22}=A_{22}$. Thus $\widetilde{N}_2=N_2$ and $\widetilde{N}_1 \ge N_1$.
+\end{remark}
+Next, let $V={{\mathbb{R}}^{{N}}}$ and $\widetilde{V}={{\mathbb{R}}^{{\widetilde{N}}}}$ and
+define the surjective mapping $\Pi_{\widetilde{D}}: \widetilde{V} \rightarrow V$ by 
+\begin{equation}\label{eq:Pi}
+\Pi_{\widetilde{D}}=(R \widetilde{D} R^T)^{-1} R \widetilde{D}, 
+\end{equation}
+where $\widetilde{D}$ is a block-diagonal matrix, e.g.,
+\begin{equation}\label{eq:tilde_D}
+\widetilde{D}=\left[
+             \begin{array}{cc}
+              \widetilde{D}_{11} & 0 \\
+              0 & I
+             \end{array}
+           \right]
+\end{equation}
+where $\widetilde{D}_{11}=\widetilde{A}_{11}$ or
+$\widetilde{D}_{11}={\rm diag}(\widetilde{A}_{11})$.
+
+Then let us consider the following fictitious-space two-grid preconditioner
+$C$ for $A$, which is implicitly defined via its inverse 
+\begin{equation}\label{eq:two-grid_1}
+C^{-1}=\Pi_{\widetilde{D}} \widetilde{A}^{-1} \Pi^T_{\widetilde{D}}. 
+\end{equation}
+The method of fictitious space preconditioning has first been  proposed in
+  \cite{1985MatsokinA_NepomnyashchikhS-aa,Nepomnyaschikh1991mesh,
+    nepomnyaschikh1995fictitious}, and refined
+  in~\cite{Xu1996auxiliary} by adding an additional smoother. The
+  basis of the  auxiliary space multigrid algorithm, is the following auxiliary
+  space two-grid preconditioner $B$, which is implicitly defined via
+  its inverse
+\begin{equation}\label{eq:two-grid_3}
+B^{-1} := \overline{M}^{-1} 
++ (I - M^{-T} A) C^{-1} (I - A M^{-1})  
+\end{equation}
+where $C$ is defined according to~\eqref{eq:two-grid_1}, the operator $M$
+denotes an $A$-norm convergent smoother, i.e., $\Vert I-M^{-1}A\Vert_A
+< 1$,  
+and $\overline{M}=M(M+M^T-A)^{-1}M^T$ is the corresponding symmetrized
+smoother. Examples of such smoothers include the Gauss-Seidel smoother and  
+the damped Jacobi smoother and are well known. 
+
+Below in Theorem~\ref{thm:KLM}
+we present an estimate for the condition number under the following assumptions:
+\begin{itemize}
+\item[(i)] the smoother $M$ satisfies
+for all ${{\bf{{v}}}} \in V={{\mathbb{R}}^{{N}}}$: 
+\begin{equation}\label{eq:eb_1}
+\underbar{$c$}\langle{{\bf{{v}}}},{{\bf{{v}}}}\rangle \le \rho_A \langle \overline{M}^{-1}{{\bf{{v}}}},{{\bf{{v}}}}\rangle
+\le \bar{c}\langle{{\bf{{v}}}},{{\bf{{v}}}}\rangle, 
+\end{equation}
+and 
+\begin{equation}\label{eq:eb_2}
+ \Vert M^{-T} A {{\bf{{v}}}}\Vert^2\le \frac{\eta}{\rho_A}\Vert {{\bf{{v}}}} \Vert_A^2, \quad 
+\end{equation}
+where $\rho_A=\lambda_{\max}(A)$ denotes the spectral radius of $A$
+and $\eta$ is  a non-negative constant;\\
+\item[(ii)] the operator $\Pi$ defined by
+\begin{equation}\label{eq:two-grid_4}
+\Pi:=(I-M^{-T} A)\Pi_{\widetilde{D}}=
+(I-M^{-T} A)(R\widetilde{D}R^T)^{-1}R\widetilde{D}
+\end{equation}
+satisfies the estimate
+\begin{equation}\label{eq:eb_3}
+\Vert \Pi \tilde{{{\bf{{v}}}}}\Vert_A^2\le c_{\Pi} 
+\Vert \tilde{{{\bf{{v}}}}}\Vert_{\widetilde{A}}^2, \quad 
+\mbox{for all}\quad \tilde{{{\bf{{v}}}}}\in \widetilde{V}={{\mathbb{R}}^{{\widetilde{N}}}}. 
+\end{equation}
+\end{itemize}
+Note that due to $\Vert\Pi^{\star}\Pi\Vert=\Vert\Pi\Pi^{\star}\Vert$, the bound \eqref{eq:eb_3} 
+is equivalent to
+$\Vert \Pi^{\star} {{\bf{{v}}}}\Vert_{\widetilde{A}}^2\le c_{\Pi} \Vert {{\bf{{v}}}}\Vert_{A}^2$ 
+for all ${{\bf{{v}}}}\in V$, where $\Pi^{\star}=\widetilde{A}^{-1}\Pi^T A$
+denotes the operator satisfying the identity
+$\langle \Pi \tilde{{{\bf{{u}}}}},{{\bf{{v}}}}\rangle_A = \langle\tilde{{{\bf{{u}}}}},\Pi^{\star}{{\bf{{v}}}} 
+\rangle_{\widetilde{A}}$ for all $\tilde{{{\bf{{u}}}}} \in \widetilde{V}, {{\bf{{v}}}}\in V$.
+
+\begin{remark}
+While the results stated here provide uniform bounds on the condition
+numbers of the preconditioned systems, it is also straightforward to
+state similar results for a convergent iterative method. Indeed, 
+if, for a large enough scaling parameter $\tau$,  we set 
+$
+C^{-1}=\tau \Pi_{\widetilde{D}} \widetilde{A}^{-1}
+\Pi^T_{\widetilde{D}}$, then 
+it holds that the related stationary iterative method is $A$-norm
+convergent, namely,  $\Vert I-C^{-1}A\Vert_A < 1$. To keep the
+presentation focused on preconditioning, however, we only consider
+$\tau=1$. 
+\end{remark}
+
+We are now ready to state the theorem (see~\cite{Kraus_Lymb_Mar_2014})
+which gives the condition number estimate. 
+\begin{theorem}[Condition number estimate~\cite{Kraus_Lymb_Mar_2014}]\label{thm:KLM}
+Under the assumptions~\eqref{eq:eb_1}--\eqref{eq:eb_3} the two-grid preconditioner $B$ 
+defined in \eqref{eq:two-grid_3} and \eqref{eq:two-grid_1} satisfies
+\begin{equation} \label{eq:eb_7}
+  \frac{\underbar{c}}{\underbar{c}+\eta} \le    \lambda_{\min}(B^{-1}A)  
+\le \lambda(B^{-1}A) \le     \lambda_{\max}(B^{-1}A)\le\bar{c}+c_{\Pi},
+\end{equation}
+that is, $\kappa(B^{-1}A)\le 
+(\bar{c}+c_{\Pi})(\underbar{c}+\eta)/\underbar{c}$.
+\end{theorem}
+
+Next, we note that if no
+  smoothing is applied, i.e. $B=C$, then the condition number estimate
+  provided in Theorem~\ref{thm:KLM} also holds and we have the
+  following result.
+\begin{corollary} If $B=C$ and under the assumptions of
+  Theorem~\ref{thm:KLM} we have the estimate
+\begin{equation}\label{eq:pi}
+\kappa(B^{-1}A)\le c_{\Pi}=c=\Vert\pi_{\widetilde{D}}
+\Vert^2_{\widetilde{A}},
+\quad\mbox{where}\quad
+\pi_{\widetilde{D}} := R^T \Pi_{\widetilde{D}} .
+\end{equation}
+\end{corollary}
+
+\subsubsection{Auxiliary space multigrid method}\label{sec:asmg}
+Let $k=0,1,\dots,\ell-1$ be the index of mesh refinement where $k=0$ corresponds
+to the finest mesh, i.e., $A^{(0)}:=A_h=A$ denotes the fine-grid matrix. Consider
+the sequence of auxiliary space stiffness matrices $\widetilde{A}^{(k)}$,
+in the two-by-two block factorized form 
+\begin{equation}\label{factorizationK}
+({\widetilde{A}}^{(k)})^{-1} = 
+(\widetilde{L}^{(k)})^T \widetilde{D}^{(k)} \widetilde{L}^{(k)} ,
+\end{equation}
+where
+\begin{equation}\label{factorizationKl}
+\widetilde{L}^{(k)} =
+\left [
+\begin{array}{cc}
+I & \\
+-\widetilde{A}^{(k)}_{21} (\widetilde{A}^{(k)}_{11})^{-1} & I
+\end{array}
+\right ] , \quad
+\widetilde{D}^{(k)} =
+\left [
+\begin{array}{cc}
+(\widetilde{A}^{(k)}_{11})^{-1} & \\
+& {Q^{(k)}}^{-1}
+\end{array}
+\right ] 
+\end{equation}
+and 
+the additive Schur complement approximation $Q^{(k)}$ defines the next coarser level matrix, i.e.
+\begin{equation}\label{factorizationK2}
+ A^{(k+1)}:=Q^{(k)}.
+\end{equation}
+
+The algebraic multilevel iteration (AMLI)-cycle auxiliary space multigrid (ASMG) preconditioner
+$B^{(k)}$
+approximating $A^{(k)}$ is defined on all levels $k < \ell$ via the following relations
+(see~\cite{Kraus_Lymb_Mar_2014})
+ \begin{equation}\label{multigrid_preconditioner}
+{B^{(k)}}^{-1} := 
+{\overline{M}^{(k)}}^{-1} + (I - {M^{(k)}}^{-T} A^{(k)})
+\Pi^{(k)} 
+ (\widetilde{L}^{(k)})^T  \overline{D}^{(k)}
+\widetilde{L}^{(k)} {\Pi^{(k)}}^T (I - A^{(k)} {M^{(k)}}^{-1}),
+ \end{equation}
+where
+\begin{equation}
+\overline{D}^{(k)} :=
+\left [
+\begin{array}{cc}
+(\widetilde{A}^{(k)}_{11})^{-1} & \\
+& B_{\nu}^{(k+1)}
+\end{array}
+\right ]
+\end{equation}
+and $B_{\nu}^{(k+1)}$
+is an approximation of the inverse of the coarse-level matrix,
+i.e., $B_{\nu}^{(k+1)} \approx {A^{(k+1)}}^{-1}$,
+\begin{equation}
+B_{\nu}^{(\ell)} := {A^{(\ell)}}^{-1}.
+\end{equation} 
+
+In the linear AMLI-cycle $B_{\nu}^{(k+1)}$ is a polynomial approximation of ${A^{(k+1)}}^{-1}$,
+i.e. 
+$$
+\begin{array}{ccc}
+ B_{\nu}^{(k+1)} & := & (I-p^{(k)}({B^{(k+1)}}^{-1}A^{(k+1)})){A^{(k+1)}}^{-1} \\
+ & =: & q^{(k)}({B^{(k+1)}}^{-1}A^{(k+1)})){B^{(k+1)}}^{-1}
+\end{array}
+$$
+that requires the action of ${B^{(k+1)}}^{-1}$. The classical choice of $p^{(k)}(t)$
+is a scaled and shifted Chebyshev polynomial of degree $\nu_k=\nu$ where
+$$
+p^{(k)}(0)=1,\qquad q^{(k)}(t):=\frac{1-p^{(k)}(t)}{t}\approx \frac{1}{t}.
+$$
+Other polynomial approximations are possible, e.g., choosing $q^{(k)}(t)$ to be the
+best approximation to $1/t$ in uniform norm, see \cite{Kraus2012polynomial}.
+
+In case of the nonlinear AMLI-cycle ASMG method
+$$B_{\nu}^{(k+1)}=B_{\nu}^{(k+1)}[\cdot]$$
+is a nonlinear mapping whose action on a vector ${{\bf{{d}}}}$ is realized by $\nu$
+iterations of a preconditioned Krylov subspace method.
+In the following the generalized conjugate gradient method will serve this
+purpose and hence we denote $B_{\nu}^{(k+1)}[\cdot]=B^{(k+1)}_{{\rm GCG,\nu}}[\cdot]$.
+
+An important step in the construction is that performing $B_{\nu}^{(k+1)}[\cdot]$
+one applies~\eqref{multigrid_preconditioner} also for preconditioning at level $(k+1)$.
+Hence, \eqref{multigrid_preconditioner} becomes a nonlinear operator, too--we will
+therefore write
+$${B^{(k)}}^{-1}={B^{(k)}}^{-1}[\cdot], \quad \mbox{for all } k<\ell.$$
+
+\subsubsection{Nonlinear ASMG algorithms}\label{sec:algorithms}
+
+In the remainder of this section we will present two variants of nonlinear ASMG algorithms
+for preconditioning the SPD matrices arising from discretization of the weighted bilinear form
+\eqref{WH-div-prod}
+and comment on some details of their implementation in the specific situation of using
+lowest-order Raviart-Thomas elements on rectangles. 
+
+On Figure \ref{fig:covering} we give an illustration of the {\it covering of ${\Omega}$} by
+overlapping subdomains, these are $9$ staggered subdomains each of size $1/2$ of the 
+original domain $\Omega$.
+
+\begin{figure}[ht!]
+ \includegraphics[width=0.2\textwidth]{element7}
+\caption{Covering of the domain by nine overlapping subdomains}\label{fig:covering}
+\end{figure}
+
+Next, let us comment on the {\it partitioning~\eqref{eq:partitioning_DOF} of
+the set $\mathcal{D}$ of DOF}.  We illustrate it in case of two grids 
+coarse, ${\mathcal T}_H$, and fine, ${\mathcal T}_h$, where $H=2h$.
+Then the corresponding sets of the edges are ${\mathcal E}_H$ and ${\mathcal E}_h$.
+The following relations are obvious: $4|{\mathcal T}_H|= |{\mathcal T}_h| $
+and $2|{\mathcal E}_H|+ 4|{\mathcal T}_H |= |{\mathcal E}_h| $.
+Since in the setting of the lowest-order Raviart-Thomas finite elements it is not immediately
+clear how to partition $\mathcal{D}$, we perform a preprocessing step which consists
+of a {\it compatible two-level basis transformation}, see e.g. \cite{Kraus_12}. 
+The global matrix $A$ is transformed 
+according to
+\begin{equation}\label{eq:A_hat}
+ \widehat{A}=J^T A J, \quad  
+\widehat{A}, J,  A  \in {\mathbb{R}}^{ |{\mathcal E}_h| \times  |{\mathcal E}_h| },
+\end{equation}
+where the transformation matrix $J$ is the product of a permutation matrix $P$ and another 
+transformation matrix $J_{\pm}$, i.e.
+\begin{equation}\label{eq:transformation_J}
+ J=P J_{\pm}, \quad P, J_{\pm} \in {\mathbb{R}}^{ |{\mathcal E}_h| \times  |{\mathcal E}_h| }.
+\end{equation}
+
+The permutation $P$ allows us to provide 
+a two-level numbering of the DOF that splits them into two groups, 
+the first one consisting of DOF associated with fine-grid edges that are not part of 
+any coarse-grid  edge 
+(interior DOF) and the second one keeping all remaining DOF ordered such that any two that are 
+on one edge have consecutive numbers. The transformation matrix $J_{\pm}$ in~\eqref{eq:transformation_J} 
+is of the form
+$$
+J_{\pm}=\left[\begin{array}{cc}
+    I& \\
+    & J_{22}
+    \end{array}\right],
+\quad \mbox{where} \quad I \in {\mathbb{R}}^{(4 |{\mathcal{T}_H}|) \times (4 |{\mathcal{T}_H}|)},
+$$
+ $J_{22}$  has the form 
+$$
+J_{22}=\frac12 \left[\begin{array}{cccccccc}
+    1 & -1 & & & & & & \\
+    &  &  1 & -1 & & & & \\
+    & & & &  \ddots & \ddots & & \\
+    & & & & & & -1 & 1 \\
+    1 & 1 & & & & & & \\
+    &  &  1 & 1 & & & & \\
+    & & & &  \ddots & \ddots & & \\
+    & & & & & & 1 & 1 
+    \end{array}\right],
+\quad \mbox{where} \quad J_{22} \in {\mathbb{R}}^{(2|{\mathcal{E}_H}|) \times (2 |{\mathcal{E}_H}|)}.
+$$
+
+The analogous transformation is performed on a local level on each subdomain $\Omega_i$, i.e.
+\begin{equation}\label{eq:A_i_hat}
+\widehat{A}_i=J^T_i A_i J_i,
+\end{equation} 
+where again $J_i=P_i J_{\pm,i}$ with $P_i$ the permutation explained above but performed
+on the degrees of freedom in the subdomain $\Omega_i$ and $ J_{\pm,i}$ has the 
+same meaning but restricted to the subdomain $\Omega_i$. 
+
+\begin{definition}
+The global and local transformations will be called {\it compatible} if  
+\begin{equation}\label{eq:compatibility1}
+ \widehat{A}=J^T A J = \sum_{i=1}^{n_{\mathcal G}} \widehat{R}_i^T \widehat{A}_i \widehat{R}_i
+\end{equation}
+which is equivalent to 
+\begin{equation}\label{eq:compatibility2}
+ R_i J=J_i \widehat{R}_i.
+\end{equation}
+\end{definition}
+
+The introduced transformation matrix $J$ defines the splitting of the DOF into coarse and fine, namely 
+the FDOF correspond to the set of interior DOF and half differences on the coarse edges while the 
+CDOF correspond to the half sums on the coarse edges.
+
+Finally we formulate the following two algorithms (variants of nonlinear ASMG)
+for solving linear systems with the matrix $A$ resulting from discretization
+of~\eqref{WH-div-prod}.
+
+The first algorithm applies the nonlinear ASMG method in the two-level basis, i.e.,
+all matrices $A^{(k)}$ are transformed into two-level basis, i.e.,
+$$\widehat{A}^{(k)}={J^{(k)}}^T A^{(k)} J^{(k)}, \quad \mbox{for all } k<\ell$$
+and also the smoothing is performed in the two-level basis, i.e., using $\widehat{M}$
+instead of $M$. 
+
+\begin{algorithm}{Nonlinear ASMG method--Variant~I: Action of~\eqref{multigrid_preconditioner}
+on a vector $\widehat{{{\bf{{d}}}}}$}\label{algorithm1} \\[-1ex]
+\hrule \vspace{1ex}
+\begin{tabular}{lll}
+& Pre-smoothing: & $\widehat{{{\bf{{u}}}}} = (\widehat{M}^{(k)})^{-1} \widehat{{{\bf{{d}}}}}$ \\
+& Auxiliary space correction: & $\left\{
+\begin{array}{l}
+\left(\begin{array}{c} \tilde{{{\bf{{q}}}}}_1 \\ \tilde{{{\bf{{q}}}}}_2 \end{array}\right)
+:=\tilde{{{\bf{{q}}}}} = \Pi_{\widetilde{D}^{(k)}}^T (\widehat{{{\bf{{d}}}}} - \widehat{A}^{(k)}
+\widehat{{{\bf{{u}}}}}) \\
+\tilde{{{\bf{{p}}}}}_1 = (\widetilde{A}^{(k)}_{11})^{-1} \tilde{{{\bf{{q}}}}}_1 \\
+\tilde{{{\bf{{p}}}}}_2 ={J^{(k+1)}}
+B^{(k+1)}_{{\rm GCG,\nu}}[{J^{(k+1)}}^T (\tilde{{{\bf{{q}}}}}_2 -  \widetilde{A}^{(k)}_{21} \tilde{{{\bf{{p}}}}}_1)] \\
+\tilde{{{\bf{{q}}}}}_1 = \tilde{{{\bf{{p}}}}}_1 - (\widetilde{A}^{(k)}_{11})^{-1} \widetilde{A}^{(k)}_{12} \tilde{{{\bf{{p}}}}}_2 \\
+\tilde{{{\bf{{q}}}}}_2 = \tilde{{{\bf{{p}}}}}_2 \\
+\widehat{{{\bf{{v}}}}} = \widehat{{{\bf{{u}}}}} + \Pi_{\widetilde{D}^{(k)}} \tilde{{{\bf{{q}}}}}
+\end{array} \right.$ \\
+& Post-smoothing: & $(\widehat{B}^{(k)})^{-1}[\widehat{{{\bf{{d}}}}}] :=
+\widehat{{{\bf{{v}}}}} + (\widehat{M}^{(k)})^{-T} (\widehat{{{\bf{{d}}}}} - \widehat{A}^{(k)}
+\widehat{{{\bf{{v}}}}})$
+\end{tabular}
+\\[1ex]
+\hrule
+\end{algorithm}
+
+The second algorithm applies the nonlinear ASMG method directly in the original basis of
+standard Raviart-Thomas basis functions and reads as follows. 
+\begin{algorithm}{Nonlinear ASMG method--Variant~II: Action of~\eqref{multigrid_preconditioner}
+on a vector ${{\bf{{d}}}}$}\label{algorithm2} \\[-1ex]
+\hrule \vspace{1ex}
+\begin{tabular}{lll}
+& Pre-smoothing: & ${{\bf{{u}}}} = {M^{(k)}}^{-1} {{\bf{{d}}}}$ \\
+& Auxiliary space correction: & $\left\{
+\begin{array}{l}
+\left(\begin{array}{c} \tilde{{{\bf{{q}}}}}_1 \\ \tilde{{{\bf{{q}}}}}_2 \end{array}\right)
+:=\tilde{{{\bf{{q}}}}} = \Pi_{\widetilde{D}^{(k)}}^T {J^{(k)}}^T ({{\bf{{d}}}} - A^{(k)} {{\bf{{u}}}}) \\
+\tilde{{{\bf{{p}}}}}_1 = (\widetilde{A}^{(k)}_{11})^{-1} \tilde{{{\bf{{q}}}}}_1 \\
+\tilde{{{\bf{{p}}}}}_2 = B^{(k+1)}_{{\rm GCG,\nu}}[(\tilde{{{\bf{{q}}}}}_2 -  \widetilde{A}^{(k)}_{21} \tilde{{{\bf{{p}}}}}_1)] \\
+\tilde{{{\bf{{q}}}}}_1 = \tilde{{{\bf{{p}}}}}_1 - (\widetilde{A}^{(k)}_{11})^{-1} \widetilde{A}^{(k)}_{12} \tilde{{{\bf{{p}}}}}_2 \\
+\tilde{{{\bf{{q}}}}}_2 = \tilde{{{\bf{{p}}}}}_2 \\
+{{\bf{{v}}}} = {{\bf{{u}}}} +  J^{(k)} \Pi_{\widetilde{D}^{(k)}} \tilde{{{\bf{{q}}}}}
+\end{array} \right.$ \\
+& Post-smoothing: & ${B^{(k)}}^{-1}[{{\bf{{d}}}}] := {{\bf{{v}}}} + {M^{(k)}}^{-T} ({{\bf{{d}}}} - A^{(k)} {{\bf{{v}}}})$
+\end{tabular}
+\\[1ex]
+\hrule
+\end{algorithm}
+\begin{remark}
+Note that the matrices $\widetilde{A}^{(k)}_{11}$, $\widetilde{A}^{(k)}_{12}$,
+$\widetilde{A}^{(k)}_{21}$ are identical in both algorithms. 
+\end{remark}
+\begin{remark}
+In general the matrices $\widehat{A}^{(k)}$ have slightly
+more nonzero entries as compared to $A^{(k)}$ and thus Algorithm~\ref{algorithm2}
+increases computational memory requirements.
+\end{remark}
+\begin{remark}
+Considering the two-level preconditioners $\widehat{B}$ and $B$ defined according
+to Algorithm~\ref{algorithm1} and Algorithm~\ref{algorithm2}, and assuming that no
+smoothing is performed, i.e., $\widehat{M}=M=0$, the corresponding condition number
+bounds for the preconditioned operators in two-level basis and standard basis read
+$\kappa(\widehat{B}^{-1}\widehat{A})\le \Vert R^T \Pi_{\widetilde{D}} \Vert^2_{\widetilde{A}}$
+and
+$\kappa(B^{-1}A)\le \Vert R^T J \, \Pi_{\widetilde{D}} \Vert^2_{\widetilde{A}}$.
+
+\end{remark}
+
+\section{Numerical Experiments}\label{sec:numerics}
+
+\subsection{Description of the parameters and the numerical test examples}
+
+Subject to numerical testing are three representative cases of problems characterized by a highly 
+varying coefficient ${{\alpha}}(x) = K^{-1}(x)$, namely:
+\begin{enumerate}
+\item[[a\hspace{-1ex}]] A binary distribution of the coefficient described by islands on which
+ ${{\alpha}}=1.0$ against a background where ${{\alpha}}=10^{-q}$, see~Figure~\ref{fig:islands_binary}; 
+ \item[[b\hspace{-1ex}]] Inclusions with ${{\alpha}}=1.0$ and a background with a coefficient 
+ ${{\alpha}}={{\alpha}}_{T}=10^{-q_{rand}}$ that is constant on each element $\tau \in  {\mathcal T}_h$,
+ where the random integer exponent $q_{rand}\in\{0,1,2,\dots,q\}$ is uniformly distributed,
+see Figure~\ref{fig:islands_random};
+\item[[c\hspace{-1ex}]] Three two-dimensional slices of the SPE10 
+(Society of Petroleum Engineers) 
+benchmark problem, see~\cite{SPE10_project},
+where the contrast $\kappa$ is $10^7$ for slices 44 and 74 and $10^6$ for slice~54,
+see~Figure~\ref{fig:spe_10}.
+\end{enumerate}
+
+\begin{figure}[hb]
+\begin{center}
+\subfigure[$32\times 32$ mesh]{
+\includegraphics[width=0.21\textwidth]{islands_32}
+\label{fig:islands_32}}
+\hspace{10mm}
+\subfigure[$128\times 128$ mesh]{
+\includegraphics[width=0.21\textwidth]{islands_128}
+\label{fig:islands_128}}
+\hspace{10mm}
+\subfigure[$512\times 512$ mesh]{
+\includegraphics[width=0.21\textwidth]{islands_512}
+\label{fig:islands_512}}
+\caption{Binary distribution of the permeability $K(x)$ corresponding to test case [a]}
+\label{fig:islands_binary}
+ \end{center}
+\end{figure}
+
+\begin{figure}[hb]
+\begin{center}
+\subfigure[$32\times 32$ mesh]{
+\includegraphics[width=0.21\textwidth]{islands_32r}
+\label{fig:islands_32r}}
+\hspace{10mm}
+\subfigure[$128\times 128$ mesh]{
+\includegraphics[width=0.21\textwidth]{islands_128r}
+\label{fig:islands_128r}}
+\hspace{10mm}
+\subfigure[$512\times 512$ mesh]{
+\includegraphics[width=0.21\textwidth]{islands_512r}
+\label{fig:islands_512r}}
+\caption{Random distribution of  ${{\alpha}}=K^{-1}(x)$ corresponding to test case [b]}
+\label{fig:islands_random}
+ \end{center}
+\end{figure}
+
+\begin{figure}[hb]
+\begin{center}
+\subfigure[Slice 44]{
+\includegraphics[width=0.28\textwidth]{spe10_slice44}
+\label{fig:slice44}}
+\hspace{3mm}
+\subfigure[Slice 54]{
+\includegraphics[width=0.28\textwidth]{spe10_slice54}
+\label{fig:slice54}}
+\hspace{3mm}
+\subfigure[Slice 74]{
+\includegraphics[width=0.28\textwidth]{spe10_slice74}
+\label{fig:slice74}}
+\caption{Distributions of the permeability $K(x)$ along planes $x_3=44, 54, 74$ form 
+the benchmark SPE10 on a $ 128 \times 128 $ mesh}
+\label{fig:spe_10}
+ \end{center}
+\end{figure}
+
+The numerical experiments are performed over a uniform mesh consisting of $N{\times}N$ elements (squares) 
+where $N=4,8,\ldots,512$, i.e. up to $525 312$ velocity DOF and $262 144$ pressure DOF.
+We have used a direct method to solve the problems on the coarsest grid.
+The iterative process has been initialized with a random vector.
+Its convergence has been tested for linear systems with right-hand side zero.
+We have used overlapping coverings of the domain as shown in Figure~\ref{fig:covering}, 
+where the subdomains are composed of $8\times 8$ elements and overlap with half of their
+width/height. 
+In the presentation of results we use the following notations:
+\begin{itemize}
+\item $\ell$ denotes the number of levels;
+\item $q=\frac{\log \kappa}{\log 10}$ is the logarithm of the contrast $\kappa$;
+\item $n_{ASMG}$ is the number of auxiliary space multigrid iterations;
+\item $m\geq 0$ is the number of 
+point Gauss-Seidel pre- and post-smoothing steps;
+\item $\rho$ is the average convergence factor defined by
+\begin{equation}\label{eq:average_factor}
+\rho=\Bigg(\frac{\Vert u_{n_{ASMG}} \Vert}{\Vert u_0 \Vert}\Bigg)^{1/n_{ASMG}},
+\end{equation}
+where 
+$u_{n_{ASMG}}$ is the
+first iterate (approximate solution of \eqref{algebraic-hdiv}) for which the residual
+has decreased by a factor of at least $10^8$.
+\end{itemize}
+The matrix $\widetilde{D}$ is as in~\eqref{eq:tilde_D} where 
+$\widetilde{D}_{11}=\widetilde{A}_{11}$. This choice of $\widetilde{D}$ requires an
+additional preconditioner for the iterative solution of linear systems with the matrix
+$D=R \widetilde{D} R^T$, which is part of the efficient application of the operator
+$\Pi_{\widetilde{D}}$. The systems with $D$ are solved using the preconditioned conjugate
+gradient (PCG) method. The stopping criterion for this inner iterative process is a
+residual reduction by a factor $10^6$, the number of PCG iterations to reach it--where
+reported--is denoted by $n_i$. A robust and uniform preconditioner $B_{ILUE}$ for $D$
+can be constructed based on incomplete factorization using exact local factorization (ILUE).
+The definition of $B_{ILUE}$ is as follows:
+$$
+B_{ILUE}:=LU,\qquad U:=\sum_{i=1}^n R_i^T U_i R_i,\qquad L:=U^T {\rm diag}(U)^{-1}, 
+$$ 
+where 
+$$
+D_i=L_i U_i,\qquad D=\sum_{i=1}^n R_i^T D_i R_i, \qquad {\rm diag}(L_i)=I,
+$$
+for details see~\cite{Kraus2009robust}.
+Note that as $D_i$ are the local contributions to $D$ related to the subdomains
+$\Omega_i$, $i=1,\dots,n$, they are all non-singular.
+
+The next two sections are devoted to the presentation of numerical results.
+The experiments fall into two categories.
+The first category, presented in Section~\ref{sec:Hdiv}, serves the evaluation of the
+performance of the ASMG method on linear systems arising from discretization of the
+weighted $H({\operatorname{div}})$ bilinear form~\eqref{WH-div-prod}. All three test cases, [a], [b],
+and [c], are considered and both variants of the ASMG method, Algorithm~\ref{algorithm1}
+and~\ref{algorithm2}, are compared, testing V- and W-cycle with and without smoothing.
+
+The second category of experiments, discussed in Section~\ref{sec:saddle_point_sys},
+addresses the solution of the indefinite linear system~\eqref{eq:saddle_point_sys}
+arising from problem~\eqref{eq:dual_mixed} by a preconditioned MinRes method.
+The main purposes are, on the one hand, to confirm the robustness of the block-diagonal
+preconditioner~\eqref{eq:AFW_preconditioner} with respect to arbitrary multiscale
+coefficient variations, and on the other hand, to demonstrate its numerical scalability.
+
+\subsection{Numerical tests for solving the system~\eqref{algebraic-hdiv}}\label{sec:Hdiv}
+Here we test the ASMG preconditioner for solving the system~\eqref{algebraic-hdiv} with
+a matrix corresponding 
+to the discretization
+of the form $\Lambda_\alpha({{\mathbf u}},{{\mathbf v}})$. 
+\begin{example} \label{ex:1} 
+The first set of experiments is for the test cases~[a] and~[b].
+In Tables~\ref{table:a_bilinear_alg1_V_m0}--\ref{table:b_bilinear_alg1_W_m1} we report the 
+number of outer iterations $n_{ASMG}$ for the $\ell$-level V-cycle and W-cycle ASMG method
+defined by
+Algorithm~\ref{algorithm1}.
+The coarsest mesh is composed of $4\times 4$ squares corresponding to $40$ DOF 
+on the ${{\mathcal{RT}}_{{0}}}$ space. 
+\end{example}
+
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c | c  c | c c  | c c | c  c }
+ \multicolumn {11}{c}{ASMG V-cycle: bilinear form~\eqref{WH-div-prod}, 
+Algorithm~\ref{algorithm1}} \\
+\multicolumn{1}{c}{~} & \multicolumn{2}{ c |}{$\ell=3$} & \multicolumn{2}{c|}{$\ell=4$} 
+& \multicolumn{2}{c|}{$\ell=5$} & \multicolumn{2}{c|}{$\ell=6$}
+& \multicolumn{2}{c}{$\ell=7$} 
+\\
+\cline{2-11}
+& $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$   &   $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ \\% & $n_{it}$ & $\rho$ \\
+\hline 
+$q = 0$   & $4$ & $0.006$  & $6$ & $0.031$  & $8$  & $0.097$  & $11$ & $0.161$  & $12$ & $0.202$ \\% & ~$00$~ & ~$0.000$~ \\ 
+$q = 1$   & $4$ & $0.005$  & $6$ & $0.034$  & $9$  & $0.115$  & $11$ & $0.169$  & $13$ & $0.224$ \\% & ~~ & ~~  \\
+$q = 2$   & $4$ & $0.004$  & $6$ & $0.032$  & $10$ & $0.151$  & $12$ & $0.199$  & $13$ & $0.235$ \\% & ~~ & ~~  \\
+$q = 3$   & $3$ & $0.002$  & $6$ & $0.031$  & $10$ & $0.158$  & $12$ & $0.211$  & $13$ & $0.235$ \\% & ~~ & ~~  \\
+$q = 4$   & $4$ & $0.004$  & $6$ & $0.041$  & $11$ & $0.157$  & $13$ & $0.213$  & $14$ & $0.256$ \\% & ~~ & ~~   \\
+$q = 5$   & $4$ & $0.006$  & $7$ & $0.053$  & $11$ & $0.185$  & $16$ & $0.314$  & $19$ & $0.366$ \\% & ~~ & ~~   \\
+$q = 6$   & $4$ & $0.008$  & $8$ & $0.085$  & $15$ & $0.271$  & $24$ & $0.462$  & $25$ & $0.495$ \\% & ~~ & ~~   \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:1}: case [a] with $K(x)=10^q$ and no smoothing steps ($m=0$)}\label{table:a_bilinear_alg1_V_m0}
+ \end{center}
+\end{table}
+
+\begin{table}[h!]
+ \begin{center}
+ \begin{tabular}{c| c  c | c  c | c c  | c c | c  c }
+ \multicolumn {11}{c}{ASMG V-cycle: bilinear form~\eqref{WH-div-prod}, 
+Algorithm~\ref{algorithm1}} \\
+\multicolumn{1}{c}{~} & \multicolumn{2}{ c |}{$\ell=3$} & \multicolumn{2}{c|}{$\ell=4$} 
+& \multicolumn{2}{c|}{$\ell=5$} & \multicolumn{2}{c|}{$\ell=6$}
+& \multicolumn{2}{c}{$\ell=7$} 
+\\
+\cline{2-11}
+& $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$   &   $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ \\ 
+\hline 
+$q = 0$   & $4$ & $0.005$  & $5$ & $0.024$  & $6$ & $0.043$  & $8$ & $0.083$  & $8$  & $0.093$ \\% & ~$00$~ & ~$0.000$~ \\ 
+$q = 1$   & $3$ & $0.002$  & $5$ & $0.022$  & $7$ & $0.058$  & $8$ & $0.084$  & $9$  & $0.121$ \\% & ~~ & ~~ \\
+$q = 2$   & $3$ & $0.002$  & $5$ & $0.019$  & $7$ & $0.068$  & $8$ & $0.091$  & $9$  & $0.121$ \\% & ~~ & ~~ \\
+$q = 3$   & $3$ & $0.002$  & $5$ & $0.018$  & $7$ & $0.070$  & $8$ & $0.095$  & $9$  & $0.125$ \\% & ~~ & ~~ \\
+$q = 4$   & $3$ & $0.002$  & $5$ & $0.017$  & $7$ & $0.069$  & $8$ & $0.098$  & $10$ & $0.142$ \\% & ~~ & ~~ \\
+$q = 5$   & $3$ & $0.002$  & $5$ & $0.017$  & $8$ & $0.082$  & $9$ & $0.118$  & $10$ & $0.145$ \\% & ~~ & ~~ \\
+$q = 6$   & $4$ & $0.005$  & $4$ & $0.010$  & $8$ & $0.092$  & $9$ & $0.125$  & $11$ & $0.181$ \\% & ~~ & ~~ \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:1}: case [a] with $K(x)=10^q$ and two smoothing steps ($m=2$)}\label{table:a_bilinear_alg1_V_m2}
+ \end{center}
+\end{table}
+
+As we can see by comparing the results summarized in Tables~\ref{table:a_bilinear_alg1_V_m0}
+and~\ref{table:a_bilinear_alg1_V_m2} the $V$-cycle multigrid preconditioner gains robustness
+with respect to the contrast of a binary distribution of a piecewise constant permeability
+coefficient when increasing the number of smoothing steps from zero to two. We further observe
+an increase of the number of ASMG iterations for decreasing mesh size $h$ (in average $2$-$3$
+times). At the same time, as seen in Table~\ref{table:a_bilinear_alg1_W_m1}, the $W$-cycle
+preconditioner with one smoothing step is robust with respect to both the contrast and
+the mesh size $h$.
+
+\begin{table}[h!]
+ \begin{center}
+ \begin{tabular}{c| c  c | c  c | c c  | c c | c  c }
+ \multicolumn {11}{c}{ASMG W-cycle: bilinear form~\eqref{WH-div-prod}, 
+Algorithm~\ref{algorithm1}} \\
+\multicolumn{1}{c}{~} & \multicolumn{2}{ c |}{$\ell=3$} & \multicolumn{2}{c|}{$\ell=4$} 
+& \multicolumn{2}{c|}{$\ell=5$} & \multicolumn{2}{c|}{$\ell=6$}
+& \multicolumn{2}{c}{$\ell=7$} 
+\\
+\cline{2-11}
+& $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$   &   $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ \\ 
+\hline 
+$q = 0$   & $4$ & $0.005$  & $4$ & $0.007$  & $4$ & $0.006$  & $4$ & $0.005$  & $4$ & $0.005$ \\% & ~$0$~ & ~$0.000$~ \\ 
+$q = 1$   & $3$ & $0.002$  & $4$ & $0.007$  & $4$ & $0.007$  & $4$ & $0.005$  & $4$ & $0.004$ \\% & ~~ & ~~ \\
+$q = 2$   & $3$ & $0.002$  & $5$ & $0.015$  & $5$ & $0.017$  & $4$ & $0.006$  & $3$ & $0.001$ \\% & ~~ & ~~ \\
+$q = 3$   & $3$ & $0.002$  & $5$ & $0.017$  & $5$ & $0.020$  & $4$ & $0.006$  & $3$ & $0.002$ \\% & ~~ & ~~ \\
+$q = 4$   & $3$ & $0.002$  & $5$ & $0.016$  & $5$ & $0.019$  & $4$ & $0.005$  & $4$ & $0.005$ \\% & ~~ & ~~ \\
+$q = 5$   & $3$ & $0.002$  & $4$ & $0.009$  & $6$ & $0.030$  & $4$ & $0.007$  & $4$ & $0.009$ \\ 
+$q = 6$   & $4$ & $0.005$  & $5$ & $0.017$  & $5$ & $0.020$  & $5$ & $0.025$  & $7$ & $0.066$ \\ 
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:1}: case [a], one smoothing step ($m=1$)}\label{table:a_bilinear_alg1_W_m1}
+ \end{center}
+\end{table}
+
+In the next set of numerical experiments we consider the same
+distribution of inclusions of low permeability
+as before but this time against a background of a randomly distributed piecewise constant
+permeability coefficient as shown on Figure~\ref{fig:islands_random}. The results, presented
+in Tables~\ref{table:b_bilinear_alg1_V_m0} and~\ref{table:b_bilinear_alg1_V_m2}, are even
+better than those obtained for the binary distribution in the sense that here both $V$-
+and $W$-cycle are robust with respect to the contrast.
+
+\begin{table}[h!]
+ \begin{center}
+ \begin{tabular}{c| c  c | c  c | c c  | c c | c  c }
+ \multicolumn {11}{c}{ASMG V-cycle: bilinear form~\eqref{WH-div-prod},
+Algorithm~\ref{algorithm1}} \\
+\multicolumn{1}{c}{~} & \multicolumn{2}{ c |}{$\ell=3$} & \multicolumn{2}{c|}{$\ell=4$} 
+& \multicolumn{2}{c|}{$\ell=5$} & \multicolumn{2}{c|}{$\ell=6$}
+& \multicolumn{2}{c}{$\ell=7$} 
+\\
+\cline{2-11}
+& $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$   &   $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ \\% & $n_{it}$ & $\rho$ \\
+\hline 
+$q = 0$   & $4$ & $0.007$  & $6$ & $0.027$  & $9$  & $0.102$  & $10$ & $0.156$  & $12$ & $0.210$ \\% & ~$00$~ & ~$0.000$~ \\ 
+$q = 1$   & $4$ & $0.006$  & $6$ & $0.035$  & $9$  & $0.103$  & $11$ & $0.171$  & $13$ & $0.224$ \\% & ~~ & ~~ \\
+$q = 2$   & $4$ & $0.005$  & $6$ & $0.032$  & $9$  & $0.102$  & $11$ & $0.159$  & $13$ & $0.222$ \\% & ~~ & ~~ \\
+$q = 3$   & $4$ & $0.006$  & $6$ & $0.042$  & $9$  & $0.110$  & $11$ & $0.174$  & $13$ & $0.229$ \\% & ~~ & ~~ \\
+$q = 4$   & $4$ & $0.006$  & $7$ & $0.043$  & $9$  & $0.127$  & $11$ & $0.183$  & $13$ & $0.233$ \\% & ~~ & ~~ \\
+$q = 5$   & $4$ & $0.006$  & $7$ & $0.049$  & $10$ & $0.138$  & $12$ & $0.195$  & $13$ & $0.239$ \\% & ~~ & ~~ \\
+$q = 6$   & $4$ & $0.006$  & $7$ & $0.056$  & $10$ & $0.149$  & $12$ & $0.207$  & $14$ & $0.252$ \\% & ~~ & ~~ \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:1}: case [b], no smoothing steps ($m=0$)}\label{table:b_bilinear_alg1_V_m0}
+ \end{center}
+\end{table}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c | c  c | c c  | c c | c  c }
+ \multicolumn {11}{c}{ASMG V-cycle: bilinear form~\eqref{WH-div-prod}, Algorithm~\ref{algorithm1}} \\
+\multicolumn{1}{c}{~} & \multicolumn{2}{ c |}{$\ell=3$} & \multicolumn{2}{c|}{$\ell=4$} 
+& \multicolumn{2}{c|}{$\ell=5$} & \multicolumn{2}{c|}{$\ell=6$}
+& \multicolumn{2}{c}{$\ell=7$} 
+\\
+\cline{2-11}
+& $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$   &   $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ \\% & $n_{it}$ & $\rho$ \\
+\hline 
+$q = 0$   & $4$ & $0.005$  & $5$ & $0.024$  & $6$ & $0.046$  & $8$ & $0.083$  & $8$  & $0.091$ \\% & ~$0$~ & ~$0.000$~ \\ 
+$q = 1$   & $4$ & $0.005$  & $6$ & $0.033$  & $7$ & $0.060$  & $8$ & $0.091$  & $9$  & $0.124$ \\% & ~~ & ~~ \\
+$q = 2$   & $3$ & $0.002$  & $5$ & $0.023$  & $6$ & $0.045$  & $7$ & $0.069$  & $9$  & $0.121$ \\% & ~~ & ~~ \\
+$q = 3$   & $3$ & $0.002$  & $5$ & $0.021$  & $6$ & $0.043$  & $7$ & $0.071$  & $8$  & $0.100$ \\% & ~~ & ~~ \\
+$q = 4$   & $4$ & $0.005$  & $5$ & $0.023$  & $6$ & $0.044$  & $8$ & $0.089$  & $9$  & $0.122$ \\% & ~~ & ~~ \\
+$q = 5$   & $4$ & $0.005$  & $5$ & $0.024$  & $6$ & $0.045$  & $8$ & $0.090$  & $9$  & $0.125$ \\% & ~~ & ~~ \\
+$q = 6$   & $4$ & $0.005$  & $6$ & $0.034$  & $6$ & $0.045$  & $8$ & $0.091$  & $10$ & $0.142$ \\% & ~~ & ~~ \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:1}: case [b], two smoothing steps ($m=2$)}\label{table:b_bilinear_alg1_V_m2}
+ \end{center}
+\end{table}
+
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c | c  c | c c  | c c | c  c }
+ \multicolumn {11}{c}{ASMG W-cycle: bilinear form~\eqref{WH-div-prod}, Algorithm~\ref{algorithm1}} \\
+\multicolumn{1}{c}{~} & \multicolumn{2}{ c |}{$\ell=3$} & \multicolumn{2}{c|}{$\ell=4$} 
+& \multicolumn{2}{c|}{$\ell=5$} & \multicolumn{2}{c|}{$\ell=6$}
+& \multicolumn{2}{c}{$\ell=7$} 
+\\
+\cline{2-11}
+& $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$   &   $n_{ASMG}$ & $\rho$ & $n_{ASMG}$ & $\rho$  \\% & $n_{it}$ & $\rho$ \\
+\hline 
+$q = 0$   & $4$ & $0.005$  & $4$ & $0.007$  & $4$ & $0.006$  & $4$ & $0.005$  & $4$ & $0.005$ \\% & ~$0$~ & ~$0.000$~ \\ 
+$q = 1$   & $4$ & $0.006$  & $4$ & $0.007$  & $4$ & $0.007$  & $4$ & $0.006$  & $4$ & $0.005$ \\% & ~~ & ~~ \\
+$q = 2$   & $4$ & $0.004$  & $4$ & $0.009$  & $5$ & $0.016$  & $4$ & $0.007$  & $4$ & $0.006$ \\% & ~~ & ~~ \\
+$q = 3$   & $4$ & $0.005$  & $5$ & $0.015$  & $5$ & $0.015$  & $4$ & $0.009$  & $4$ & $0.006$ \\% & ~~ & ~~ \\
+$q = 4$   & $4$ & $0.005$  & $5$ & $0.016$  & $5$ & $0.016$  & $4$ & $0.009$  & $4$ & $0.008$ \\% & ~~ & ~~ \\
+$q = 5$   & $4$ & $0.005$  & $5$ & $0.018$  & $5$ & $0.015$  & $4$ & $0.009$  & $4$ & $0.008$ \\% & ~~ & ~~ \\
+$q = 6$   & $4$ & $0.005$  & $5$ & $0.019$  & $5$ & $0.015$  & $4$ & $0.008$  & $4$ & $0.007$ \\% & ~~ & ~~ \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:1}: case [b], one smoothing step ($m=1$)}\label{table:b_bilinear_alg1_W_m1}
+ \end{center}
+\end{table}
+
+\begin{example} \label{ex:2} 
+The second set of experiments is related to the test case~[c] where, similarly to 
+Example~\ref{ex:1}, we examine the performance of the preconditioner for the bilinear
+form~\eqref{WH-div-prod}.  Here we compare the ASMG preconditioners defined by
+Algorithm~\ref{algorithm1} and Algorithm~\ref{algorithm2}. In this example the
+finest mesh is always composed of $256\times 256$ elements meaning that changing
+the number of levels $\ell$ refers to a different size of the coarse-grid problem.
+Tables~\ref{table:c44_bilinear_V}--\ref{table:c74_bilinear_W} report the number
+of outer iterations $n_{ASMG}$ and the maximum number of inner iterations $n_i$ needed
+to reduce the residual of the linear systems with the matrix $R\widetilde{D}R^T$ by a
+factor of~$10^6$.
+\end{example}
+
+Tables~\ref{table:c44_bilinear_V} and~\ref{table:c44_bilinear_W} contain the results
+for SPE10 slice 44. We see that while the number of inner iterations is about the
+same, the number $n_{ASMG}$ of outer iterations in case of the V-cycle is on average
+$2.5$ times higher than those for the W-cycle. However, since the complexity of the V-cycle
+is lower, the overall performance of these two methods is comparable. Comparing the
+two algorithms, we see that they have approximately the same number of inner and outer
+iterations. Due to its lower memory requirements we could therefore recommend
+Algorithm~\ref{algorithm1} for these kinds of problems. 
+On Tables \ref{table:c74_bilinear_V}--\ref{table:c74_bilinear_W}  we present the results
+for SPE10 slice 74, which has slightly different permeability distribution but has
+the same contrast, $\kappa=10^7$. Computational results are pretty much the same for
+this case as well.
+
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c  c  | c c c | c c c | c c c }
+ \multicolumn {13}{c}{ASMG V-cycle: bilinear form~\eqref{WH-div-prod}} \\
+\multicolumn{1}{c}{~} & \multicolumn{6}{c|}{Algorithm~\ref{algorithm1}} & \multicolumn{6}{c}{Algorithm~\ref{algorithm2}}
+\\
+\cline{2-13}
+ & \multicolumn{3}{ c |}{$m=0$} & \multicolumn{3}{c|}{$m=1$} 
+& \multicolumn{3}{c|}{$m=0$} & \multicolumn{3}{c}{$m=1$}\\
+\cline{2-13}
+& $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$   &   $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$  \\
+\hline 
+$\ell = 3$   & $8$  & $0.080$ & $4$ & $7$  & $0.064$ & $5$    & $8$  & $0.090$ & $5$ & $8$  & $0.080$ & $5$   \\ 
+$\ell = 4$   & $10$ & $0.157$ & $6$ & $9$  & $0.122$ & $6$    & $11$ & $0.184$ & $6$ & $10$ & $0.143$ & $6$   \\ 
+$\ell = 5$   & $12$ & $0.209$ & $6$ & $10$ & $0.154$ & $6$    & $13$ & $0.231$ & $6$ & $11$ & $0.185$ & $6$   \\
+$\ell = 6$   & $13$ & $0.239$ & $6$ & $11$ & $0.179$ & $6$    & $14$ & $0.264$ & $6$ & $12$ & $0.207$ & $6$   \\
+$\ell = 7$   & $13$ & $0.239$ & $6$ & $11$ & $0.179$ & $6$    & $14$ & $0.264$ & $6$ & $12$ & $0.207$ & $6$   \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:2}: case [c] - slice 44 of SPE10 benchmark}\label{table:c44_bilinear_V}
+ \end{center}
+\end{table}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c  c  | c c c | c c c | c c c }
+ \multicolumn {13}{c}{ASMG W-cycle: bilinear form~\eqref{WH-div-prod} } \\
+\multicolumn{1}{c}{~} & \multicolumn{6}{c|}{Algorithm~\ref{algorithm1}} & \multicolumn{6}{c}{Algorithm~\ref{algorithm2}}
+\\
+\cline{2-13}
+ & \multicolumn{3}{ c |}{$m=0$} & \multicolumn{3}{c|}{$m=1$} 
+& \multicolumn{3}{c|}{$m=0$} & \multicolumn{3}{c}{$m=1$}\\
+\cline{2-13}
+& $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$   &   $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$  \\
+\hline 
+$\ell = 3$   & $5$ & $0.019$ & $6$ & $5$ & $0.014$ & $5$    & $5$ & $0.025$ & $5$ & $5$ & $0.017$ & $6$    \\ 
+$\ell = 4$   & $5$ & $0.019$ & $6$ & $5$ & $0.014$ & $5$    & $5$ & $0.025$ & $5$ & $5$ & $0.017$ & $6$    \\
+$\ell = 5$   & $5$ & $0.019$ & $6$ & $5$ & $0.014$ & $5$    & $6$ & $0.026$ & $6$ & $5$ & $0.017$ & $6$    \\
+$\ell = 6$   & $5$ & $0.019$ & $6$ & $5$ & $0.014$ & $5$    & $6$ & $0.026$ & $6$ & $5$ & $0.017$ & $6$    \\
+$\ell = 7$   & $5$ & $0.019$ & $6$ & $5$ & $0.014$ & $5$    & $6$ & $0.026$ & $6$ & $5$ & $0.017$ & $6$    \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:2}: case [c] - slice 44 of SPE10 benchmark}\label{table:c44_bilinear_W}
+ \end{center}
+\end{table}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c  c  | c c c | c c c | c c c }
+ \multicolumn {13}{c}{ASMG V-cycle: bilinear form~\eqref{WH-div-prod}} \\
+\multicolumn{1}{c}{~} & \multicolumn{6}{c|}{Algorithm~\ref{algorithm1}} & \multicolumn{6}{c}{Algorithm~\ref{algorithm2}}
+\\
+\cline{2-13}
+ & \multicolumn{3}{ c |}{$m=0$} & \multicolumn{3}{c|}{$m=1$} 
+& \multicolumn{3}{c|}{$m=0$} & \multicolumn{3}{c}{$m=1$}\\
+\cline{2-13}
+& $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$   &   $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$  \\
+\hline 
+$\ell = 3$   & $7$  & $0.070$ & $4$ & $7$  & $0.059$ & $4$    &  $8$  & $0.079$ & $4$ & $7$  & $0.069$ & $4$    \\ 
+$\ell = 4$   & $10$ & $0.156$ & $5$ & $9$  & $0.122$ & $6$    &  $11$ & $0.173$ & $5$ & $10$ & $0.143$ & $6$    \\
+$\ell = 5$   & $13$ & $0.236$ & $5$ & $11$ & $0.173$ & $6$    &  $14$ & $0.256$ & $5$ & $12$ & $0.196$ & $6$    \\
+$\ell = 6$   & $14$ & $0.253$ & $5$ & $11$ & $0.183$ & $6$    &  $15$ & $0.283$ & $5$ & $12$ & $0.210$ & $6$    \\
+$\ell = 7$   & $14$ & $0.253$ & $6$ & $11$ & $0.183$ & $6$    &  $15$ & $0.283$ & $5$ & $12$ & $0.210$ & $6$    \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:2}: case [c] - slice 54 of SPE10 benchmark}\label{table:c54_bilinear_V}
+ \end{center}
+\end{table}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c  c  | c c c | c c c | c c c }
+ \multicolumn {13}{c}{ASMG W-cycle: bilinear form~\eqref{WH-div-prod} } \\
+\multicolumn{1}{c}{~} & \multicolumn{6}{c|}{Algorithm~\ref{algorithm1}} & \multicolumn{6}{c}{Algorithm~\ref{algorithm2}}
+\\
+\cline{2-13}
+ & \multicolumn{3}{ c |}{$m=0$} & \multicolumn{3}{c|}{$m=1$} 
+& \multicolumn{3}{c|}{$m=0$} & \multicolumn{3}{c}{$m=1$}\\
+\cline{2-13}
+& $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$   &   $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$  \\
+\hline 
+$\ell = 3$   & $5$ & $0.016$ & $4$ & $5$ & $0.013$ & $4$    & $5$ & $0.021$ & $4$ & $5$ & $0.016$ & $4$    \\ 
+$\ell = 4$   & $5$ & $0.017$ & $6$ & $5$ & $0.013$ & $5$    & $5$ & $0.023$ & $6$ & $5$ & $0.017$ & $6$    \\
+$\ell = 5$   & $5$ & $0.018$ & $6$ & $5$ & $0.013$ & $6$    & $5$ & $0.023$ & $6$ & $5$ & $0.017$ & $6$    \\
+$\ell = 6$   & $5$ & $0.018$ & $6$ & $5$ & $0.013$ & $6$    & $5$ & $0.023$ & $6$ & $5$ & $0.017$ & $6$    \\
+$\ell = 7$   & $5$ & $0.018$ & $6$ & $5$ & $0.013$ & $6$    & $5$ & $0.023$ & $6$ & $5$ & $0.017$ & $6$    \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:2}: case [c] - slice 54 of SPE10 benchmark}\label{table:c54_bilinear_W}
+ \end{center}
+\end{table}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c  c  | c c c | c c c | c c c }
+ \multicolumn {13}{c}{ASMG V-cycle: bilinear form~\eqref{WH-div-prod}} \\
+\multicolumn{1}{c}{~} & \multicolumn{6}{c|}{Algorithm~\ref{algorithm1}} & \multicolumn{6}{c}{Algorithm~\ref{algorithm2}}
+\\
+\cline{2-13}
+ & \multicolumn{3}{ c |}{$m=0$} & \multicolumn{3}{c|}{$m=1$} 
+& \multicolumn{3}{c|}{$m=0$} & \multicolumn{3}{c}{$m=1$}\\
+\cline{2-13}
+& $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$  &  $n_{ASMG}$ & $\rho$ & $n_{i}$
+& $n_{ASMG}$ & $\rho$ & $n_{i}$  \\
+\hline 
+$\ell = 3$   & $8$  & $0.090$ & $4$ & $7$  & $0.070$ & $4$    & $8$  & $0.097$ & $4$ & $8$  & $0.087$ & $4$    \\ 
+$\ell = 4$   & $11$ & $0.178$ & $5$ & $10$ & $0.145$ & $5$    & $12$ & $0.199$ & $5$ & $11$ & $0.162$ & $6$    \\
+$\ell = 5$   & $13$ & $0.229$ & $5$ & $11$ & $0.166$ & $6$    & $14$ & $0.257$ & $5$ & $11$ & $0.183$ & $6$    \\
+$\ell = 6$   & $13$ & $0.242$ & $6$ & $11$ & $0.180$ & $6$    & $15$ & $0.276$ & $6$ & $13$ & $0.219$ & $6$    \\
+$\ell = 7$   & $13$ & $0.242$ & $6$ & $11$ & $0.180$ & $6$    & $15$ & $0.276$ & $6$ & $13$ & $0.219$ & $6$    \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:2}: case [c] - slice 74 of SPE10 benchmark}\label{table:c74_bilinear_V}
+ \end{center}
+\end{table}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c| c  c  c  | c c c | c c c | c c c }
+ \multicolumn {13}{c}{ASMG W-cycle: bilinear form~\eqref{WH-div-prod} } \\
+\multicolumn{1}{c}{~} & \multicolumn{6}{c|}{Algorithm~\ref{algorithm1}} & \multicolumn{6}{c}{Algorithm~\ref{algorithm2}}
+\\
+\cline{2-13}
+ & \multicolumn{3}{ c |}{$m=0$} & \multicolumn{3}{c|}{$m=1$} 
+& \multicolumn{3}{c|}{$m=0$} & \multicolumn{3}{c}{$m=1$}\\
+\cline{2-13}
+& $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$   &   $n_{ASMG}$ & $\rho$ & $n_{i}$ & $n_{ASMG}$ & $\rho$ & $n_{i}$  \\
+\hline 
+$\ell = 3$   & $5$ & $0.019$ & $4$ & $5$ & $0.014$ & $4$    & $5$ & $0.025$ & $4$ & $5$ & $0.017$ & $5$    \\ 
+$\ell = 4$   & $5$ & $0.020$ & $5$ & $5$ & $0.015$ & $5$    & $6$ & $0.030$ & $5$ & $5$ & $0.018$ & $6$    \\
+$\ell = 5$   & $5$ & $0.020$ & $6$ & $5$ & $0.015$ & $6$    & $6$ & $0.030$ & $6$ & $5$ & $0.018$ & $6$    \\
+$\ell = 6$   & $5$ & $0.020$ & $6$ & $5$ & $0.015$ & $6$    & $6$ & $0.030$ & $6$ & $5$ & $0.018$ & $6$    \\
+$\ell = 7$   & $5$ & $0.020$ & $6$ & $5$ & $0.015$ & $6$    & $6$ & $0.030$ & $6$ & $5$ & $0.018$ & $6$    \\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:2}: case [c] - slice 74 of SPE10 benchmark}\label{table:c74_bilinear_W}
+ \end{center}
+\end{table}
+
+\subsection{Testing of block-diagonal preconditioner for system~\eqref{eq:saddle_point_sys}
+within MinRes iteration}\label{sec:saddle_point_sys}
+Now we present a number of numerical experiments for solving the mixed finite element
+system~\eqref{eq:saddle_point_sys} by using
+a preconditioned MinRes method.
+We consider two different examples, first, Example~\ref{ex:3} in which the performance
+of the block-diagonal preconditioner and its dependence on the accuracy of the inner
+solves with W-cycle ASMG preconditioner is evaluated, and second, 
+Example~\ref{ex:4}
+that tests the scalability of the MinRes iteration, again using a W-cycle ASMG preconditioner
+with one smoothing step for the inner iterations.
+\begin{example}\label{ex:3} 
+  Here we apply the MinRes iteration to
+  solve~\eqref{eq:saddle_point_sys} for test case [c]. The hierarchy 
+  of meshes is the same as in Example~\ref{ex:2}. 
+An ASMG W-cycle
+  based on Algorithm~\ref{algorithm1} with one smoothing step has been
+  used as a preconditioner on the ${{\mathcal{RT}}_{{0}}}$
+  space. Table~\ref{table:c44_saddle_W_m1} shows the number of MinRes
+  iterations denoted by $n_{MinRes}$, the
+  maximum number of ASMG iterations $n_{ASMG}$ needed to achieve an
+  ASMG residual reduction by $\varpi$. 
+\end{example}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c |  c  c  | c c | c c }
+ \multicolumn {7}{c}{MinRes iteration: saddle point system~\eqref{eq:saddle_point_sys}} \\
+\multicolumn{1}{c}{~} & \multicolumn{2}{c|}{$\varpi=10^6$} & \multicolumn{2}{c|}{$\varpi=10^8$} 
+& \multicolumn{2}{c}{$\varpi=10^{10}$}
+ \\
+\cline{2-7}
+&  $n_{MinRes}$ & $n_{ASMG}$ 
+& $n_{MinRes}$ & $n_{ASMG}$  
+& $n_{MinRes}$ & $n_{ASMG}$  
+\\
+\hline 
+$\ell = 3$ & $24$ & $4$ 
+& $17$ & $6$ 
+& $15$ & $8$ 
+\\ 
+$\ell = 4$ & $15$ & $5$ 
+& $13$ & $6$ 
+& $13$ & $8$ 
+\\
+$\ell = 5$ & $21$ & $5$ 
+& $17$ & $6$ 
+& $15$ & $8$ 
+\\
+$\ell = 6$ & $22$ & $5$ 
+& $17$ & $6$ 
+& $15$ & $8$ 
+\\
+$\ell = 7$ & $22$ & $5$ 
+& $17$ & $6$ 
+& $15$ & $8$ 
+\\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:3}: case [c] - slice 44 of SPE10 benchmark. The hierarchy 
+  of meshes is the same as in Example~\ref{ex:2}.}\label{table:c44_saddle_W_m1}
+ \end{center}
+\end{table}
+
+\begin{example}\label{ex:4}
+In the last set of experiments the MinRes iteration has been used to 
+solve~\eqref{eq:saddle_point_sys} for test case~[c] on the same hierarchy of 
+meshes as in Example~\ref{ex:1}. An ASMG W-cycle based on Algorithm~\ref{algorithm1} with
+one smoothing step has been used as a preconditioner on the ${{\mathcal{RT}}_{{0}}}$ space for a residual
+reduction by $10^8$. Table~\ref{table:c44_saddle_W_m1_m} shows the number of MinRes
+iterations $n_{MinRes}$,
+the maximum number of (inner) ASMG iterations $n_{ASMG}$ per (outer) MinRes iteration,
+and the number of DOF. Note that as long as the product $n_{MinRes}n_{ASMG}$ is constant, 
+the total number of arithmetic operations required to achieve any prescribed 
+accuracy is proportional to the number of DOF. 
+\end{example}
+\begin{table}[ht!]
+ \begin{center}
+ \begin{tabular}{c|ccr}
+ \multicolumn {4}{c}{MinRes iteration: saddle point system~\eqref{eq:saddle_point_sys}} \\
+ & $n_{MinRes}$ & $n_{ASMG}$ & \multicolumn{1}{c}{DOF}
+\\
+\hline 
+$\ell = 4$ & $13$ & $5$ & $3,136$   
+\\
+$\ell = 5$ & $13$ & $6$ & $12,416$  
+\\
+$\ell = 6$ & $15$ & $6$ & $49,408$  
+\\
+$\ell = 7$ & $17$ & $6$ & $197,120$ 
+\\
+$\ell = 8$ & $17$ & $6$ & $787,456$ 
+\\
+\end{tabular} \vspace{2ex}
+\caption{Example~\ref{ex:3}: case [c] - slice 44 of SPE10
+  benchmark. The hierarchy of meshes is the same as in
+  Example~\ref{ex:1}.}\label{table:c44_saddle_W_m1_m}
+ \end{center}
+\end{table}
+
+\subsection{Some conclusions and general comments regarding the numerical experiments}
+
+The presented numerical results clearly demonstrate the efficiency of the proposed algebraic
+multilevel iteration (AMLI)-cycle auxiliary space multigrid (ASMG) preconditioner
+for problems with highly varying
+coefficients
+as they typically arise in the mathematical modelling of physical processes in high-contrast
+and high-frequency media. 
+
+The first group of tests examines
+the convergence behavior of the nonlinear ASMG method
+for the weighted bilinear 
+form~\eqref{WH-div-prod}. 
+This is a key 
+point in the presented study.
+The cases~[a] and~[b] are designed to represent a typical multiscale geometry with
+islands and channels. Although case~[b] (a background with a random coefficient)
+appears to be more complicated, the impact of the multiscale heterogeneity seems to
+be stronger in the binary case~[a] where the number of iterations is slightly larger. 
+However, in both cases we
+observe a uniformly converging
+ASMG V-cycle 
+with $m=2$ and W-cycle ($\nu=2$) with $m=1$. Some small 
+fluctuations of the results
+in the right-lower corner of the tables could be due to some round off effects. 
+Case~[c] (SPE10) is
+a popular benchmark problem in the petroleum engineering
+community. Here we observe robust and uniform convergence with respect
+to the number of levels $\ell$, or, equivalently, mesh-size $h$. Note
+that such uniform convergence is present for the ASMG V-cycle even
+without smoothing iterations (i.e.  $m=0$) and for both,
+Algorithm~\ref{algorithm1} and Algorithm~\ref{algorithm2}. In
+addition, Algorithm~\ref{algorithm2} is computationally more favorable
+when compared to Algorithm~\ref{algorithm1} because
+the matrices used in Algorithm~\ref{algorithm2}
+have fewer non-zeroes (they are sparser).
+
+The last two tables,
+Table~\ref{table:c44_saddle_W_m1}--\ref{table:c44_saddle_W_m1_m},
+confirm the expected optimal convergence rate
+of the block-diagonally preconditioned MinRes iteration applied
+to the coupled saddle point system~\eqref{eq:saddle_point_sys}.
+The results in Table~\ref{table:c44_saddle_W_m1} demonstrate 
+how the efficiency (in terms of the product $n_{MinRes} n_{ASMG}$) is achieved 
+for a relative accuracy of $10^{-8}$ of the inner ASMG solver. 
+Table \ref{table:c44_saddle_W_m1_m} illustrates
+the scalability of the solver
+indicated by a (almost) constant number of  MinRes and ASMG
+iterations since the total computational work is
+in terms of fine grid matrix vector multiplications is proportional to
+the product $n_{MinRes}n_{ASMG}$.
+
+Although not in the scope of this study, we note that the proposed
+auxiliary space multigrid method would be suitable for implementation
+on distributed memory computer architectures.
+
+\appendix
+\section{Discrete inf-sup condition}\label{append}
+Here we provide a proof of the discrete inf-sup condition
+\eqref{inf_sup_fin_set} for the bilinear form arising in the mixed
+finite element method.  We begin by introducing some details regarding
+the finite element spaces involved in the approximation of
+problem~\eqref{eq:dual_mixed} or \eqref{eq:LS}.
+
+\subsection{Raviart-Thomas-{N\'ed\'elec\ } space} 
+
+We consider the standard lowest order
+Raviart-Thomas-{N\'ed\'elec\ } space ${{\boldsymbol V}}_h$. 
+Recall that every element ${{\mathbf v}}\in {{\boldsymbol V}}_h$ can be written as
+\begin{equation}\label{eq:RT}
+{{\mathbf v}} = \sum_{e\in \mathcal{E}_h} \sigma_e({{\mathbf v}} ){{\boldsymbol \psi}}_e({{\mathbf x}}),
+\quad \sigma_e({{\mathbf v}})  = \int_e {{\mathbf v}}\cdot{{\mathbf n}}_e.
+\end{equation}
+Here the vector ${{\mathbf n}}_e$ has a fixed direction (normal to $e$), and
+this direction is set once and for all for every
+face $e\in \mathcal{E}_h$.  For an element $T\in \mathcal{T}_h$
+let ${{\mathbf n}}_{e,T}$ define the unit normal vector to $e\in \partial
+T\cap \mathcal{E}_h$ which points outward with respect to $T$. 
+Now, if $e$ is the intersection of two elements from
+$\mathcal{T}_h$, $e=T_e^+\cap T_e^-$, then $T^+_e$ is the element for
+which  ${{\mathbf n}}_e\cdot{{\mathbf n}}_{e,T}=1$ and 
+$T^{-}_e$ is the element for which 
+${{\mathbf n}}_e\cdot{{\mathbf n}}_{e,T}=-1$.  
+If $e$ is on  the boundary of the domain then the corresponding
+element is $T^{+}_e$ and $T_e^{-}$ is missing. Finally, for a
+piece-wise constant function $q\in W_h$ we denote
+\[
+q_{\pm,e} = q\big|_{T^\pm_e}, \quad e\in \mathcal{E}_h.
+\]
+
+The basis function ${{\boldsymbol \psi}}_e\in {{\boldsymbol V}_{\hspace{-0.2mm}h}}$, for $e\in \mathcal{E}_h$
+corresponds to an edge/face $e\in \partial T$, for some $T\in {\mathcal T}_h$. If
+$e$ is the face opposite to the vertex $P_e$ of the triangle/tetrahedron $T$,
+then
+\begin{equation}\label{eq:RT-basis}
+{{\boldsymbol \psi}}_e\big|_T = \frac{c_d}{|T|}({{\mathbf x}}-{{\mathbf x}}_{P_e}).
+\end{equation}
+where $c_d$ is a constant depending only on the spatial dimension $d$
+and is chosen so that $\int_e {{\boldsymbol \psi}}_e\cdot{{\mathbf n}}_e = 1$. 
+
+  We note that explicit formulas similar to~\eqref{eq:RT-basis} 
+are available also for the case of lowest order 
+Raviart-Thomas-{N\'ed\'elec\ } elements on $d$-dimensional cuboids
+(parallelograms or rectangular parallelepipeds). Indeed, if a
+  cuboidal element $T \in \mathcal{T}_h$ is with faces
+  parallel to the coordinate planes, this can be seen as
+  follows. We denote by ${{\boldsymbol \psi}}_{k}^{\pm}$, the basis function which
+  corresponds to a face $F_k^{\pm}$ with outward normal vector
+  $\pm{{\mathbf e}}_k$, $k=1,\ldots,d$. Here, ${{\mathbf e}}_k$ is the $k$-th coordinate
+  vector in $\mathbb{R}^d$. Let ${{\mathbf x}}_{M,k}^{\pm} \in \mathbb{R}^d$ be the mass center of
+  the face $F_{k}^{\pm}$, $k=1,\ldots,d$. We then have
+\begin{equation}\label{eq:RT-basis-cube}
+{{\boldsymbol \psi}}_k^{\pm}({{\mathbf x}}) = \frac{({{\mathbf x}}-{{\mathbf x}}_{M,k}^{\mp})^T {{\mathbf e}}_k  }{|T|} {{\mathbf e}}_k .
+\end{equation}
+Here for simplicity we have used the notation ${{\mathbf x}}^T {{\mathbf e}}_k$ for the standard Euclidean inner 
+product of vectors ${{\mathbf x}}, {{\mathbf e}}_k \in \mathbb{R}^d$. From this formula we see that over 
+the finite element $T$ the basis functions
+$ {{\boldsymbol \psi}}_k^{\pm}({{\mathbf x}})$ are linear of the variable $x_k$ and constant in the
+remaining variables in ${\mathbb{R}}^d$. 
+
+These are exactly $2d$ basis functions satisfying
+\[
+\int_{F_j^{\pm}}{{\boldsymbol \psi}}_k^+\cdot {{\mathbf n}}_{F^\pm_j} = \int_{F_k^{-}}{{\boldsymbol \psi}}_k^+\cdot {{\mathbf n}}_{F^-_k} = 0,
+\;\mbox{for}\;  j\neq k,\; 
+\;\mbox{and}\; 
+\int_{F_k^{+}}{{\boldsymbol \psi}}_k^+\cdot {{\mathbf n}}_{F^+_k} = 1.
+\]
+with a similar relation for ${{\boldsymbol \psi}}_k^-$, $k=1,\ldots,d$. We note that all numerical experiments in the 
+subsequent sections were done using these finite elements.
+
+These
+simple formulas also show that on a shape regular mesh we have:
+\begin{equation}\label{eq:scaling}
+\|{{\boldsymbol \psi}}_e\|_{0,T}^2 \sim h_e^{2-d},\quad h_e=\operatorname{diam}(e),\quad
+\quad T^+\cap T^-=e\in \mathcal{E}_h. 
+\end{equation}
+The constants in the norm equivalence in \eqref{eq:scaling}
+depend on the shape of the finite elements, but not on the
+contrast $\kappa$.
+
+We treat Dirichlet, Neumann boundary conditions (or mixture of these)
+in a unified fashion. In order to do this we set $\mathcal{E}_h$ to
+denote the set of faces (edges) of $\mathcal{T}_h$ minus the set of
+faces (edges) on which we have Neumann conditions
+and $|\mathcal{E}_h|$ is the number of these edges/faces. Thus, in the case of pure
+Neumann conditions on $\partial \Omega$ the set of faces (edges) $\mathcal{E}_h$
+is the set of interior faces (edges). Further, $W_h$ is the space of all
+piece-wise constant scalar valued functions with zero mean value over $\Omega$, namely,
+$\int_\Omega q=0$. In the case of pure Dirichlet conditions, $W_h$ is
+the space of piece-wise constants (without restriction) and
+$\mathcal{E}_h$ is the set of all faces (edges) in $\mathcal{T}_h$.
+ 
+\subsection{Scalar products and discrete gradients}
+We now define a weighted scalar product on ${{\boldsymbol V}_{\hspace{-0.2mm}h}}$: For a vector of
+weights $\omega\in \mathbb{R}^{|\mathcal{E}_h|}$ we set
+\[
+({{\mathbf u}},{{\mathbf v}})_{*,\omega} = \sum_{e\in \mathcal{E}_h} 
+\omega_{e}\sigma_{e}({{\mathbf u}}) \sigma_{e}({{\mathbf v}})\| {{\boldsymbol \psi}}_e\|^2, \quad
+({{\mathbf u}},{{\mathbf v}})_{*,1} = \sum_{e\in \mathcal{E}_h} 
+\sigma_{e}({{\mathbf u}}) \sigma_{e}({{\mathbf v}})\|{{\boldsymbol \psi}}_e\|^2.
+\]
+Note that $({{\mathbf u}},{{\mathbf v}})_{*,1}$ is an inner product for which
+$\omega_e=1$ for all $e\in \mathcal{E}_h$. The corresponding norms are
+denoted by $\|\cdot\|_{*,\omega}$ and $\|\cdot\|_{*,1}$. 
+
+Next, with the vector $\omega\in \mathbb{R}^{|\mathcal{E}_h|}$, we
+associate an operator $D_{\omega}:{{\boldsymbol V}_{\hspace{-0.2mm}h}}\mapsto {{\boldsymbol V}_{\hspace{-0.2mm}h}}$. The
+action of the operator is determined by defining
+$\sigma_e(D_{\omega}{{\mathbf v}})$ for $e\in \mathcal{E}_h$, since these
+degrees of freedom uniquely determine any element from ${{\boldsymbol V}_{\hspace{-0.2mm}h}}$. We
+set
+\begin{equation}\label{eq:operator}
+\sigma_e(D_{\omega} {{\mathbf v}}) = \omega_e\sigma_e({{\mathbf v}}). 
+\end{equation}
+
+The discrete gradient is defined as adjoint of the ``${\operatorname{div}}$'' in the 
+$(\cdot,\cdot)_{*,1}$ inner product and denoted by ``$\nabla_h$''. For
+$q\in W_h$, $\nabla_h q$ is the unique element in ${{\boldsymbol V}_{\hspace{-0.2mm}h}}$ satisfying
+\begin{equation}\label{discrete-grad}
+({{\mathbf v}},\nabla_h q)_{*,1}  = -({\operatorname{div}} {{\mathbf v}},q),
+\quad\mbox{for all}\quad {{\mathbf v}}\in{{\boldsymbol V}_{\hspace{-0.2mm}h}}.
+\end{equation}
+A straightforward computation (by taking ${{\mathbf v}}={{\boldsymbol \psi}}_e$)  shows that 
+$$
+\sigma_e(\nabla_h q) = 
+\frac{{\lbrack\!\lbrack {q} \rbrack\!\rbrack}_e}{\|{{\boldsymbol \psi}}_e\|^2}, \quad {\lbrack\!\lbrack {q} \rbrack\!\rbrack}_e = q_{-,e}-q_{+,e}.
+$$
+For Dirichlet boundary faces (edges) ${\lbrack\!\lbrack {q} \rbrack\!\rbrack}_e=q_{+,e}$. 
+We have the following proposition:
+\begin{proposition}\label{proposition:simple} 
+Let ${{\mathbf v}}\in {{\boldsymbol V}_{\hspace{-0.2mm}h}}$ and $\omega_e>0$ for all
+  $e\in \mathcal{E}_h$. We then have 
+\begin{itemize}
+\item[(i)] $({{\mathbf u}},{{\mathbf v}})_{*,\omega}= (D_\omega {{\mathbf u}}, {{\mathbf v}})_{*,1}$;
+\item[(ii)]  The bilinear form on $W_h\times W_h$ defined by
+\[
+(D_\omega \nabla_h \varphi,\nabla_h \chi)_{*,1} = 
+\sum_{e\in\mathcal{E}_h}
+\frac{\omega_e}{\| {{\boldsymbol \psi}}_e\|^2}{\lbrack\!\lbrack {\varphi} \rbrack\!\rbrack}_e{\lbrack\!\lbrack {\chi} \rbrack\!\rbrack}_e
+\]
+is symmetric and positive definite on $W_h$. 
+\end{itemize}
+\end{proposition}
+\begin{proof} (i) follows directly from the definition of
+  $D_\omega$ and $(\cdot,\cdot)_{*,\omega}$. 
+
+Regarding (ii), we take $\chi=\varphi$ and we obtain
+\[
+(D_\omega \nabla_h \varphi,\nabla_h \varphi)_{*,1} =
+(\nabla_h \varphi,\nabla_h \varphi)_{*,\omega} = 
+\sum_{e\in\mathcal{E}_h}
+\frac{\omega_e}{\|{{\boldsymbol \psi}}_e\|^2}({\lbrack\!\lbrack {\varphi} \rbrack\!\rbrack}_e)^2\ge 0.
+\]
+To show that this inequality is strict (which implies positive
+definiteness of the bilinear form) we observe that if we have Dirichlet
+conditions on part of, or, the whole boundary then the matrix
+corresponding to this bilinear form is a symmetric, weakly diagonally
+dominant $M$-matrix and hence it is positive definite. If we have
+Neumann conditions on $\partial\Omega$,  then setting 
+$(\nabla_h \varphi,\nabla_h \varphi)_{*,\omega}=0$ implies that
+$q_{+,e}=q_{-,e}$ for all $e\in \mathcal{E}_h$ and we conclude that $q$
+is a constant on $\Omega$. Since the average of $q$ is $0$ (in case of
+Neumann conditions) we conclude that $q=0$. Thus, the bilinear form
+has a trivial kernel and is positive definite on $W_h$. The proof of (ii) is
+complete. 
+\end{proof}
+
+\subsection{A discrete \emph{a priori} estimate}
+Recall that $K(x)$ and $\alpha$ are a piece-wise constant
+tensor-functions whose discontinuities are aligned with the
+triangulation $\mathcal{T}_h$. For any face $e\in \mathcal{E}_h$, 
+$e=\overline T_e^+\cap \overline T_e^{-}$ we
+now define
+\begin{equation}\label{eq:alphae}
+\begin{aligned}
+\widehat{\alpha}\in \mathbb{R}^{|\mathcal{E}_h|}, \quad 
+\widehat{\alpha}_e =  
+\frac{\| {{\boldsymbol \psi}}_e\|^2_{0,\alpha,T_e^+}}{\| {{\boldsymbol \psi}}_e\|^2}+
+\frac{\|{{\boldsymbol \psi}}_e\|^2_{0,\alpha,T_e^-}}{\| {{\boldsymbol \psi}}_e\|^2},
+\quad \widehat{\kappa}\in \mathbb{R}^{|\mathcal{E}_h|}, 
+\quad \widehat{\kappa}_e = \widehat{\alpha}_e^{-1}.
+\end{aligned}
+\end{equation}
+We have the following lemma which is a crucial ingredient in the proof
+of the discrete inf-sup condition. 
+\begin{lemma}\label{lemma:mass-equivalence} 
+Let $\widehat{\alpha}\in\mathbb{R}^{|\mathcal{E}_h|}$ and
+$\widehat{\kappa}\in\mathbb{R}^{|\mathcal{E}_h|}$ be defined as
+in~\eqref{eq:alphae}. Then
+\begin{itemize}
+\item[(i)]  
+$\|{{\mathbf u}}\|^2_{0,\alpha} \le
+  (d+1)\|{{\mathbf u}}\|^2_{*,\widehat{\alpha}}$ and 
+$\|{{\mathbf u}}\|^2 \eqsim \|{{\mathbf u}}\|^2_{*,1}$.
+\item[(ii)] $D_{\widehat{\alpha}}D_{\widehat{\kappa}} = I$.
+\item[(iii)] $\widehat{\alpha}_e\le 2$ and  
+$\widehat{\kappa}_e\ge \frac12$.  
+\end{itemize}
+\end{lemma}
+\begin{proof}
+To prove the first inequality in (i), let ${{\mathbf u}}\in
+    {{\boldsymbol V}}_h$. Then, for all $T\in T_h$ we have ${{\mathbf u}}\big|_T =
+    \sum_{e\subset\partial T}\sigma_e({{\mathbf u}}) {{\boldsymbol \psi}}_e$,  and,  hence, 
+\begin{eqnarray*}
+\|{{\mathbf u}}\|^2_{0,\alpha} & = & 
+\sum_T \int_T \alpha_T{{\mathbf u}}\cdot {{\mathbf u}}  
+=  
+\sum_T 
+\sum_{e\in\partial T}\sum_{e'\in \partial T}
+\sigma_e({{\mathbf u}})\sigma_{e'}({{\mathbf u}})\int_T \alpha_T{{\boldsymbol \psi}}_e\cdot {{\boldsymbol \psi}}_{e'}
+\\[1.7ex]
+&\le &
+\sum_T 
+\sum_{e\in\partial T}\sum_{e'\in \partial T}
+|\sigma_e({{\mathbf u}})||\sigma_{e'}({{\mathbf u}})|\|{{\boldsymbol \psi}}_e\|_{0,\alpha,T}\|{{\boldsymbol \psi}}_{e'}\|_{0,\alpha,T}
+\\[1.7ex]
+&\le &
+\frac12\sum_T 
+\sum_{e\in\partial T}\sum_{e'\in \partial T}
+\left([\sigma_e({{\mathbf u}})]^2\|{{\boldsymbol \psi}}_e\|^2_{0,\alpha,T}+
+[\sigma_{e'}({{\mathbf u}})]^2\|{{\boldsymbol \psi}}_{e'}\|^2_{0,\alpha,T}\right)
+\\[1.7ex]
+& = & 
+(d+1)\sum_T 
+\sum_{e\in\partial T}[\sigma_e({{\mathbf u}})]^2\|{{\boldsymbol \psi}}_e\|^2_{0,\alpha,T}. 
+\end{eqnarray*}
+In the last step we have used $\sum_{e\in \partial T} 1 = (d+1)$. 
+Switching the order of summation in the right side of the inequality above then gives 
+\begin{equation}\label{eq:norm-equivalence}
+\begin{array}{rcl}
+\|{{\mathbf u}}\|^2_{0,\alpha} & \le & 
+(d+1)\sum_{e\in\mathcal{E}_h}\left(\| {{\boldsymbol \psi}}_e\|^2_{0,\alpha,T^+_e}
+  +\|{{\boldsymbol \psi}}_e\|^2_{0,\alpha,T_e^-} 
+\right)
+[\sigma_e({{\mathbf u}})]^2 \\[1.7ex]
+& = & 
+(d+1)\sum_{e\in\mathcal{E}_h}\widehat{\alpha}_{e}[\sigma_e({{\mathbf u}})]^2\|  {{\boldsymbol \psi}}_e\|^2
+ = (d+1)\|{{\mathbf u}}\|^2_{*,\widehat{\alpha}}.
+\end{array}
+\end{equation}
+To prove the equivalence in (i) for $\widehat{\alpha}_e=1$,
+$e\in\mathcal{E}_h$, we observe that for $T\in \mathcal T_h$ 
+we have the following equivalence  relation
+with constants only depending on the geometry of $T$ 
+(bounded for shape regular triangulation):
+\begin{equation}\label{eq:mass-matrix}
+\sum_{e\in\partial T}\sum_{e'\in \partial T}
+ \sigma_e({{\mathbf u}} )\sigma_{e'}({{\mathbf u}})\int_T {{\boldsymbol \psi}}_e {{\boldsymbol \psi}}_{e'}
+ \eqsim \sum_{e\in\partial T} [\sigma_e({{\mathbf u}})]^2\| {{\boldsymbol \psi}}_e\|^2.
+\end{equation}
+The equivalence \eqref{eq:mass-matrix}  is just spectral equivalence between the
+  element mass matrix 
+$\{({{\boldsymbol \psi}}_e,{{\boldsymbol \psi}}_{e'})\}_{e,e'\in\partial T}$
+  and its diagonal $\{\|{{\boldsymbol \psi}}\|^2\}_{e\in\partial T}$ which is easy 
+  to establish, for example, by using the explicit form of the basis 
+  functions given in~\eqref{eq:RT-basis}
+  and~\eqref{eq:RT-basis-cube}. 
+This completes the proof of (i). 
+
+Items (ii) and (iii) directly follow from the definitions and
+the inequality~\eqref{bound_below_K} which implies that
+$\|\alpha\|_{\ell^2}\le 1$.  
+\end{proof}
+
+An immediate corollary from Proposition~\ref{proposition:simple}
+and Lemma~\ref{lemma:mass-equivalence} is the following  {Poincar\'e } inequality.
+\begin{corollary}\label{lemma:Poincare} 
+If $\omega_e = 1$ for all $e\in \mathcal{E}_h$ we have 
+\begin{equation}\label{eq:Poincare}
+\|\chi\|^2 \le C_P\|\nabla_h \chi\|^2_{*,1}, 
+\end{equation}
+with a constant $C_P$ independent of $h$. 
+\end{corollary}
+\begin{proof}
+  To prove this {Poincar\'e }{} inequality we recall a classical result on the solvability of the
+  mixed discretizations of the Laplace equation. It is well known
+  (see, for example, \cite[(7.1.28) and Proposition
+  5.4.3]{2013BoffiD_BrezziF_FortinM-aa}; also \cite{2002ArnoldD-aa}), that the
+  following estimate holds with $\widetilde{\gamma}>0$ independent of
+  $h$ for all $q\in W_h$:
+\begin{equation}\label{eq:inf-sup-1}
+\sup_{{{\mathbf v}}\in {{\boldsymbol V}_{\hspace{-0.2mm}h}}}\frac{(q,{\operatorname{div}} {{\mathbf v}})}{\|{{\mathbf v}}\|_{\Lambda_1}}\ge \widetilde{\gamma}\|q\|. 
+\end{equation}
+Since by Lemma~\ref{lemma:mass-equivalence}(i) the norms $\|\cdot\|$
+and $\|\cdot\|_{*,1}$ are equivalent norms on ${{\boldsymbol V}}_h$, for any
+$\chi\in W_h$:
+\begin{eqnarray*}
+\|\nabla_h \chi\|_{*,1} 
+&= &\sup_{{{\mathbf v}}\in {{\boldsymbol V}}_h}\frac{(\nabla_h \chi,{{\mathbf v}})_{*,1}}{\|{{\mathbf v}}\|_{*,1}}
+= \sup_{{{\mathbf v}}\in {{\boldsymbol V}}_h}\frac{(\chi,{\operatorname{div}} {{\mathbf v}})}{\|{{\mathbf v}}\|_{*,1}}\\
+&\gtrsim& \sup_{{{\mathbf v}}\in {{\boldsymbol V}}_h}\frac{(\chi,{\operatorname{div}} {{\mathbf v}})}{\|{{\mathbf v}}\|}
+\ge \sup_{{{\mathbf v}}\in {{\boldsymbol V}}_h}\frac{(\chi,{\operatorname{div}} {{\mathbf v}})}{\|{{\mathbf v}}\|_{\Lambda_1}}
+\ge \widetilde{\gamma}\|\chi\|.
+\end{eqnarray*}
+Therefore, \eqref{eq:Poincare} holds with $C_P=\widetilde{\gamma}^{-2}$. 
+\end{proof}
+
+\begin{remark}
+Clearly, for a scalar coefficient $K(x)$ the edge weights $\widehat{\kappa}_e$ are weighted 
+harmonic averages of the values of the coefficient on the
+two elements sharing the face $e$. On a uniform mesh, where 
+$
+\| {{\boldsymbol \psi}}_e\|^2_{0,\alpha,T_e^\pm}/\| {{\boldsymbol \psi}}_e\|^2= 
+|\alpha_{T_e^{\pm}}|/2$ we have that 
+\[
+\widehat{\kappa}_e 
+=\frac{2K_{+,e}K_{-,e}}{K_{+,e}+K_{-,e}}
+\]
+On a non-uniform mesh or for tensor coefficient $K(x)$ 
+the average is more complicated and involves weights depending
+on geometrical quantities describing pairs of neighboring elements. 
+\end{remark}
+
+Consider now $q\in W_h$ 
+and let $\varphi\in W_h$ be the solution of the variational problem
+\begin{equation}\label{eq:variational}
+(D_{\widehat{\kappa}}\nabla_h \varphi,\nabla_h \chi)_{*,1} = (q,\chi),\quad \mbox{for all}\quad \chi\in 
+W_h. 
+\end{equation}
+In accordance with Proposition~\ref{proposition:simple}(ii) the
+solution to the variational problem~\eqref{eq:variational} 
+$\varphi$ exists and is unique. 
+We further set 
+\begin{equation}\label{eq:def-w}
+{{\mathbf w}} = D_{\widehat{\kappa}}\nabla_h \varphi
+\end{equation}
+and by the definition of $\nabla_h$ we have 
+$-({\operatorname{div}} D_{\widehat{\kappa}}\nabla_h 
+\varphi,\chi)_{*,1} = (q,\chi)$ for all $\chi\in W_h$, which implies that
+\begin{equation}\label{eq:div-w}
+{\operatorname{div}} D_{\widehat{\kappa}}\nabla_h\varphi=-q.
+\end{equation}
+
+Next, we prove an a priori estimate needed for the proof of a contrast
+independent inf-sup condition.
+\begin{lemma}\label{lemma:a-priori}
+  Let $\varphi\in W_h$ be the solution of~\eqref{eq:variational} and
+  let ${{\mathbf w}} \in {{\boldsymbol V}_{\hspace{-0.2mm}h}}$ be defined as in~\eqref{eq:def-w}, namely, 
+  ${{\mathbf w}} =D_{\widehat{\kappa}}\nabla_h\varphi$. Then the following 
+\emph{a  priori} estimate holds
+\begin{equation}\label{eq:a-priori}
+\|{{\mathbf w}}\|^2_{*,\widehat{\alpha}} \le 2C_P\|q\|^2.
+\end{equation}
+\end{lemma}
+\begin{proof}
+The proof follows from Proposition~\ref{proposition:simple}, 
+Lemma~\ref{lemma:mass-equivalence} and some simple equalities. We have
+\begin{equation*}
+\begin{aligned}
+\|{{\mathbf w}}\|^2_{*,\widehat{\alpha}}& =  
+(D_{\widehat{\alpha}}{{\mathbf w}},{{\mathbf w}})_{*,1} 
+&\qquad\mbox{[by Proposition~\ref{proposition:simple}(i)]}\\
+& = 
+(D_{\widehat{\alpha}}\;D_{\widehat{\kappa}}\nabla_h\varphi,{{\mathbf w}})_{*,1}
+& \qquad\mbox{[by the definition of ${{\mathbf w}}$]}
+\\
+& =   (\nabla_h\varphi,{{\mathbf w}})_{*,1}
+&\qquad \mbox{by [Lemma~\ref{lemma:mass-equivalence}(ii)]}\\
+&=  -(\varphi,{\operatorname{div}} {{\mathbf w}})=(\varphi, q) \le  \|\varphi\|\|q\|. 
+&\qquad\mbox{[by~\eqref{eq:div-w}]}
+\end{aligned}
+\end{equation*}
+
+We now use the {Poincar\'e } inequality to estimate $\|\varphi\|$:
+\begin{equation*}
+\begin{aligned}
+\|\varphi\|^2 &\le C_P(\nabla_h\varphi,\nabla_h\varphi)_{*,1} 
+&\qquad\mbox{[by \eqref{eq:Poincare}]}\\
+&\le 2C_P(D_{\widehat{\kappa}}\nabla_h\varphi,\nabla_h\varphi)_{*,1}
+&\qquad\mbox{[by Lemma~\ref{lemma:mass-equivalence}(iii)]}\\
+&=
+2C_P(D_{\widehat{\kappa}}\nabla_h\varphi,D_{\widehat{\alpha}}D_{\widehat{\kappa}}
+  \nabla_h\varphi)_{*,1},
+&\qquad\mbox{[by Lemma~\ref{lemma:mass-equivalence}(ii)]}\\
+& =  2C_P\|{{\mathbf w}}\|^2_{*,\widehat{\alpha}} 
+& \qquad\mbox{[by the definition of ${{\mathbf w}}$]}
+\end{aligned}
+\end{equation*}
+Note that  we have used the inequality  
+$\widehat{\kappa}_e\ge \frac12$ for all $e\in \mathcal{E}_h$. 
+\end{proof}
+
+After all the preparatory work, we are ready to prove the discrete
+inf-sup condition. 
+\begin{theorem}\label{theorem:inf-sup} The following inequality holds
+  with constant $\gamma>0$ independent of the contrast $\kappa$:
+\begin{equation}
+\inf_{q\in W_h}\sup_{{{\mathbf v}}\in {{\boldsymbol V}_{\hspace{-0.2mm}h}}}\frac{(q,{\operatorname{div}}
+  {{\mathbf v}})}{\|{{\mathbf v}}\|_{\Lambda_\alpha}\;\|q\|}\ge \gamma.
+\end{equation}
+\end{theorem}
+\begin{proof}
+For all $q\in W_h$  and with ${{\mathbf w}}$ defined as in~\eqref{eq:def-w} we have  
+\begin{equation*}
+\begin{aligned}
+  \sup_{{{\mathbf v}}\in {{\boldsymbol V}_{\hspace{-0.2mm}h}}} \frac{(q,{\operatorname{div}} {{\mathbf v}})}{\|{{\mathbf v}}\|_{\Lambda_\alpha}} &
+  \ge \|q\|^2 /\left (\|{{\mathbf w}}\|_{0,\alpha}^2+\|{\operatorname{div}} {{\mathbf w}}\|^2
+    \right )^\frac12  &\qquad \mbox{[by the definition of $\sup$]}
+  \\
+  &\ge  \|q\|^2 / \left (  (d+1)\|{{\mathbf w}}\|^2_{*,\widehat{\alpha}}+\|{\operatorname{div}} {{\mathbf w}}\|^2
+      \right )^\frac12 &\qquad 
+\mbox{[by      Lemma~\ref{lemma:mass-equivalence}(i)]} 
+\\
+&= \|q\|^2 / \left ( (d+1)\|{{\mathbf w}}\|^2_{*,\widehat{\alpha}}+\|q\|^2 \right )^\frac12
+&\qquad \mbox{[by \eqref{eq:div-w}]}\\
+&\ge \|q\|/ \sqrt{2(d+1)C_P+1},
+& \qquad \mbox{[by Lemma~\ref{lemma:a-priori}]}
+\end{aligned}
+\end{equation*}
+which completes the proof.
+\end{proof}
+The standard theory of mixed finite element methods then immediately
+implies the following approximation result
+\begin{theorem}\label{theorem:cea} 
+Let $({{\mathbf u}},p)\in {{\boldsymbol H}}_N({\operatorname{div}})\times  L_2$ be the solution of the mixed 
+problem~\eqref{eq:dual_mixed} and
+  $({{\mathbf u}}_h,p_h)\in {{\boldsymbol V}_{\hspace{-0.2mm}h}}\times W_h$ be the solution of the
+  discrete problem~\eqref{eq:dual_mixed_FEM}. Then the following estimate
+  holds
+\begin{equation}\label{eq:cea}
+  \|{{\mathbf u}}-{{\mathbf u}}_h\|_{\Lambda_\alpha} +\|p-p_h\|
+\le 
+C \left( \inf_{{{\mathbf v}}\in {{\boldsymbol V}_{\hspace{-0.2mm}h}}}\|{{\mathbf u}}-{{\mathbf v}}\|_{\Lambda_\alpha}+
+\inf_{q\in W_h}\|p-q\|\right),
+\end{equation}
+where the constant $C$ 
+depend on the shape
+regularity of the mesh, the Poincar\'e constant $C_P$, and the spatial dimension $d$, but is
+independent of the variations in $K(x)$. 
+\end{theorem}
+
+\section*{Acknowledgments}
+This work has been partially supported by the Bulgarian NSF Grant DCVP
+02/1, FP7 Grant AComIn, and the Austrian NSF Grant P22989. R. Lazarov
+has been supported in parts by US NSF Grant DMS-1016525, by Award
+No. KUS-C1-016-04, made by KAUST. L. Zikatanov has been supported in
+part by US NSF Grants DMS-1418843, DMS-1217142 and DMS-1016525.
+
+\bibliographystyle{abbrv}
+\bibliography{for_arxiv}
+\end{document}
+
