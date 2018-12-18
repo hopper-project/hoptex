@@ -369,9 +369,9 @@ def populate_db(eqs, article):
             if '_F' in eqid: eqid = eqid.strip('_F')
             sql_command = ("""INSERT INTO article_equations(article_id,equation_id) \
                     VALUES{}""").format((a,eqid))
-            #nr = cursor.execute(sql_command)
-            #if nr != 1:
-            #    print('INSERT operation failed for {}'.format((a,eqid)))
+            nr = cursor.execute(sql_command)
+            if nr != 1:
+                print('INSERT operation failed for {}'.format((a,eqid)))
 
     print('populate_db complete')
     db.commit()
