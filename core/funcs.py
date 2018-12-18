@@ -187,7 +187,7 @@ def format_tex_equation(text, eq):
         docclass = '\\documentclass{article}\n'
     preamble = [docclass] + packages + ['\\begin{document}\n']
     postamble = ["\\end{document}"]
-    output = '\n\n'.join(preamble + eq + postamble)
+    output = '\n\n'.join(preamble + [eq] + postamble)
     return output
 
 def sanitized_doc_from_file(filename):
