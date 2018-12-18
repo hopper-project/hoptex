@@ -533,8 +533,10 @@ def separate_articles(eqs, article_list, output_dir, K):
     sing_file.close()
     nonsing_file.close()
 
+    l = sing_count/K + 1
+
     os.chdir('./sep')
-    subprocess.call(["split --numeric=1 -d -a 4 -n {} singular_articles.txt".format(str(K))], shell=True)
+    subprocess.call(["split --numeric=1 -d -a 4 -l {} singular_articles.txt".format(str(l))], shell=True)
     subprocess.call(["rename 's/^x0*//' x*"], shell=True)
     subprocess.call(["chmod 770 *"], shell=True)
 
