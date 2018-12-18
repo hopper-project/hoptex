@@ -533,7 +533,7 @@ def separate_articles(eqs, article_list, output_dir, K):
     sing_file.close()
     nonsing_file.close()
 
-    l = sing_count/K + 1
+    l = int(sing_count/K) + 1
 
     os.chdir('./sep')
     subprocess.call(["split --numeric=1 -d -a 4 -l {} singular_articles.txt".format(str(l))], shell=True)
