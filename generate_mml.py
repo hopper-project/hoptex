@@ -21,10 +21,10 @@ TIMEOUT = 1000
 KEY_PATH = '/rigel/home/{}/.ssh/id_rsa'
 
 # Cache paths on Habanero
-TEX_CACHE = '/rigel/home/{}/cache/tex_cache'
-XHTML_CACHE = '/rigel/home/{}/cache/xhtml_cache'
-MML_CACHE = '/rigel/home/{}/cache/mml_cache'
-JSON_CACHE = '/rigel/home/{}/cache/json_cache'
+TEX_CACHE = '/rigel/home/{}/hoptex/cache/tex_cache'
+XHTML_CACHE = '/rigel/home/{}/hoptex/cache/xhtml_cache'
+MML_CACHE = '/rigel/home/{}/hoptex/cache/mml_cache'
+JSON_CACHE = '/rigel/home/{}/hoptex/cache/json_cache'
 #TSV_CACHE = '/rigel/home/{}/cache/tsv_cache'
 # MML_TSV_CACHE = '/rigel/home/dpj2108/cache/mml_tsv_cache'
 
