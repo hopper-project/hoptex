@@ -194,7 +194,7 @@ def main():
 
     origdir = os.getcwd()
     tex_list = args.tex_list
-    arr_suffix = ('_' + tex_list) if args.initial else ''
+    arr_suffix = ('_' + tex_list) if args.singular else ''
     tex_path = os.path.abspath(args.tex_path)
     xhtml_path = os.path.abspath(args.xhtml_path + arr_suffix) # DEFAULT: XHTML_CACHE_${SLURM_ARRAY_TASK_ID}
     mml_path = os.path.abspath(args.mml_path + arr_suffix) # DEFAULT: MML_CACHE_${SLURM_ARRAY_TASK_ID}
