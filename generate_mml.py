@@ -209,7 +209,7 @@ def main():
     print('Running {} {} article processing...'.format(mode, article_type))
 
     # Singular articles processing
-    if args.singular and not tex_list:
+    if (args.singular or (args.initial and not args.singular)) and not tex_list:
         print('Error: File list not provided for parallelization')
         sys.exit()
 
@@ -219,7 +219,7 @@ def main():
     # if not os.path.exists(MML_CACHE.format(username) + arr_suffix): os.mkdir(MML_CACHE.format(username) + arr_suffix)
     if not os.path.exists(JSON_CACHE.format(username)): os.mkdir(JSON_CACHE.format(username))
 
-    if args.singular:
+    if args.singular or (args.initial and not args.singular):
         # Fetch .tex files to process from tex_list
         try:
             with open(tex_list, 'r') as tl:
