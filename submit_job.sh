@@ -15,6 +15,6 @@
 module load anaconda/3-5.1
 source activate arxivlab
 echo "SLURM_ARRAY_TASK_ID: " ${SLURM_ARRAY_TASK_ID}
-python3 generate_mml.py --initial --singular --tex_list ${SLURM_ARRAY_TASK_ID} /local/hoptex/initial
+python3 generate_mml.py --initial --singular /local/hoptex/initial ${SLURM_ARRAY_TASK_ID}
 
 #End of script
