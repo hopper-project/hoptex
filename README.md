@@ -73,6 +73,34 @@ Optional (or not-so-optional) flags:
 
 This script will replace all instances of an equation across the aforementioned documents with its corresponding equation ID.
 
+### generate_mml.py
+
+Usage: `python3 generate_mml.py /path/to/tex/dir`
+
+Optional (or not-so-optional) flags:
+* `--initial` - Indicates that you are running an initial article processing.**Must be included for initial processing to ensure correct behavior**
+* `--singular` - Indicates that you are processing singular articles (exclude this flag if you are processing nonsingular articles) **Must be included for singular article processing to ensure correct behavior**
+* `--tex_list [path]` - You need to include this option and provide a path to the list of articles to you want the script to process
+
+Given a list of articles to process, this script does the following (in the precise order listed):
+* Fetch the .tex file for each article from arxivlab
+* Generate MathML representation for the equations that lack one in the arxivlab database
+* Generate a .json file for the given article and store it on arxivlab.cs.columbia.edu:/local/hoptex/dest/json_dest/
+
+There are four different modes for running the script. The following list provides their differences to be aware of.
+* Initial Singular: Name of the article list for --tex_list must be a number; does not query the database to check whether MathML exists
+* Initial Nonsingular: Queries the database to check whether MathML exists
+* Noninitial Singular: Name of the article list for --tex_list must be a number; queries the database to check whether MathML exists
+* Noninitial Nonsingular: Queries the database to check whether MathML exists
+
+Note that the singular processing pipeline was designed to be run in parallel on Habanero--Columbia's compute cluster. The name of the article list provided for --tex_list is assumed to be a number, because when we run a parallel job on Habanero, we use `... --tex_list ${SLURM_ARRAY_TASK_ID} ...`.
+
+### submit_job.sh
+
+Usage: `sbatch submit_job.sh`
+
+This bash script submits a parallelized job to Habanero for processing singular articles. To modify the settings for the job (e.g. number of array tasks), edit the parameter values set at the top of the script.
+
 ### striplatex.py
 
 Usage: `python3 striplatex.py /input/tex/dir /output/tex/dir`
