@@ -12,9 +12,9 @@
 #SBATCH --array=1-10
 
 
-module load anaconda/3-4.4.0
+module load anaconda/3-5.1
+source activate arxivlab
 echo "SLURM_ARRAY_TASK_ID: " ${SLURM_ARRAY_TASK_ID}
-python process_tsv.py --tex_list x000${SLURM_ARRAY_TASK_ID} --tsv_file eqs.tsv --mml_dir MML_DIR --json_dir JSON_DIR ./1000articles/ XHTML_DIR
-#scp eqs.tsv.mathml #destination
+python3 generate_mml.py --initial --singular --tex_list ${SLURM_ARRAY_TASK_ID} /local/hoptex/initial
 
 #End of script
