@@ -183,9 +183,9 @@ def main():
     username = getpass.getuser()
     parser = argparse.ArgumentParser(description='Conversion of sanitized LaTeX documents to XHTML')
     parser.add_argument('tex_path', help='Path to input directory of .tex files')
+    parser.add_argument('tex_list', help='List of .tex files to process (txt)')
     parser.add_argument('--initial', help='Flag indicating initial processing', default=False, action='store_true')
     parser.add_argument('--singular', help='Flag indicating singular article processing', default=False, action='store_true')
-    parser.add_argument('--tex_list', help='List of .tex files to process (txt)', default=None)
     parser.add_argument('--xhtml_path', help='Path to output directory for .xhtml files', default=XHTML_CACHE.format(username))
     parser.add_argument('--mml_path', help='Path to output directory for .mml files', default=MML_CACHE.format(username))
     parser.add_argument('--json_path', help='Path to output directory for .json files', default=JSON_CACHE.format(username))
@@ -194,7 +194,7 @@ def main():
 
     origdir = os.getcwd()
     tex_list = args.tex_list
-    arr_suffix = ('_' + tex_list) if tex_list else ''
+    arr_suffix = ('_' + tex_list) if args.initial else ''
     tex_path = os.path.abspath(args.tex_path)
     xhtml_path = os.path.abspath(args.xhtml_path + arr_suffix) # DEFAULT: XHTML_CACHE_${SLURM_ARRAY_TASK_ID}
     mml_path = os.path.abspath(args.mml_path + arr_suffix) # DEFAULT: MML_CACHE_${SLURM_ARRAY_TASK_ID}
@@ -219,6 +219,7 @@ def main():
     # if not os.path.exists(MML_CACHE.format(username) + arr_suffix): os.mkdir(MML_CACHE.format(username) + arr_suffix)
     if not os.path.exists(JSON_CACHE.format(username)): os.mkdir(JSON_CACHE.format(username))
 
+    '''
     if args.singular or (args.initial and not args.singular):
         # Fetch .tex files to process from tex_list
         try:
@@ -227,7 +228,16 @@ def main():
         except FileNotFoundError:
             print('Error: Provided article list does not exist')
             sys.exit()
+    '''
+    # Fetch .tex files to process from tex_list
+    try:
+        with open(tex_list, 'r') as tl:
+            tex_files = [tex_file.strip() for tex_file in tl.readlines()]
+    except FileNotFoundError:
+        print('Error: Provided article list does not exist')
+        sys.exit()
 
+    '''
     else:
         # Fetch .tex files to process from arxivlab:tex_path
         ssh_client = paramiko.SSHClient()
@@ -236,6 +246,7 @@ def main():
         ssh_client.connect('arxivlab.cs.columbia.edu', username=username, password=key)
         stdin, stdout, stderr = ssh_client.exec_command('cd {}; ls'.format(tex_path))
         tex_files = [tex_file.strip() for tex_file in stdout.readlines()]
+    '''
 
     error_list = []
 
