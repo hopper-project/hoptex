@@ -386,13 +386,15 @@ def put_mathml(tex, mathml):
 
     sql_command = ('''UPDATE equation_metadata SET mathml='{}' \
             WHERE BINARY tex="{}"''').format(add_backslash(mathml),add_backslash(tex))
-    nr = cursor.execute(sql_command)
+    retry_on_deadlock(cursor, sql_command)
+    #nr = cursor.execute(sql_command)
     #if nr != 1:
     #    print('INSERT operation failed for {}'.format(eqid))
 
     sql_command = ('''SELECT equation_id FROM equation_metadata \
             WHERE BINARY mathml="{}"''').format(add_backslash(mathml))
-    nr = cursor.execute(sql_command)
+    retry_on_deadlock(cursor, sql_command)
+    #nr = cursor.execute(sql_command)
     eqid = cursor.fetchall()
     if len(eqid) == 0:
         print('INSERT operation failed')
@@ -453,7 +455,8 @@ def get_mathml(tex):
     sql_command = ('''SELECT mathml FROM equation_metadata \
             WHERE BINARY tex="{}"''').format(add_backslash(tex))
 
-    cursor.execute(sql_command)
+    retry_on_deadlock(cursor, sql_command)
+    #cursor.execute(sql_command)
     mathml = cursor.fetchall()
     if mathml[0][0] == None:
         db.commit()
@@ -517,7 +520,7 @@ def separate_articles(eqs, article_list, output_dir, K):
             # for article_id in article_ids:
                 # article_eq_dict[article_id] = 1 # Flag to indicate article is nonsingular
 
-    sing_count = 0
+    sing_count = 0.
     for aid in article_id_set:
         nonsing_flag = 0
         for eq_id in article_to_eq[aid]:
@@ -533,7 +536,7 @@ def separate_articles(eqs, article_list, output_dir, K):
     sing_file.close()
     nonsing_file.close()
 
-    l = int(sing_count/K) + 1
+    l = int(math.ceil(sing_count/K))
 
     os.chdir('./sep')
     subprocess.call(["split --numeric=1 -d -a 4 -l {} singular_articles.txt".format(str(l))], shell=True)
@@ -542,3 +545,14 @@ def separate_articles(eqs, article_list, output_dir, K):
 
 def add_backslash(tex):
     return tex.replace('\\','\\\\').replace("'", "\\'").replace('"','\\"')
+
+def retry_on_deadlock(cursor, sql_command):
+    for i in range(5):
+        try:
+            cursor.execute(sql_command)
+            break
+        except pymysql.err.OperationalError as e:
+            if 'Deadlock' in repr(e):
+                continue
+            else:
+                break
