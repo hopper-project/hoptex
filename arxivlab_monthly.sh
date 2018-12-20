@@ -6,3 +6,6 @@ cp /local/hoptex/article_service_test/update_article_service/processed_articles/
 
 # Run enumerate.py on the new articles
 python3 enumerate.py /local/hoptex/monthly_test 10
+
+# Copy the article lists to Habanero for monthly processing
+scp -r /local/hoptex/sep habanero:~/hoptex
